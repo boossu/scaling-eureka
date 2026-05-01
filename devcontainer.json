@@ -1,0 +1,8 @@
+{
+  "名称"："PHP",
+  "图像": "mcr.微软。com/devcontainers/php:1-8.2-bullseye",
+  "功能": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [8080]
+}
