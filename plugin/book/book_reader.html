@@ -209,14 +209,12 @@ img{display:block}
 </head>
 <body>
 <div id="hub">
-  <section class="hub-head" aria-label="插件">
-    <div class="hub-head-row">
-      <span class="hub-badge" aria-hidden>漫</span>
-      <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">插件 v9</span>
-    </div>
-    <p class="hub-desc">书籍小程序：分类、详情、章节全是真请求。</p>
-  </section>
+  <!-- 用户 2026-11-24 15:36“顶部栏的问题要改apk，顶部栏不再切换任何插件，
+       就是个固定显示”：入口页顶栏改由 APK 固定显示（WebView 上方的原生
+       header），阅读器里不再自己画顶栏（图标/标题“聚合插件”/副标题/
+       版本徽标/描述行都已去掉），切换插件时顶栏不再重载、不再跳。
+       入口页从第一行就是插件列表；更新状态仍显示在各入口下方的
+       .hub-status 行。 -->
   <section aria-label="插件列表">
     <div class="hub-list">
       <div class="hub-row">
@@ -263,7 +261,7 @@ img{display:block}
 <div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
 <script>
 "use strict";
-var PLUGIN_VERSION = 7;
+var PLUGIN_VERSION = 8;
 /* ============================================================
    书籍阅读器 JS —— 浏览器控制台（bookEngine.ts + BookPlugin.tsx）
    的完整复刻。纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
@@ -806,7 +804,7 @@ function hubSaveExtraPlugins(list) {
 function hubSetBridgeVisible(v) {
   try { if (window.ComicBridge && typeof window.ComicBridge.setHubVisible === "function") window.ComicBridge.setHubVisible(v); } catch (e) { /* no bridge */ }
 }
-/* 漫画阅读器本地副本缓存（localStorage "mangaReaderCache"，与漫画阅读器同 key）：
+/* 漫画阅读器本地存的副本（localStorage "mangaReaderCache"，与漫画阅读器同 key）：
    见漫画阅读器里的说明：漫画插件已经下载在本机，入口优先载入本地副本，
    不再每次都去 GitHub 重拉。 */
 var MANGA_READER_CACHE_KEY = "mangaReaderCache";
@@ -818,10 +816,6 @@ var MANGA_DIRECT_ENTRY_KEY = "mangaDirectEntry";
 function setMangaDirectEntry() {
   try { if (window.localStorage) window.localStorage.setItem(MANGA_DIRECT_ENTRY_KEY, "1"); } catch (e) { /* 存储不可用时忽略 */ }
 }
-/* 入口页 header 徽标的漫画版本兜底（打包时已知的漫画版本）。
-   header 徽标取 mangaReaderCache 里存的最新漫画版本；没有缓存时用这个值。
-   漫画版本升级时这里要跟着改（与漫画阅读器的 PLUGIN_VERSION 对齐）。 */
-var MANGA_HUB_VER = 9;
 function saveMangaReaderCache(version, readerText) {
   try { if (window.localStorage) window.localStorage.setItem(MANGA_READER_CACHE_KEY, JSON.stringify({ version: version, readerText: readerText })); } catch (e) { /* 存储不可用时忽略 */ }
 }
@@ -883,6 +877,17 @@ function fetchTextTimeout(url, ms) {
     return res.text();
   });
 }
+/* 清单/阅读器拉取绕过 HTTP 缓存（与漫画阅读器同款）。用户 2026-11-24 15:31
+   “下载回来不是缓存，是真存，更新就覆盖”——更新检查必须看到最新的清单。
+   raw.githubusercontent.com 回 Cache-Control: max-age=300，裸 fetch 会在
+   5 分钟内读到缓存里的旧清单，导致点“更新插件”显示“已是最新”却升不了版。
+   时间戳查询串让每次拉取都是新地址，既绕过 WebView 的 HTTP 缓存，也绕过
+   CDN 边缘节点的旧清单。清单地址常量本身不变，只在拉取时拼查询串。
+   清单只在用户主动点“更新插件”（或手动添加/更新插件、点漫画无存档时首
+   次拉取）时拉，启动时不拉。 */
+function manifestUrlFresh(url) {
+  return url + (url.indexOf("?") === -1 ? "?" : "&") + "t=" + Date.now();
+}
 function validatePluginManifest(m) {
   if (!m || typeof m !== "object") return "清单不是有效的 JSON 对象";
   if (typeof m.version !== "number") return "清单缺少 version（数字）";
@@ -895,11 +900,11 @@ function validatePluginManifest(m) {
    任一步失败即 throw，调用方不得保存半拉的条目；更新失败时旧条目原样不动。 */
 function pullPluginFromManifest(manifestUrl, customName) {
   var m;
-  return fetchTextTimeout(manifestUrl).then(function (text) {
+  return fetchTextTimeout(manifestUrlFresh(manifestUrl)).then(function (text) {
     try { m = JSON.parse(text); } catch (e) { throw new Error("清单 JSON 解析失败"); }
     var bad = validatePluginManifest(m);
     if (bad) throw new Error(bad);
-    return fetchTextTimeout(m.reader.url);
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url));
   }).then(function (readerText) {
     if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上，拒绝保存");
     var entry = { name: "", url: manifestUrl, version: m.version, rules: m.rules.length, updated: m.updated || "", readerText: readerText, readerSha256: String(m.reader.sha256).toLowerCase(), ruleTexts: {} };
@@ -1011,17 +1016,9 @@ function showHub() {
   var hub = $("hub"), app = $("app");
   if (hub) hub.classList.remove("hidden");
   if (app) app.classList.add("hidden");
-  /* v7：入口页 header 与漫画 hub 完全一致（顶部固定“聚合插件”，切换 hub 不跳）：
-     图标 漫、标题 聚合插件、副标题 插件运行控制台、徽标“插件 vX”。
-     X 取漫画版本（mangaReaderCache 里存的最新漫画版本；没有缓存时用打包时
-     已知的漫画版本 MANGA_HUB_VER 兜底）。书籍自己的版本仍显示在书籍入口行
-     （“插件 v7 · 2 条规则”），不丢信息。 */
-  var v = $("hubVer");
-  if (v) {
-    var mv = MANGA_HUB_VER;
-    try { var _mc = loadMangaReaderCache(); if (_mc && _mc.version) mv = _mc.version; } catch (e) { /* no cache */ }
-    v.textContent = "插件 v" + mv;
-  }
+  /* v8：入口页顶栏已去掉（改由 APK 固定显示，见 hub 段注释），这里不再写
+     版本徽标。书籍自己的版本仍显示在书籍入口行（“插件 v8 · 2 条规则”），
+     不丢信息。 */
   renderExtraList();
   hubSetBridgeVisible(true);
   window.scrollTo(0, 0);
@@ -1054,7 +1051,7 @@ function checkBookUpdate() {
   if (btn) btn.disabled = true;
   if (st) st.textContent = "正在检查更新…";
   function done() { hubUpdating = false; if (btn) btn.disabled = false; }
-  fetchTextTimeout(BOOK_MANIFEST_URL).then(function (text) {
+  fetchTextTimeout(manifestUrlFresh(BOOK_MANIFEST_URL)).then(function (text) {
     var m;
     try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
     var bad = validatePluginManifest(m);
@@ -1064,7 +1061,7 @@ function checkBookUpdate() {
       done();
       return;
     }
-    return fetchTextTimeout(m.reader.url).then(function (readerText) {
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
       if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
       try {
         var list = hubExtraPlugins();
@@ -1108,12 +1105,12 @@ function enterManga() {
   mangaBusy = true;
   var st = $("mangaUpdateStatus");
   if (st) st.textContent = "正在拉取漫画插件…";
-  fetchTextTimeout(MANGA_MANIFEST_URL).then(function (text) {
+  fetchTextTimeout(manifestUrlFresh(MANGA_MANIFEST_URL)).then(function (text) {
     var m;
     try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
     var bad = validatePluginManifest(m);
     if (bad) throw new Error(bad);
-    return fetchTextTimeout(m.reader.url).then(function (readerText) {
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
       if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
       saveMangaReaderCache(m.version, readerText);
       mangaBusy = false;
@@ -1136,7 +1133,7 @@ function checkMangaUpdate() {
   if (btn) btn.disabled = true;
   if (st) st.textContent = "正在检查更新…";
   function done() { mangaBusy = false; if (btn) btn.disabled = false; }
-  fetchTextTimeout(MANGA_MANIFEST_URL).then(function (text) {
+  fetchTextTimeout(manifestUrlFresh(MANGA_MANIFEST_URL)).then(function (text) {
     var m;
     try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
     var bad = validatePluginManifest(m);
@@ -1151,9 +1148,9 @@ function checkMangaUpdate() {
       done();
       return;
     }
-    return fetchTextTimeout(m.reader.url).then(function (readerText) {
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
       if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
-      saveMangaReaderCache(m.version, readerText); /* 新版原字节同步进本地副本缓存 */
+      saveMangaReaderCache(m.version, readerText); /* 新版原字节同步进本地存的副本（覆盖旧版） */
       try {
         var l2 = hubExtraPlugins();
         for (var j = 0; j < l2.length; j++) {
