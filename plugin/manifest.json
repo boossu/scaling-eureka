@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "updated": "2026-11-24",
+  "reader": {
+    "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/comic_reader.html",
+    "sha256": "c598f17d78e14568438ea787d1bf011fccd9f387f3a23a7cc2abbecd23cdc434"
+  },
+  "rules": [
+    {
+      "name": "光社漫画",
+      "file": "_____0_t94g.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/rules/_____0_t94g.json",
+      "sha256": "ee752c730d9ac201b7c7713f7516bf84c0ea0f8899d7663916dd96fe14780956"
+    },
+    {
+      "name": "漫画台",
+      "file": "_____3_dgo3.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/rules/_____3_dgo3.json",
+      "sha256": "4ae0921817cf1785edd0bae0a38ac6a6bf439a25453df111015ad2d901b2be31"
+    },
+    {
+      "name": "滴答漫画",
+      "file": "_____10_vqy5.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/rules/_____10_vqy5.json",
+      "sha256": "34a6eda31498f457a1bdde28aa7afb170ed2815404e4e74d4cd198525d1d852e"
+    },
+    {
+      "name": "快看漫画",
+      "file": "_____11_awkg.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/rules/_____11_awkg.json",
+      "sha256": "ec794c99ccf42c91e4e14d4c27ba1305e3b14c6cd63008433a981a94bf70543d"
+    },
+    {
+      "name": "蛙漫漫画",
+      "file": "____14_uj7f.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/rules/____14_uj7f.json",
+      "sha256": "39593209b601a2f811207859264db2bb9dbdc055953a2b5de96bd585699353fe"
+    },
+    {
+      "name": "新爱漫画",
+      "file": "_____15_q8x4.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/rules/_____15_q8x4.json",
+      "sha256": "afb45e68387e9cce71cd44031b8889fc0720b44a2653c1c567d6ee2364f7e363"
+    }
+  ]
+}

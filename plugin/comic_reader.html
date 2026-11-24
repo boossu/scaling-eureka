@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
+<title>漫画阅读器</title>
+<style>
+/* Exact theme tokens from the beautified web console (theme.css) */
+:root{
+  color-scheme:dark;
+  --bg:#0b0d0f; --surface:#15181b; --surface2:#1e2225; --surface3:#272c30;
+  --text:#eef1ee; --dim:#9aa39b; --faint:#666e67; --border:#262c2f;
+  --accent:#3dd68c; --accent-dim:#123325; --fill-gs:#0e9f6e;
+  --warm:#f2a93b; --warm-dim:#38280e; --fill-mt:#d97c16;
+  --amber:#e8a33d; --bad:#e5604f; --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;min-height:2.25rem;border:none;background:none;color:inherit;cursor:pointer}
+img{display:block}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+#app{max-width:72rem;margin:0 auto;padding:0 12px 96px}
+.hidden{display:none!important}
+/* ---------- rule cards ---------- */
+#rules{padding-top:16px}
+.rule-row{display:flex;flex-wrap:wrap;gap:10px}
+.rule-card{flex:1;min-width:160px;display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);box-shadow:0 2px 8px rgba(0,0,0,.25);text-align:left;transition:all .15s}
+.rule-card:active{transform:scale(.98)}
+.rule-card.active-gs{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.rule-card.active-mt{border-color:var(--warm);background:var(--warm-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.rule-badge{flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:20px;font-weight:700;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.rule-badge.gs{background:var(--fill-gs)}
+.rule-badge.mt{background:var(--fill-mt)}
+.rule-meta{min-width:0;flex:1}
+.rule-title{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:600;color:#fff}
+.rule-author{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--dim)}
+.rule-file{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;color:var(--faint);font-family:ui-monospace,Menlo,Consolas,monospace}
+.rule-dot{flex:none;width:8px;height:8px;border-radius:50%;margin-left:auto}
+.rule-dot.gs{background:var(--accent)}
+.rule-dot.mt{background:var(--warm)}
+.import-btn{flex:1;min-width:140px;display:flex;align-items:center;justify-content:center;padding:12px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);font-size:14px;color:var(--dim)}
+.import-btn:active{color:var(--text)}
+#importErr{margin-top:8px;font-size:14px;color:var(--bad)}
+/* ---------- chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding-top:16px}
+.chip{border-radius:9999px;padding:6px 14px;font-size:14px;background:var(--surface);color:var(--dim);box-shadow:inset 0 0 0 1px var(--border);transition:all .15s}
+.chip:active{transform:scale(.95)}
+.chip.on-gs{background:var(--fill-gs);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(14,159,110,.4)}
+.chip.on-mt{background:var(--fill-mt);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(217,124,22,.4)}
+.mt-rows{padding-top:16px;display:flex;flex-direction:column;gap:10px}
+.mt-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.mt-row .lbl{flex:none;width:36px;font-size:12px;font-weight:500;color:var(--faint)}
+.chip.sm{padding:6px 12px;font-size:12px}
+/* ---------- sections & cards ---------- */
+.sec{padding-top:16px}
+.sec-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:15px;font-weight:700;color:#fff}
+.sec-h::before{content:"";width:4px;height:16px;border-radius:9999px;background:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);column-gap:10px;row-gap:16px}
+@media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card{min-width:0;text-align:left;transition:transform .15s}
+.card:active{transform:scale(.98)}
+.cover{position:relative;width:100%;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:var(--surface2);box-shadow:0 4px 14px rgba(0,0,0,.35);box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.05)}
+.cover img{width:100%;height:100%;object-fit:cover}
+.cover .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--surface2);color:var(--dim)}
+.cover .ph b{font-size:24px;color:var(--faint)}
+.cover .ph span{font-size:10px;line-height:1.2;text-align:center;padding:0 4px}
+.cover.loading{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.card-t{margin-top:6px;font-size:13px;font-weight:500;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-d{margin-top:2px;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skel-grid{display:grid;grid-template-columns:repeat(3,1fr);column-gap:10px;row-gap:16px}
+@media(min-width:640px){.skel-grid{grid-template-columns:repeat(4,1fr)}}
+.skel-c{width:100%;aspect-ratio:2/3;border-radius:12px;background:var(--surface2);animation:pulse 1.2s ease-in-out infinite}
+.skel-t{margin-top:8px;height:12px;width:80%;border-radius:4px;background:var(--surface2);animation:pulse 1.2s ease-in-out infinite}
+.skel-d{margin-top:6px;height:10px;width:60%;border-radius:4px;background:var(--surface2);animation:pulse 1.2s ease-in-out infinite}
+.empty{border:1px dashed var(--border);border-radius:16px;background:var(--surface);padding:40px 16px;text-align:center}
+.empty b{display:block;font-size:24px;color:var(--faint)}
+.empty p{margin-top:8px;font-size:14px;color:var(--dim)}
+.errbox{border:1px solid rgba(229,96,79,.5);border-radius:16px;background:var(--surface);padding:20px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.errbox p{font-size:14px;color:var(--bad)}
+.retry{margin-top:12px;border-radius:9999px;background:var(--surface2);padding:8px 20px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
+.retry:active{transform:scale(.95)}
+.pager{display:flex;align-items:center;justify-content:center;gap:12px;padding-top:20px}
+.pager button{border-radius:9999px;background:var(--surface);padding:8px 20px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
+.pager button:disabled{opacity:.4}
+.pager button:active{transform:scale(.95)}
+.pager span{font-size:14px;color:var(--dim);font-family:ui-monospace,Menlo,Consolas,monospace}
+/* ---------- detail ---------- */
+.backbtn{margin:16px 0 12px;border-radius:9999px;background:var(--surface);padding:6px 16px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
+.backbtn:active{transform:scale(.95)}
+.panel{border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.panel-top{display:flex;gap:16px}
+.panel-cover{flex:none;width:128px;aspect-ratio:2/3;border-radius:12px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.35);background:var(--surface2)}
+@media(min-width:640px){.panel-cover{width:160px}}
+.panel-cover img{width:100%;height:100%;object-fit:cover}
+.panel-info{min-width:0}
+.panel-info h2{font-size:20px;font-weight:700;line-height:1.4;color:#fff}
+.panel-info .au{margin-top:6px;font-size:14px;color:var(--dim)}
+.status-badge{display:inline-block;margin-top:8px;border-radius:9999px;background:var(--accent-dim);padding:2px 10px;font-size:12px;font-weight:500;color:var(--accent)}
+.tags{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+.tags span{border-radius:9999px;background:var(--surface2);padding:2px 8px;font-size:11px;color:var(--dim)}
+.panel-meta{margin-top:8px;font-size:11px;color:var(--faint);font-family:ui-monospace,Menlo,Consolas,monospace}
+.panel-desc{margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:14px;line-height:1.7;color:var(--dim)}
+.ch-head{display:flex;align-items:center;gap:8px;margin-top:20px}
+.ch-head h3{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:#fff}
+.ch-head h3::before{content:"";width:4px;height:16px;border-radius:9999px;background:var(--accent)}
+.ch-head .cnt{font-size:12px;font-weight:400;color:var(--faint)}
+.ch-head button{margin-left:auto;border-radius:9999px;background:var(--surface);padding:6px 14px;font-size:12px;box-shadow:inset 0 0 0 1px var(--border)}
+.ch-head button:active{transform:scale(.95)}
+.ch-grid{margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:52vh;overflow-y:auto;padding-right:4px}
+@media(min-width:640px){.ch-grid{grid-template-columns:repeat(6,1fr)}}
+.ch-grid button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:8px;background:var(--surface);padding:10px 6px;font-size:12px;text-align:center;box-shadow:inset 0 0 0 1px var(--border);transition:all .15s}
+.ch-grid button:active{transform:scale(.97)}
+.ch-grid button.cur{background:var(--accent-dim);color:var(--accent);font-weight:600}
+/* ---------- reader ---------- */
+#reader{padding-top:12px}
+.r-top{position:sticky;top:8px;z-index:20;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.55);padding:8px 12px;box-shadow:0 8px 24px rgba(0,0,0,.45);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.r-top-row{display:flex;align-items:center;gap:8px}
+.r-top-row .r-back{flex:none;border-radius:9999px;background:rgba(255,255,255,.1);padding:6px 14px;font-size:14px;color:#fff}
+.r-top-row .r-back:active{transform:scale(.95)}
+.r-mid{flex:1;min-width:0;text-align:center}
+.r-mid .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:600;color:#fff}
+.r-mid .s{font-size:11px;color:rgba(255,255,255,.6);font-family:ui-monospace,Menlo,Consolas,monospace}
+.r-note{margin-top:4px;text-align:center;font-size:11px;color:var(--amber);font-family:ui-monospace,Menlo,Consolas,monospace}
+.r-imgs{display:flex;flex-direction:column;padding-bottom:96px}
+.r-imgs img{width:100%;height:auto}
+.r-imgs .ph{width:100%;aspect-ratio:2/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--surface2);color:var(--dim)}
+.r-imgs .ph b{font-size:24px;color:var(--faint)}
+.r-imgs .ph span{font-size:12px}
+.r-loading{padding:40px 0;text-align:center}
+.r-loading .sk{margin:0 auto;width:66%;max-width:320px;aspect-ratio:2/3;border-radius:12px;background:var(--surface2);animation:pulse 1.2s ease-in-out infinite}
+.r-loading p{margin-top:16px;font-size:14px;color:var(--dim);font-family:ui-monospace,Menlo,Consolas,monospace}
+.r-nav{position:fixed;left:0;right:0;bottom:16px;z-index:40;display:flex;justify-content:center;padding:0 16px;pointer-events:none}
+.r-nav-in{pointer-events:auto;display:flex;align-items:center;gap:4px;border-radius:9999px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.6);padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.r-nav-in button{border-radius:9999px;padding:8px 16px;font-size:14px;color:#fff;transition:all .15s}
+.r-nav-in button:active{transform:scale(.95)}
+.r-nav-in button.mid{background:rgba(255,255,255,.12);font-weight:500}
+/* ---------- toast & log ---------- */
+#toast{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:0 24px;pointer-events:none}
+#toast .in{max-width:86vw;border-radius:9999px;background:rgba(0,0,0,.75);padding:10px 20px;text-align:center;font-size:14px;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.5);box-shadow:0 8px 24px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#log{margin-top:16px;border-radius:16px;border:1px solid var(--border);background:var(--surface);overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#log .lh{display:flex;align-items:center;justify-content:space-between;padding:10px 12px}
+#log .lh h2{font-size:13px;font-weight:600;color:var(--dim)}
+#log .lh h2 span{font-size:11px;color:var(--faint);font-family:ui-monospace,Menlo,Consolas,monospace}
+#log .lh .btns{display:flex;gap:6px}
+#log .lh button{border-radius:9999px;padding:4px 10px;font-size:12px;color:var(--dim);box-shadow:inset 0 0 0 1px var(--border)}
+#log ol{max-height:46vh;overflow-y:auto;border-top:1px solid var(--border);padding:6px 12px;list-style:none}
+#log li{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding:6px 0}
+#log li:last-child{border-bottom:none}
+#log .dot{flex:none;width:6px;height:6px;border-radius:50%}
+#log .dot.ok{background:var(--accent)}
+#log .dot.bad{background:var(--bad)}
+#log .tm{flex:none;font-size:11px;color:var(--faint);font-family:ui-monospace,Menlo,Consolas,monospace}
+#log .lb{flex:none;font-size:12px;font-weight:500}
+#log .dt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--dim)}
+#log .dt.bad{color:var(--bad)}
+#log .ms{flex:none;font-size:10px;color:var(--faint);font-family:ui-monospace,Menlo,Consolas,monospace}
+#log .none{padding:16px 0;text-align:center;font-size:12px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="rules" aria-label="已导入规则"><div class="rule-row" id="ruleRow"></div><div id="importErr"></div></section>
+  <main id="main"></main>
+  <aside id="log" aria-label="请求日志">
+    <div class="lh"><h2>请求日志 <span id="logCount">0 条</span></h2><div class="btns"><button type="button" id="logToggle">收起</button><button type="button" id="logClear">清空</button></div></div>
+    <ol id="logList"></ol>
+  </aside>
+</div>
+<div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
+<input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+<script>
+"use strict";
+var PLUGIN_VERSION = 1;
+/* ============================================================
+   漫画阅读器 JS —— 浏览器控制台（engine.ts + App.tsx）的完整复刻。
+   纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
+   ============================================================ */
+
+/* ---------------- 光社 hs 库（engine.ts 原样移植） ---------------- */
+var GS_HOST = "https://m.g-mh.org";
+var GS_API = "https://v2.apikk.top";
+var GS_IMG_HOST = { "1": "https://c-nd1-1.6wm.top", "2": "https://c-nd2-1.6wm.top", "3": "https://c-nd3-1.6wm.top" };
+var GS_CATS = [
+  { k: "fuchou", n: "复仇" }, { k: "gufeng", n: "古风" }, { k: "qihuan", n: "奇幻" },
+  { k: "nixi", n: "逆袭" }, { k: "yineng", n: "异能" }, { k: "chuanyue", n: "穿越" },
+  { k: "rexue", n: "热血" }, { k: "chunai", n: "纯爱" }, { k: "xitong", n: "系统" },
+  { k: "zhongsheng", n: "重生" }, { k: "maoxian", n: "冒险" }, { k: "lingyi", n: "灵异" },
+  { k: "lianai", n: "恋爱" }, { k: "xuanhuan", n: "玄幻" }, { k: "kehuan", n: "科幻" },
+  { k: "xuanyi", n: "悬疑" }, { k: "xiuxian", n: "修仙" }, { k: "zhandou", n: "战斗" }
+];
+function gsCatName(k) { for (var i = 0; i < GS_CATS.length; i++) if (GS_CATS[i].k === k) return GS_CATS[i].n; return k; }
+function norm(s) {
+  var out = String(s == null ? "" : s);
+  out = out.replace(/<[^>]+>/g, " ");
+  out = out.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  out = out.replace(/&#(\d{2,5});?/g, function (a, d) { var n = parseInt(d, 10); return (n > 31 && n < 65536) ? String.fromCharCode(n) : a; });
+  return out.replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+}
+function fixPic(u) {
+  var s = String(u || "").replace(/^\s+|\s+$/g, "");
+  if (!s) return "";
+  if (s.indexOf("//") === 0) s = "https:" + s;
+  if (!/^https?:\/\//i.test(s)) s = GS_HOST + (s.charAt(0) === "/" ? s : "/" + s);
+  return s;
+}
+function gsParseCards(html) {
+  var out = [], seen = {};
+  if (!html) return out;
+  var blocks = String(html).split('class="pb-2"');
+  for (var i = 1; i < blocks.length; i++) {
+    var b = blocks[i] || "";
+    var hm = b.match(/href="(\/manga\/[^"?#]+)"/);
+    if (!hm || !hm[1]) continue;
+    var slug = hm[1].replace(/^\/manga\//, "");
+    if (!slug || seen[slug]) continue;
+    seen[slug] = 1;
+    var nm = norm(((b.match(/<h3[^>]*>([\s\S]*?)<\/h3>/) || [])[1] || ""));
+    var pc = fixPic(((b.match(/<img[^>]*src="([^"]+)"/) || [])[1] || ""));
+    out.push({ title: nm || slug, desc: "", pic: pc, ref: slug });
+  }
+  var re2 = /<a href="(\/manga\/[^"?#]+)"[^>]*class="slicarda"[^>]*>([\s\S]*?)<\/a>/g, m2;
+  while ((m2 = re2.exec(String(html))) !== null) {
+    var sl = (m2[1] || "").replace(/^\/manga\//, "");
+    if (!sl || seen[sl]) continue;
+    seen[sl] = 1;
+    var body = m2[2] || "";
+    var nm2 = norm(((body.match(/<h3[^>]*>([\s\S]*?)<\/h3>/) || [])[1] || ""));
+    var pc2 = fixPic(((body.match(/<img[^>]*src="([^"]+)"/) || [])[1] || ""));
+    var tip = norm(((body.match(/<p class="slicardtagp"[^>]*>([\s\S]*?)<\/p>/) || [])[1] || ""));
+    out.push({ title: nm2 || sl, desc: tip, pic: pc2, ref: sl });
+  }
+  return out;
+}
+function gsParseHome(html) {
+  var segs = String(html || "").split(/<h2 class="text-xl"[^>]*>/);
+  var groups = [];
+  for (var si = 1; si < segs.length; si++) {
+    var seg = segs[si] || "";
+    var nm = norm((seg.split("</h2>")[0] || ""));
+    if (!nm) continue;
+    var part = gsParseCards(seg);
+    if (!part.length) continue;
+    groups.push({ title: nm, items: part.slice(0, 9) });
+  }
+  return groups;
+}
+function gsParseDetailHtml(html, nameHint) {
+  if (!html || html.length <= 1000) return null;
+  var h1 = ((html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1] || "");
+  var midM = ((html.match(/id="bookmarkData"[^>]*data-mid="(\d+)"/) || [])[1] ||
+    (html.match(/data-mid="(\d+)"/) || [])[1] || "");
+  if (!midM) return null;
+  var coverM = ((html.match(/id="bookmarkData"[^>]*data-cover="([^"]+)"/) || [])[1] || "");
+  var tags = [], tseen = {};
+  var tre = /href="\/manga-tag\/([a-z-]+)"/g, tr;
+  while ((tr = tre.exec(html)) !== null) {
+    var key = tr[1] || "";
+    if (!key || tseen[key]) continue;
+    tseen[key] = 1;
+    var cn = gsCatName(key);
+    if (cn && tags.indexOf(cn) < 0) tags.push(cn);
+  }
+  var author = "";
+  var am = html.match(/"author":\[\{"@type":"Person","name":"([^"]+)"/);
+  if (am && am[1]) author = am[1];
+  return {
+    mid: midM,
+    name: norm((h1.split("<span")[0] || "")) || nameHint,
+    status: norm(((h1.match(/<span[^>]*>([\s\S]*?)<\/span>/) || [])[1] || "")),
+    cover: coverM,
+    desc: norm(((html.match(/<p class="text-medium[^"]*"[^>]*>([\s\S]*?)<\/p>/) || [])[1] || "")),
+    tags: tags, author: author
+  };
+}
+function gsChaptersFromApi(jsonText) {
+  var j; try { j = JSON.parse(jsonText); } catch (e) { return []; }
+  var raw = j && j.data && j.data.chapters;
+  if (!Array.isArray(raw)) return [];
+  var out = [];
+  for (var i = 0; i < raw.length; i++) {
+    var ch = raw[i] || {}, at = ch.attributes || {};
+    out.push({ id: String(ch.id != null ? ch.id : ""), name: norm(at.title || ("第" + String(ch.id != null ? ch.id : "") + "话")), order: parseFloat(String(at.order != null ? at.order : "")) || i + 1 });
+  }
+  out.sort(function (a, b) { return a.order - b.order; });
+  return out.map(function (c) { return { id: c.id, name: c.name }; });
+}
+function gsApiMeta(jsonText) {
+  var j; try { j = JSON.parse(jsonText); } catch (e) { return null; }
+  var d = j && j.data;
+  if (!d) return null;
+  return { title: typeof d.title === "string" ? d.title : "", cover: typeof d.cover === "string" ? d.cover : "", desc: typeof d.desc === "string" ? d.desc : "" };
+}
+/* ---- 图集解密（hs 库原样） ---- */
+var PREFIX1 = "J7r", SUFFIX1 = "nQ", PREFIX2 = "kD", SUFFIX2 = "W4s", BLOCKSIZE = 7;
+var CUSTOM_ALPHA = "_-9876543210abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+function b64decode(s) {
+  var bytes = [], acc = 0, bits = 0;
+  for (var i = 0; i < s.length; i++) {
+    var v = CUSTOM_ALPHA.indexOf(s.charAt(i));
+    if (v < 0) continue;
+    acc = ((acc << 6) | v) & 0xffffff; bits += 6;
+    if (bits >= 8) { bits -= 8; bytes.push((acc >> bits) & 0xff); }
+  }
+  var out = "", j = 0;
+  while (j < bytes.length) {
+    var c = bytes[j++] || 0;
+    if (c < 0x80) out += String.fromCharCode(c);
+    else if (c >= 0xc0 && c < 0xe0) out += String.fromCharCode(((c & 0x1f) << 6) | ((bytes[j++] || 0) & 0x3f));
+    else if (c >= 0xe0 && c < 0xf0) out += String.fromCharCode(((c & 0x0f) << 12) | (((bytes[j++] || 0) & 0x3f) << 6) | ((bytes[j++] || 0) & 0x3f));
+    else {
+      var cp = ((c & 0x07) << 18) | (((bytes[j++] || 0) & 0x3f) << 12) | (((bytes[j++] || 0) & 0x3f) << 6) | ((bytes[j++] || 0) & 0x3f);
+      cp -= 0x10000;
+      out += String.fromCharCode(0xd800 + (cp >> 10), 0xdc00 + (cp & 0x3ff));
+    }
+  }
+  return out;
+}
+function reorder7(s) {
+  var out = "";
+  for (var i = 0; i < s.length; i += BLOCKSIZE) {
+    var blk = s.substring(i, i + BLOCKSIZE);
+    if ((i / BLOCKSIZE) % 2 === 1) blk = blk.split("").reverse().join("");
+    out += blk;
+  }
+  return out;
+}
+function decodeImages(enc) {
+  var e = String(enc || "");
+  if (e.length < 10) return [];
+  var inner = e.substring(PREFIX1.length, e.length - SUFFIX1.length);
+  var w = inner.indexOf(SUFFIX2);
+  if (w < 0) return [];
+  var lastPart = inner.substring(w + SUFFIX2.length);
+  var kds = [], st = 0;
+  for (;;) { var p = inner.indexOf(PREFIX2, st); if (p === -1 || p >= w) break; kds.push(p); st = p + 1; }
+  for (var k = 0; k < kds.length; k++) {
+    var kd = kds[k];
+    var ri = lastPart + inner.substring(0, kd) + inner.substring(kd + PREFIX2.length, w);
+    try {
+      var arr = JSON.parse(b64decode(reorder7(ri)));
+      if (Array.isArray(arr) && arr.length) return arr;
+    } catch (err) { /* next kD */ }
+  }
+  return [];
+}
+function gsImagesFromApi(jsonText) {
+  var j; try { j = JSON.parse(jsonText); } catch (e) { return []; }
+  var info = j && j.data && j.data.info;
+  if (!info) return [];
+  var im = info.images || {};
+  var list = decodeImages(im.images || "");
+  if (!list.length) return [];
+  var host = GS_IMG_HOST[String(im.line || "3")] || GS_IMG_HOST["3"] || "";
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var it = list[i], path = "";
+    if (typeof it === "string") path = it;
+    else if (it && typeof it === "object" && typeof it.url === "string") path = it.url;
+    if (!path) continue;
+    if (/^https?:\/\//i.test(path)) out.push(path);
+    else if (path.charAt(0) === "/") out.push(host + path);
+    else out.push(host + "/" + path);
+  }
+  return out;
+}
+function gsChapterApiUrl(mid) { return GS_API + "/api/v2/manga/get?mid=" + mid + "&mode=all"; }
+function gsChapterImagesApiUrl(mid, cid) { return GS_API + "/api/v2/chapter/getinfo?m=" + mid + "&c=" + cid; }
+
+/* ---------------- 漫画台规则（engine.ts 原样移植） ---------------- */
+var MT_LIST_TEMPLATE = "https://apigate.kaimanhua.com/comic-api/v3/comic/getcomicserch?type=device&openid=4821C2A50213018D145A32AFD42038B6&cartoon_status_id=fyarea&pay_type=&human_type=&tag=fyclass&sortby=fysort&is_video=-1&pagesize=24&pageno=fypage&productname=mht&platformname=android";
+var MT_CATS = {
+  classes: [["全部", ""], ["热血", "rexue"], ["恋爱", "lianai"], ["玄幻", "xuanhuan"], ["神魔", "shenmo"], ["都市", "dushi"], ["霸总", "bazong"], ["穿越", "chuanyue"], ["搞笑", "gaoxiao"], ["冒险", "maoxian"], ["古风", "gufeng"], ["悬疑", "xuanyi"], ["武侠", "wuxia"], ["修真", "xiuzhen"], ["科幻", "kehuan"], ["真人", "zhenren"]],
+  areas: [["全部", ""], ["连载", "1"], ["完结", "2"]],
+  sorts: [["最近更新", "update_time"], ["人气最高", "total_view_num"]]
+};
+function mtListUrl(cls, area, sort, page) {
+  return MT_LIST_TEMPLATE.replace("fyclass", encodeURIComponent(cls)).replace("fyarea", encodeURIComponent(area)).replace("fysort", encodeURIComponent(sort)).replace("fypage", String(page));
+}
+function mtParseList(jsonText) {
+  var j; try { j = JSON.parse(jsonText); } catch (e) { return []; }
+  var items = j && j.data && j.data.item;
+  if (!Array.isArray(items)) return [];
+  var out = [];
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i] || {};
+    var id = String(it.cartoon_id != null ? it.cartoon_id : "");
+    if (!id) continue;
+    out.push({ title: String(it.cartoon_name != null ? it.cartoon_name : id), desc: String(it.comic_feature != null ? it.comic_feature : ""), pic: "http://image.yqmh.com/mh/" + id + "_3_4.jpg-noresize.webp", ref: id });
+  }
+  return out;
+}
+function mtDetailUrl(comicId) { return "http://comic.321mh.com/app_api/v5/getcomicinfo_body/?comic_id=" + comicId + "&from_page=search&platformname=android&productname=mht"; }
+function mtParseDetail(jsonText) {
+  var j; try { j = JSON.parse(jsonText); } catch (e) { return null; }
+  var d = j;
+  if (!d || d.comic_id == null) return null;
+  var raw = Array.isArray(d.comic_chapter) ? d.comic_chapter.slice() : [];
+  raw.reverse();
+  var chapters = [];
+  for (var i = 0; i < raw.length; i++) {
+    var it = raw[i] || {};
+    var cid = String(it.chapter_id != null ? it.chapter_id : "");
+    if (!cid) continue;
+    chapters.push({ id: cid, name: norm(it.chapter_name || cid) });
+  }
+  var coverList = Array.isArray(d.cover_list) ? d.cover_list : [];
+  return { name: String(d.comic_name != null ? d.comic_name : ""), desc: String(d.comic_desc != null ? d.comic_desc : ""), cover: typeof coverList[0] === "string" ? coverList[0] : "", comicId: String(d.comic_id), chapters: chapters };
+}
+function mtChapterApiUrl(comicId, chapterId) {
+  return "https://m.kanman.com/api/getchapterinfov2?product_id=1&productname=kmh&platformname=wap&comic_id=" + comicId + "&chapter_newid=" + chapterId + "&isWebp=1&quality=low";
+}
+function mtImagesFromApi(jsonText) {
+  var j; try { j = JSON.parse(jsonText); } catch (e) { return []; }
+  var list = j && j.data && j.data.current_chapter && j.data.current_chapter.chapter_img_list;
+  if (!Array.isArray(list)) return [];
+  return list.filter(function (x) { return typeof x === "string" && x.length > 0; });
+}
+/* ---------------- 章节表导航（插件同款逻辑） ---------------- */
+function rebuildChapters(page) { return (page && page.chapters) ? page.chapters : []; }
+function fillChaptersFromStack(stack) {
+  var top = stack[stack.length - 1];
+  if (!top) return { chapters: [], fromIndex: -1 };
+  var own = rebuildChapters(top);
+  if (own.length) return { chapters: own, fromIndex: stack.length - 1 };
+  for (var i = stack.length - 2; i >= 0; i--) {
+    var p = stack[i];
+    if (p && p.chapters && p.chapters.length) return { chapters: p.chapters, fromIndex: i };
+  }
+  return { chapters: [], fromIndex: -1 };
+}
+
+/* ---------------- node 测试导出（浏览器里无用） ---------------- */
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { gsParseCards: gsParseCards, gsParseHome: gsParseHome, gsParseDetailHtml: gsParseDetailHtml, gsChaptersFromApi: gsChaptersFromApi, gsApiMeta: gsApiMeta, gsImagesFromApi: gsImagesFromApi, decodeImages: decodeImages, b64decode: b64decode, reorder7: reorder7, mtParseList: mtParseList, mtParseDetail: mtParseDetail, mtImagesFromApi: mtImagesFromApi, mtListUrl: mtListUrl, rebuildChapters: rebuildChapters, fillChaptersFromStack: fillChaptersFromStack, norm: norm, fixPic: fixPic };
+}
+
+
+/* ---------------- App（App.tsx 的香草 JS 复刻） ---------------- */
+var DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+var MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
+
+var RULES = [
+  { id: "gs", title: "光社漫画", author: "WorkBuddy", kind: "guangse", fileName: "_____2_i9q0.json", badge: "光", warm: false },
+  { id: "mt", title: "漫画台", author: "zhao", kind: "manhuatai", fileName: "___1_9dfy.json", badge: "漫", warm: true }
+];
+var state = {
+  ruleId: "gs",
+  view: { kind: "browse" },
+  browse: { nav: "home", page: 1, cards: [], sections: null, hasMore: false, loading: false, error: "", mtCls: "", mtArea: "", mtSort: "update_time" },
+  logs: [],
+  toast: "",
+  detailLoading: "",
+  chapterDesc: false,
+  logOpen: true
+};
+var logId = 0, toastTimer = null;
+function rule() { for (var i = 0; i < RULES.length; i++) if (RULES[i].id === state.ruleId) return RULES[i]; return RULES[0]; }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function $(id) { return document.getElementById(id); }
+function nowTime() { var d = new Date(); function p(n) { return (n < 10 ? "0" : "") + n; } return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); }
+function pushLog(e) {
+  logId++;
+  state.logs.unshift({ id: logId, time: nowTime(), label: e.label, url: e.url, ok: e.ok, detail: e.detail, ms: e.ms || 0 });
+  if (state.logs.length > 300) state.logs.length = 300;
+  renderLog();
+}
+function showToast(msg) {
+  var t = $("toast"), inn = $("toastIn");
+  inn.textContent = msg;
+  t.classList.remove("hidden");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.add("hidden"); }, 2200);
+}
+function request(label, url, ua, summarize) {
+  var t0 = Date.now();
+  /* ua 决定 UA：光社用桌面 Chrome，漫画台用移动 Chrome。
+     真 WebView 里 fetch 的 User-Agent 是禁设头（浏览器忽略，改用 WebView 自身的真 Chrome UA）；
+     node/jsdom 自测里则由这行送出真 UA——apikk 的 Cloudflare 会拦无 UA/undici 之类机器人 UA。 */
+  var headers = { "User-Agent": ua === "desktop" ? DESKTOP_UA : MOBILE_UA, "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "zh-CN,zh;q=0.9" };
+  function attempt(n) {
+    return fetch(url, { headers: headers, signal: AbortSignal.timeout(30000) }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.text().then(function (text) {
+        var extra = "";
+        if (summarize) { try { extra = summarize(text) || ""; } catch (e) { extra = ""; } }
+        pushLog({ label: label, url: url, ok: true, detail: "HTTP " + res.status + " · " + text.length + " 字符" + (extra ? " · " + extra : "") + (n > 1 ? " · 第 " + n + " 次重试成功" : ""), ms: Date.now() - t0 });
+        return text;
+      });
+    }).catch(function (e) {
+      if (n < 3) {
+        return new Promise(function (res2) { setTimeout(res2, 1500); }).then(function () { return attempt(n + 1); });
+      }
+      pushLog({ label: label, url: url, ok: false, detail: (e && e.message ? e.message : String(e)) + "（已重试 2 次）", ms: Date.now() - t0 });
+      throw e;
+    });
+  }
+  return attempt(1);
+}
+/* 直接 <img> 加载：成功显示图，失败留首字占位（手机 IP 不被 CDN 拦时正常出图） */
+function imgHtml(src, alt, cls) {
+  var initial = (String(alt || "漫").trim().charAt(0) || "漫");
+  if (!src) return '<div class="' + cls + '"><div class="ph"><b>' + esc(initial) + '</b><span>无图</span></div></div>';
+  return '<div class="' + cls + '" data-src="' + esc(src) + '" data-alt="' + esc(alt || "") + '"><div class="ph"><b>' + esc(initial) + '</b><span>加载中</span></div></div>';
+}
+function bindImgs(root) {
+  var holders = (root || document).querySelectorAll("[data-src]");
+  for (var i = 0; i < holders.length; i++) {
+    (function (h) {
+      var src = h.getAttribute("data-src"), alt = h.getAttribute("data-alt") || "";
+      var im = new Image();
+      im.alt = alt;
+      im.onload = function () {
+        h.innerHTML = "";
+        im.style.width = "100%"; im.style.height = "100%"; im.style.objectFit = "cover";
+        h.appendChild(im);
+      };
+      im.onerror = function () {
+        var initial = (alt.trim().charAt(0) || "漫");
+        h.innerHTML = '<div class="ph"><b>' + esc(initial) + '</b><span>图片加载失败</span></div>';
+      };
+      im.src = src;
+    })(holders[i]);
+  }
+}
+/* ---------------- 列表加载 ---------------- */
+function loadGsHome() {
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.nav = "home"; b.page = 1; render();
+  request("首页·光社", GS_HOST + "/", "desktop", function (t) {
+    var g = gsParseHome(t);
+    var n = 0; for (var i = 0; i < g.length; i++) n += g[i].items.length;
+    return g.length + " 个板块 · " + n + " 张卡片";
+  }).then(function (html) {
+    var groups = gsParseHome(html);
+    if (!groups.length) throw new Error("首页没解析出板块");
+    b.loading = false; b.sections = groups; b.cards = []; b.hasMore = false; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+function loadGsCategory(tag, page) {
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.nav = tag; b.page = page; render();
+  var url = GS_HOST + "/manga-tag/" + tag + "/page/" + page;
+  request("分类·光社", url, "desktop", function (t) { return "parseCards 解析出 " + gsParseCards(t).length + " 张卡片"; }).then(function (html) {
+    var list = gsParseCards(html);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 10; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+function loadMtList(cls, area, sort, page) {
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.page = page; b.mtCls = cls; b.mtArea = area; b.mtSort = sort; render();
+  var url = mtListUrl(cls, area, sort, page);
+  request("分类·漫画台", url, "mobile", function (t) { return "find_rule 解析出 " + mtParseList(t).length + " 张卡片"; }).then(function (text) {
+    var list = mtParseList(text);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 24; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+function loadBrowseForRule(r) {
+  state.view = { kind: "browse" };
+  state.chapterDesc = false;
+  if (r.kind === "guangse") loadGsHome();
+  else loadMtList("", "", "update_time", 1);
+}
+/* ---------------- 详情 ---------------- */
+function openDetail(r, card) {
+  state.detailLoading = card.title; render();
+  if (r.kind === "guangse") {
+    request("详情页·光社", GS_HOST + "/manga/" + card.ref, "desktop", function (t) {
+      var meta = gsParseDetailHtml(t, card.title);
+      return meta ? ("解析出 mid=" + meta.mid) : "未解析出 mid";
+    }).then(function (html) {
+      var meta = gsParseDetailHtml(html, card.title);
+      if (!meta) throw new Error("详情页没解析出 mid，站点可能抽风，重试一次");
+      return request("详情接口·光社", gsChapterApiUrl(meta.mid), "desktop", function (t) { return "章节 " + gsChaptersFromApi(t).length + " 话"; }).then(function (jsonText) {
+        var chapters = gsChaptersFromApi(jsonText);
+        var apiMeta = gsApiMeta(jsonText);
+        if (!chapters.length) throw new Error("接口没返回章节，重试一次");
+        state.view = { kind: "detail", detail: { ref: card.ref, title: meta.name || (apiMeta && apiMeta.title) || card.title, author: meta.author, cover: fixPic(meta.cover) || (apiMeta && apiMeta.cover) || card.pic, desc: meta.desc || (apiMeta && apiMeta.desc) || "", status: meta.status, tags: meta.tags, mid: meta.mid, chapters: chapters } };
+        state.detailLoading = ""; render();
+      });
+    }).catch(function (e) { state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+  } else {
+    request("详情接口·漫画台", mtDetailUrl(card.ref), "mobile", function (t) {
+      var d = mtParseDetail(t); return "章节 " + (d ? d.chapters.length : 0) + " 话";
+    }).then(function (text) {
+      var d = mtParseDetail(text);
+      if (!d) throw new Error("详情接口没解析出数据，重试一次");
+      state.view = { kind: "detail", detail: { ref: d.comicId, title: d.name || card.title, author: "", cover: d.cover || card.pic, desc: d.desc, status: "", tags: [], mid: "", chapters: d.chapters } };
+      state.detailLoading = ""; render();
+    }).catch(function (e) { state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+  }
+}
+/* ---------------- 阅读器 ---------------- */
+function loadChapterImages(r, detail, index, tableNote) {
+  var ch = detail.chapters[index];
+  if (!ch) return;
+  state.view = { kind: "reader", detail: detail, index: index, tableNote: tableNote, images: [], loading: true, error: "" };
+  render();
+  var p;
+  if (r.kind === "guangse") {
+    p = request("章节图·光社", gsChapterImagesApiUrl(detail.mid, ch.id), "desktop", function (t) { return "hs 解密出 " + gsImagesFromApi(t).length + " 张图"; }).then(function (t) { return gsImagesFromApi(t); });
+  } else {
+    p = request("章节图·漫画台", mtChapterApiUrl(detail.ref, ch.id), "mobile", function (t) { return "chapter_img_list " + mtImagesFromApi(t).length + " 张图"; }).then(function (t) { return mtImagesFromApi(t); });
+  }
+  p.then(function (images) {
+    if (!images.length) throw new Error("这话没拿到图（接口抽风或还没放出来），点此重试");
+    state.view = { kind: "reader", detail: detail, index: index, tableNote: tableNote, images: images, loading: false, error: "" };
+    render();
+    window.scrollTo(0, 0);
+  }).catch(function (e) {
+    state.view = { kind: "reader", detail: detail, index: index, tableNote: tableNote, images: [], loading: false, error: e.message || String(e) };
+    render();
+  });
+}
+function openChapter(r, detail, index) {
+  var detailPage = { kind: "detail", chapters: detail.chapters };
+  var readPage = { kind: "read", chapters: r.kind === "manhuatai" ? detail.chapters : null };
+  var filled = fillChaptersFromStack([detailPage, readPage]);
+  var note = filled.fromIndex === 1
+    ? ("章节表：读页 rebuildChapters 直接建出 " + filled.chapters.length + " 章")
+    : ("章节表：读页建表 0 章 → fillChaptersFromStack 从页面栈详情页补入 " + filled.chapters.length + " 章");
+  pushLog({ label: "章节表导航", url: "hiker://page/read?i=" + index, ok: filled.chapters.length > 0, detail: note, ms: 0 });
+  loadChapterImages(r, detail, index, note);
+}
+function readerNav(dir) {
+  var v = state.view;
+  if (v.kind !== "reader") return;
+  var r = rule();
+  var total = v.detail.chapters.length;
+  var target = dir === "prev" ? v.index - 1 : v.index + 1;
+  if (target < 0) { showToast("已经是第一话"); return; }
+  if (target > total - 1) { showToast("已经是最后一话"); return; }
+  var detailPage = { kind: "detail", chapters: v.detail.chapters };
+  var readPage = { kind: "read", chapters: r.kind === "manhuatai" ? v.detail.chapters : null };
+  var filled = fillChaptersFromStack([detailPage, readPage]);
+  var note = filled.fromIndex === 1
+    ? ("章节表：读页 rebuildChapters 直接建出 " + filled.chapters.length + " 章")
+    : ("章节表：读页建表 0 章 → fillChaptersFromStack 从页面栈详情页补入 " + filled.chapters.length + " 章");
+  loadChapterImages(r, v.detail, target, note);
+}
+/* 直接打开一组图（壳子点章节传 pics:// / 图片 JSON / 单图时用） */
+function openImagesDirect(images, title) {
+  var detail = { ref: "", title: title || "", author: "", cover: "", desc: "", status: "", tags: [], mid: "", chapters: [{ id: "__direct__", name: title || "本话" }] };
+  state.view = { kind: "reader", detail: detail, index: 0, tableNote: "直接打开图片（壳子传入，无章节表）", images: images, loading: false, error: "" };
+  render();
+  window.scrollTo(0, 0);
+}
+function readerNavDirect(dir) {
+  showToast(dir === "prev" ? "已经是第一话" : "已经是最后一话");
+}
+/* ---------------- 渲染 ---------------- */
+function renderRuleRow() {
+  var html = "";
+  for (var i = 0; i < RULES.length; i++) {
+    var r = RULES[i], active = r.id === state.ruleId;
+    var cls = "rule-card" + (active ? (r.warm ? " active-mt" : " active-gs") : "");
+    html += '<button type="button" class="' + cls + '" data-rule="' + r.id + '">'
+      + '<span class="rule-badge ' + (r.warm ? "mt" : "gs") + '">' + esc(r.badge) + '</span>'
+      + '<span class="rule-meta"><span class="rule-title">' + esc(r.title) + '</span>'
+      + '<span class="rule-author">' + esc(r.author) + '</span>'
+      + '<span class="rule-file">' + esc(r.fileName) + '</span></span>'
+      + (active ? '<span class="rule-dot ' + (r.warm ? "mt" : "gs") + '"></span>' : '')
+      + '</button>';
+  }
+  html += '<label class="import-btn" for="fileInput">+ 导入规则文件</label>';
+  $("ruleRow").innerHTML = html;
+  var btns = $("ruleRow").querySelectorAll("[data-rule]");
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].addEventListener("click", function () {
+      var id = this.getAttribute("data-rule");
+      state.ruleId = id;
+      var rr = rule();
+      renderRuleRow();
+      loadBrowseForRule(rr);
+    });
+  }
+}
+function cardGridHtml(cards) {
+  var html = '<div class="grid">';
+  for (var i = 0; i < cards.length; i++) {
+    var c = cards[i];
+    html += '<button type="button" class="card" data-card="' + i + '">'
+      + imgHtml(c.pic, c.title, "cover")
+      + '<span class="card-t">' + (state.detailLoading === c.title ? "加载中…" : esc(c.title)) + '</span>'
+      + (c.desc ? '<span class="card-d">' + esc(c.desc) + '</span>' : '')
+      + '</button>';
+  }
+  return html + '</div>';
+}
+function renderBrowse() {
+  var r = rule(), b = state.browse, html = "";
+  html += '<div style="text-align:right;font-size:11px;color:var(--faint);padding:2px 4px 0">插件 v' + (window.PLUGIN_VERSION || 1) + '</div>';
+  if (r.kind === "guangse") {
+    html += '<div class="chips">';
+    var chips = [{ k: "home", n: "首页" }].concat(GS_CATS);
+    for (var i = 0; i < chips.length; i++) {
+      var c = chips[i];
+      html += '<button type="button" class="chip' + (b.nav === c.k ? " on-gs" : "") + '" data-nav="' + c.k + '">' + esc(c.n) + '</button>';
+    }
+    html += '</div>';
+  } else {
+    html += '<div class="mt-rows">';
+    var rows = [
+      { label: "分类", items: MT_CATS.classes, key: "mtCls" },
+      { label: "状态", items: MT_CATS.areas, key: "mtArea" },
+      { label: "排序", items: MT_CATS.sorts, key: "mtSort" }
+    ];
+    for (var ri = 0; ri < rows.length; ri++) {
+      var row = rows[ri];
+      html += '<div class="mt-row"><span class="lbl">' + row.label + '</span>';
+      for (var k = 0; k < row.items.length; k++) {
+        var it = row.items[k];
+        var on = b[row.key] === it[1];
+        html += '<button type="button" class="chip sm' + (on ? " on-mt" : "") + '" data-mt="' + row.key + '" data-v="' + esc(it[1]) + '">' + esc(it[0]) + '</button>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '<div class="sec">';
+  if (b.loading) {
+    html += '<div class="skel-grid">';
+    for (var s = 0; s < 8; s++) html += '<div><div class="skel-c"></div><div class="skel-t"></div><div class="skel-d"></div></div>';
+    html += '</div>';
+  } else if (b.error) {
+    html += '<div class="errbox"><p>请求失败：' + esc(b.error) + '</p><button type="button" class="retry" id="btnRetry">重试</button></div>';
+  } else if (r.kind === "guangse" && b.nav === "home" && b.sections) {
+    for (var g = 0; g < b.sections.length; g++) {
+      var sec = b.sections[g];
+      html += '<div class="sec-h">' + esc(sec.title) + '</div>' + cardGridHtml(sec.items);
+      if (g < b.sections.length - 1) html += '<div style="height:24px"></div>';
+    }
+  } else {
+    if (!b.cards.length) {
+      html += '<div class="empty"><b>漫</b><p>这一页没解析出卡片。</p></div>';
+    } else {
+      html += cardGridHtml(b.cards);
+    }
+    html += '<div class="pager"><button type="button" id="btnPrevPage"' + (b.page <= 1 ? " disabled" : "") + '>‹ 上一页</button><span>第 ' + b.page + ' 页</span><button type="button" id="btnNextPage"' + (!b.hasMore ? " disabled" : "") + '>下一页 ›</button></div>';
+  }
+  html += '</div>';
+  return html;
+}
+function renderDetail() {
+  var d = state.view.detail;
+  var total = d.chapters.length;
+  var shown = [];
+  if (state.chapterDesc) { for (var i = total - 1; i >= 0; i--) shown.push({ c: d.chapters[i], idx: i }); }
+  else { for (var j = 0; j < total; j++) shown.push({ c: d.chapters[j], idx: j }); }
+  var html = '<button type="button" class="backbtn" id="btnBackList">‹ 返回列表</button>'
+    + '<div class="panel"><div class="panel-top">'
+    + imgHtml(d.cover, d.title, "panel-cover")
+    + '<div class="panel-info"><h2>' + esc(d.title) + '</h2>'
+    + (d.author ? '<p class="au">作者：' + esc(d.author) + '</p>' : '')
+    + (d.status ? '<p><span class="status-badge">' + esc(d.status) + '</span></p>' : '')
+    + (d.tags.length ? '<p class="tags">' + d.tags.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join("") + '</p>' : '')
+    + '<p class="panel-meta">' + (d.mid ? ('mid=' + esc(d.mid) + ' · ') : '') + '共 ' + total + ' 话</p>'
+    + '</div></div>'
+    + (d.desc ? '<p class="panel-desc">' + esc(d.desc) + '</p>' : '')
+    + '</div>'
+    + '<div class="ch-head"><h3>章节列表 <span class="cnt">' + total + ' 话</span></h3><button type="button" id="btnSort">' + (state.chapterDesc ? "倒序" : "正序") + '</button></div>'
+    + '<div class="ch-grid">';
+  for (var k = 0; k < shown.length; k++) {
+    html += '<button type="button" data-ch="' + shown[k].idx + '">' + esc(shown[k].c.name) + '</button>';
+  }
+  return html + '</div>';
+}
+function renderReader() {
+  var v = state.view, d = v.detail, total = d.chapters.length, ch = d.chapters[v.index];
+  var html = '<div id="reader"><div class="r-top"><div class="r-top-row">'
+    + '<button type="button" class="r-back" id="btnReaderBack">‹ 目录</button>'
+    + '<div class="r-mid"><p class="t">' + esc(ch ? ch.name : "") + '</p><p class="s">第 ' + (v.index + 1) + ' / ' + total + ' 话' + (v.images.length ? ' · ' + v.images.length + ' 张图' : '') + '</p></div>'
+    + '<span style="width:68px;flex:none"></span></div>'
+    + '<p class="r-note">' + esc(v.tableNote || "") + '</p></div>';
+  if (v.loading) {
+    html += '<div class="r-loading"><div class="sk"></div><p>正在请求这一话的图…</p></div>';
+  } else if (v.error) {
+    html += '<div class="errbox" style="margin-top:24px;max-width:28rem;margin-left:auto;margin-right:auto"><p>' + esc(v.error) + '</p><button type="button" class="retry" id="btnRetryCh">重试这一话</button></div>';
+  } else {
+    html += '<div class="r-imgs">';
+    for (var i = 0; i < v.images.length; i++) {
+      html += imgHtml(v.images[i], (ch ? ch.name : "") + " 第 " + (i + 1) + " 页", "r-img-ph");
+    }
+    html += '</div>';
+  }
+  html += '<div class="r-nav"><div class="r-nav-in">'
+    + '<button type="button" id="btnPrev">‹ 上一话</button>'
+    + '<button type="button" class="mid" id="btnToc">目录</button>'
+    + '<button type="button" id="btnNext">下一话 ›</button>'
+    + '</div></div></div>';
+  return html;
+}
+function renderLog() {
+  var ol = $("logList");
+  $("logCount").textContent = state.logs.length + " 条";
+  if (!state.logOpen) { ol.classList.add("hidden"); $("logToggle").textContent = "展开"; return; }
+  ol.classList.remove("hidden");
+  $("logToggle").textContent = "收起";
+  if (!state.logs.length) { ol.innerHTML = '<li class="none">还没有请求。点任意分类或卡片，这里就会多一条。</li>'; return; }
+  var html = "";
+  for (var i = 0; i < state.logs.length; i++) {
+    var l = state.logs[i];
+    html += '<li title="' + esc(l.url) + '"><span class="dot ' + (l.ok ? "ok" : "bad") + '"></span>'
+      + '<span class="tm">' + l.time + '</span><span class="lb">' + esc(l.label) + '</span>'
+      + '<span class="dt' + (l.ok ? "" : " bad") + '">' + esc(l.detail) + '</span>'
+      + '<span class="ms">' + l.ms + 'ms</span></li>';
+  }
+  ol.innerHTML = html;
+}
+function render() {
+  var main = $("main"), v = state.view;
+  var html = "";
+  if (v.kind === "browse") html = renderBrowse();
+  else if (v.kind === "detail") html = renderDetail();
+  else if (v.kind === "reader") html = renderReader();
+  main.innerHTML = html;
+  bindImgs(main);
+  /* 事件绑定 */
+  var b = state.browse, r = rule();
+  var navBtns = main.querySelectorAll("[data-nav]");
+  for (var i = 0; i < navBtns.length; i++) navBtns[i].addEventListener("click", function () {
+    var k = this.getAttribute("data-nav");
+    if (k === "home") loadGsHome(); else loadGsCategory(k, 1);
+  });
+  var mtBtns = main.querySelectorAll("[data-mt]");
+  for (var j = 0; j < mtBtns.length; j++) mtBtns[j].addEventListener("click", function () {
+    var key = this.getAttribute("data-mt"), val = this.getAttribute("data-v");
+    var cls = key === "mtCls" ? val : b.mtCls, area = key === "mtArea" ? val : b.mtArea, sort = key === "mtSort" ? val : b.mtSort;
+    loadMtList(cls, area, sort, 1);
+  });
+  var cardBtns = main.querySelectorAll("[data-card]");
+  for (var k = 0; k < cardBtns.length; k++) cardBtns[k].addEventListener("click", function () {
+    var idx = parseInt(this.getAttribute("data-card"), 10);
+    var card = null;
+    if (r.kind === "guangse" && b.nav === "home" && b.sections) {
+      var n = 0;
+      for (var s = 0; s < b.sections.length && !card; s++) {
+        if (idx < n + b.sections[s].items.length) card = b.sections[s].items[idx - n];
+        n += b.sections[s].items.length;
+      }
+    } else card = b.cards[idx];
+    if (card) openDetail(r, card);
+  });
+  var retry = $("btnRetry"); if (retry) retry.addEventListener("click", function () { loadBrowseForRule(rule()); });
+  var pp = $("btnPrevPage"); if (pp) pp.addEventListener("click", function () { if (r.kind === "guangse") loadGsCategory(b.nav, b.page - 1); else loadMtList(b.mtCls, b.mtArea, b.mtSort, b.page - 1); });
+  var np = $("btnNextPage"); if (np) np.addEventListener("click", function () { if (r.kind === "guangse") loadGsCategory(b.nav, b.page + 1); else loadMtList(b.mtCls, b.mtArea, b.mtSort, b.page + 1); });
+  var bl = $("btnBackList"); if (bl) bl.addEventListener("click", function () { state.view = { kind: "browse" }; render(); });
+  var bs = $("btnSort"); if (bs) bs.addEventListener("click", function () { state.chapterDesc = !state.chapterDesc; render(); });
+  var chBtns = main.querySelectorAll("[data-ch]");
+  for (var c = 0; c < chBtns.length; c++) chBtns[c].addEventListener("click", function () {
+    openChapter(rule(), state.view.detail, parseInt(this.getAttribute("data-ch"), 10));
+  });
+  var rb = $("btnReaderBack"); if (rb) rb.addEventListener("click", function () { state.view = { kind: "detail", detail: state.view.detail }; render(); });
+  var pv = $("btnPrev"); if (pv) pv.addEventListener("click", function () { if (state.view.detail.chapters.length === 1 && state.view.detail.chapters[0].id === "__direct__") readerNavDirect("prev"); else readerNav("prev"); });
+  var nx = $("btnNext"); if (nx) nx.addEventListener("click", function () { if (state.view.detail.chapters.length === 1 && state.view.detail.chapters[0].id === "__direct__") readerNavDirect("next"); else readerNav("next"); });
+  var tc = $("btnToc"); if (tc) tc.addEventListener("click", function () { state.view = { kind: "detail", detail: state.view.detail }; render(); });
+  var rc = $("btnRetryCh"); if (rc) rc.addEventListener("click", function () { loadChapterImages(rule(), state.view.detail, state.view.index, state.view.tableNote); });
+  renderLog();
+}
+/* ---------------- 导入规则文件 ---------------- */
+function onImportFile(file) {
+  var t0 = Date.now();
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var raw = JSON.parse(reader.result);
+      var def = ruleDefFromJson(raw, file.name);
+      if (!def) throw new Error("这份规则不是光社（hs 库）或漫画台（kaimanhua）这两类形状，控制台跑不了");
+      RULES.push(def);
+      state.ruleId = def.id;
+      pushLog({ label: "导入小程序", url: file.name, ok: true, detail: def.title + " · " + (def.author || "未知作者") + " · " + (def.kind === "guangse" ? def.cats.length + " 个分类" : "漫画台类"), ms: Date.now() - t0 });
+      $("importErr").textContent = "";
+      renderRuleRow();
+      loadBrowseForRule(def);
+    } catch (e) {
+      var msg = e.message || String(e);
+      $("importErr").textContent = "导入失败：" + msg;
+      pushLog({ label: "导入小程序", url: file.name, ok: false, detail: msg, ms: Date.now() - t0 });
+    }
+  };
+  reader.readAsText(file);
+}
+function ruleDefFromJson(raw, fileName) {
+  var title = typeof raw.title === "string" ? raw.title : "";
+  var author = typeof raw.author === "string" ? raw.author : "";
+  var pages = [];
+  try { var parsed = typeof raw.pages === "string" ? JSON.parse(raw.pages) : raw.pages; if (Array.isArray(parsed)) pages = parsed; } catch (e) { pages = []; }
+  var hs = null;
+  for (var i = 0; i < pages.length; i++) if (pages[i] && pages[i].path === "hs") { hs = pages[i]; break; }
+  if (hs && typeof hs.rule === "string") {
+    var cats = [];
+    var re = /\{\s*k:\s*'([^']+)',\s*n:\s*'([^']+)'\s*\}/g, m;
+    while ((m = re.exec(hs.rule)) !== null) if (m[1] && m[2]) cats.push({ k: m[1], n: m[2] });
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: title || "光社类规则", author: author, kind: "guangse", cats: cats.length ? cats : GS_CATS, fileName: fileName, badge: (title || "光").charAt(0), warm: false };
+  }
+  var url = typeof raw.url === "string" ? raw.url : "";
+  if (url.indexOf("getcomicserch") >= 0 || url.indexOf("kaimanhua") >= 0) {
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: title || "漫画台类规则", author: author, kind: "manhuatai", fileName: fileName, badge: (title || "漫").charAt(0), warm: true };
+  }
+  return null;
+}
+/* ---------------- 深链（壳子点章节传入） ---------------- */
+function parseShellUrl(u) {
+  var s = String(u || "").trim();
+  if (!s) return null;
+  var m = s.match(/hiker:\/\/page\/read\?([^#]*)/);
+  if (m) {
+    var q = {};
+    m[1].split("&").forEach(function (kv) { var p = kv.split("="); q[decodeURIComponent(p[0] || "")] = decodeURIComponent(p[1] || ""); });
+    if (q.mid) return { kind: "gs", mid: q.mid, index: parseInt(q.i || "0", 10) || 0, slug: q.slug || "" };
+  }
+  if (s.indexOf("getchapterinfov2") >= 0) {
+    var q2 = {};
+    var qs2 = s.split("?")[1] || "";
+    qs2.split("&").forEach(function (kv) { var p = kv.split("="); q2[decodeURIComponent(p[0] || "")] = decodeURIComponent(p[1] || ""); });
+    if (q2.comic_id && q2.chapter_newid) return { kind: "mt", comicId: q2.comic_id, chapterId: q2.chapter_newid };
+  }
+  if (s.indexOf("pics://") === 0) {
+    var imgs = s.substring(7).split("&&").map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+    if (imgs.length) return { kind: "pics", images: imgs };
+  }
+  if (s.charAt(0) === "[") {
+    try {
+      var arr = JSON.parse(s), list = [];
+      for (var i = 0; i < arr.length; i++) {
+        if (typeof arr[i] === "string") list.push(arr[i]);
+        else if (arr[i] && typeof arr[i].url === "string") list.push(arr[i].url);
+        else if (arr[i] && typeof arr[i].pic === "string") list.push(arr[i].pic);
+      }
+      if (list.length) return { kind: "pics", images: list };
+    } catch (e) { /* not json */ }
+  }
+  if (/^https?:\/\/[^ ]+\.(jpg|jpeg|png|webp|gif)(\?[^ ]*)?$/i.test(s)) return { kind: "pics", images: [s] };
+  return null;
+}
+function openShellDeepLink(url, title) {
+  var d = parseShellUrl(url);
+  if (!d) return false;
+  if (d.kind === "gs") {
+    state.ruleId = "gs";
+    var r = rule();
+    var fakeCard = { title: title || ("mid=" + d.mid), desc: "", pic: "", ref: "" };
+    pushLog({ label: "壳子传入", url: url, ok: true, detail: "光社 mid=" + d.mid + " 第 " + (d.index + 1) + " 话", ms: 0 });
+    /* 先拉详情取章节表，再进指定话 */
+    request("详情接口·光社", gsChapterApiUrl(d.mid), "desktop", function (t) { return "章节 " + gsChaptersFromApi(t).length + " 话"; }).then(function (jsonText) {
+      var chapters = gsChaptersFromApi(jsonText);
+      var apiMeta = gsApiMeta(jsonText);
+      if (!chapters.length) throw new Error("接口没返回章节");
+      var detail = { ref: "", title: (apiMeta && apiMeta.title) || title || ("mid=" + d.mid), author: "", cover: (apiMeta && apiMeta.cover) || "", desc: (apiMeta && apiMeta.desc) || "", status: "", tags: [], mid: d.mid, chapters: chapters };
+      var idx = Math.max(0, Math.min(d.index, chapters.length - 1));
+      openChapter(r, detail, idx);
+    }).catch(function (e) { showToast(e.message || String(e)); });
+    return true;
+  }
+  if (d.kind === "mt") {
+    state.ruleId = "mt";
+    var r2 = rule();
+    pushLog({ label: "壳子传入", url: url, ok: true, detail: "漫画台 comic_id=" + d.comicId + " 章节 " + d.chapterId, ms: 0 });
+    /* 先拉详情取章节表，再进指定话 */
+    request("详情接口·漫画台", mtDetailUrl(d.comicId), "mobile", function (t) { var dd = mtParseDetail(t); return "章节 " + (dd ? dd.chapters.length : 0) + " 话"; }).then(function (text) {
+      var dd = mtParseDetail(text);
+      if (!dd || !dd.chapters.length) throw new Error("详情接口没解析出数据");
+      var detail2 = { ref: dd.comicId, title: dd.name || title || ("comic_id=" + d.comicId), author: "", cover: dd.cover || "", desc: dd.desc, status: "", tags: [], mid: "", chapters: dd.chapters };
+      var idx2 = 0;
+      for (var k = 0; k < dd.chapters.length; k++) if (dd.chapters[k].id === d.chapterId) { idx2 = k; break; }
+      openChapter(r2, detail2, idx2);
+    }).catch(function (e) { showToast(e.message || String(e)); });
+    return true;
+  }
+  if (d.kind === "pics") {
+    pushLog({ label: "壳子传入", url: url, ok: true, detail: "直接打开 " + d.images.length + " 张图", ms: 0 });
+    openImagesDirect(d.images, title || "");
+    return true;
+  }
+  return false;
+}
+/* ---------------- 启动 ---------------- */
+function boot() {
+  renderRuleRow();
+  $("logToggle").addEventListener("click", function () { state.logOpen = !state.logOpen; renderLog(); });
+  $("logClear").addEventListener("click", function () { state.logs = []; renderLog(); });
+  $("fileInput").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    if (f) onImportFile(f);
+    this.value = "";
+  });
+  pushLog({ label: "导入小程序", url: "_____2_i9q0.json（页面内嵌）", ok: true, detail: "光社漫画 · WorkBuddy · " + GS_CATS.length + " 个分类", ms: 0 });
+  pushLog({ label: "导入小程序", url: "___1_9dfy.json（页面内嵌）", ok: true, detail: "漫画台 · zhao · 16 个分类", ms: 0 });
+  /* 壳子传入（WebView 桥）优先；其次 URL 参数（浏览器自测用） */
+  var initUrl = "", initTitle = "";
+  try {
+    if (window.ComicBridge && typeof window.ComicBridge.getInitialUrl === "function") initUrl = window.ComicBridge.getInitialUrl() || "";
+    if (window.ComicBridge && typeof window.ComicBridge.getInitialTitle === "function") initTitle = window.ComicBridge.getInitialTitle() || "";
+  } catch (e) { /* no bridge */ }
+  if (!initUrl) {
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      initUrl = qs.get("open") || "";
+      initTitle = qs.get("title") || "";
+    } catch (e) { /* no query */ }
+  }
+  if (initUrl && openShellDeepLink(initUrl, initTitle)) return;
+  loadBrowseForRule(rule());
+}
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+}
+
+</script>
+</body>
+</html>
