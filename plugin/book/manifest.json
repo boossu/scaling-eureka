@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "updated": "2026-11-24",
+  "reader": {
+    "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/book/book_reader.html",
+    "sha256": "d07b1d154493324650a1fd37b79ccc6400ba3ca4b0ec1a3fc2531ff529af59ff"
+  },
+  "rules": [
+    {
+      "name": "无奈书库",
+      "file": "wunai.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/book/rules/wunai.json",
+      "sha256": "ec1f373d483b06754f107660f1c16fe597aaa7326cce96a077dcaf3fe4e414cd"
+    },
+    {
+      "name": "国学经典",
+      "file": "guoxue.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/book/rules/guoxue.json",
+      "sha256": "38b86e3fae172f5f0deaa2482527b71091a7e85903ed3552be6c2e1a864ea6a6"
+    }
+  ]
+}
