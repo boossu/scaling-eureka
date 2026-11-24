@@ -1,6 +1,6 @@
 {
   "reader": {
-    "sha256": "56e30f79e44af7fad8ca16ef58c55110b781b8b1ca6039414f3881111b359264",
+    "sha256": "4052c8fc813256eb1dc3d937829e2b771cce56965ef78409caf646ad518c082e",
     "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/book/book_reader.html"
   },
   "rules": [
@@ -18,5 +18,5 @@
     }
   ],
   "updated": "2026-11-24",
-  "version": 5
+  "version": 6
 }

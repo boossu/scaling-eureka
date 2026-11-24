@@ -213,7 +213,7 @@ img{display:block}
     <div class="hub-head-row">
       <span class="hub-badge" aria-hidden>书</span>
       <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">书籍插件 v5</span>
+      <span class="hub-ver" id="hubVer">书籍插件 v6</span>
     </div>
     <p class="hub-desc">书籍小程序：分类、详情、章节全是真请求。</p>
   </section>
@@ -263,7 +263,7 @@ img{display:block}
 <div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
 <script>
 "use strict";
-var PLUGIN_VERSION = 5;
+var PLUGIN_VERSION = 6;
 /* ============================================================
    书籍阅读器 JS —— 浏览器控制台（bookEngine.ts + BookPlugin.tsx）
    的完整复刻。纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
@@ -806,6 +806,21 @@ function hubSaveExtraPlugins(list) {
 function hubSetBridgeVisible(v) {
   try { if (window.ComicBridge && typeof window.ComicBridge.setHubVisible === "function") window.ComicBridge.setHubVisible(v); } catch (e) { /* no bridge */ }
 }
+/* 漫画阅读器本地副本缓存（localStorage "mangaReaderCache"，与漫画阅读器同 key）：
+   见漫画阅读器里的说明：漫画插件已经下载在本机，入口优先载入本地副本，
+   不再每次都去 GitHub 重拉。 */
+var MANGA_READER_CACHE_KEY = "mangaReaderCache";
+function saveMangaReaderCache(version, readerText) {
+  try { if (window.localStorage) window.localStorage.setItem(MANGA_READER_CACHE_KEY, JSON.stringify({ version: version, readerText: readerText })); } catch (e) { /* 存储不可用时忽略 */ }
+}
+function loadMangaReaderCache() {
+  try {
+    var raw = window.localStorage ? window.localStorage.getItem(MANGA_READER_CACHE_KEY) : null;
+    var c = raw ? JSON.parse(raw) : null;
+    if (c && typeof c.readerText === "string" && c.readerText.indexOf("PLUGIN_VERSION") !== -1) return c;
+    return null;
+  } catch (e) { return null; }
+}
 /* 纯 JS SHA-256（同步，不依赖 crypto.subtle：file:// 与旧 WebView 也能用）。
    校验向量：sha256Hex("abc") === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"。 */
 function sha256Hex(str) {
@@ -1057,7 +1072,16 @@ function checkBookUpdate() {
    缺的是从书籍 hub 回漫画的路。这里直接拉漫画清单、验 sha256 后载入。 */
 var MANGA_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
 var mangaBusy = false;
+/* v6：点漫画先走本地副本——漫画插件已经下载在本机（漫画阅读器启动时把
+   全文存进 localStorage "mangaReaderCache"，更新时也同步刷新），入口直接
+   载入本地副本，不再每次都去 GitHub 重新拉清单+阅读器。以前每次点都要等
+   两次联网（清单+175KB 阅读器）+ sha256，页面只多一行“正在拉取…”、
+   看起来像没反应，用户就再点一下——第一下的拉取完成后才进，就觉得
+   “要点两次”。没有本地副本时才联网拉取，并顺手存一份供下次直接进。
+   更新仍走“更新插件”按钮（checkMangaUpdate），入口本身不查新版。 */
 function enterManga() {
+  var cached = loadMangaReaderCache();
+  if (cached) { loadReaderText(cached.readerText); return; }
   if (mangaBusy) return;
   mangaBusy = true;
   var st = $("mangaUpdateStatus");
@@ -1069,6 +1093,7 @@ function enterManga() {
     if (bad) throw new Error(bad);
     return fetchTextTimeout(m.reader.url).then(function (readerText) {
       if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
+      saveMangaReaderCache(m.version, readerText);
       mangaBusy = false;
       loadReaderText(readerText);
     });
@@ -1105,6 +1130,7 @@ function checkMangaUpdate() {
     }
     return fetchTextTimeout(m.reader.url).then(function (readerText) {
       if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
+      saveMangaReaderCache(m.version, readerText); /* 新版原字节同步进本地副本缓存 */
       try {
         var l2 = hubExtraPlugins();
         for (var j = 0; j < l2.length; j++) {
