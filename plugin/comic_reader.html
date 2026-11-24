@@ -225,14 +225,12 @@ img{display:block}
 </head>
 <body>
 <div id="hub">
-  <section class="hub-head" aria-label="插件">
-    <div class="hub-head-row">
-      <span class="hub-badge" aria-hidden>漫</span>
-      <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">插件 v9</span>
-    </div>
-    <p class="hub-desc">漫画小程序：分类、详情、章节全是真请求。</p>
-  </section>
+  <!-- 用户 2026-11-24 15:36“顶部栏的问题要改apk，顶部栏不再切换任何插件，
+       就是个固定显示”：入口页顶栏改由 APK 固定显示（WebView 上方的原生
+       header），阅读器里不再自己画顶栏（图标/标题“聚合插件”/副标题/
+       版本徽标/描述行都已去掉），切换插件时顶栏不再重载、不再跳。
+       入口页从第一行就是插件列表；更新状态仍显示在各入口下方的
+       .hub-status 行。 -->
   <section aria-label="插件列表">
     <div class="hub-list">
       <div class="hub-row">
@@ -270,7 +268,7 @@ img{display:block}
 <input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 9;
+var PLUGIN_VERSION = 10;
 var PLUGIN_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
 /* ---------------- 主界面 hub（入口页，v479 壳子版同款，v4 起做到 GitHub 阅读器里） ---------------- */
 /* v3 的教训：GitHub 阅读器里根本没有 hub，goHome() 只回规则卡首页；
@@ -293,25 +291,22 @@ function hubSaveExtraPlugins(list) {
 function hubSetBridgeVisible(v) {
   try { if (window.ComicBridge && typeof window.ComicBridge.setHubVisible === "function") window.ComicBridge.setHubVisible(v); } catch (e) { /* no bridge */ }
 }
-/* 漫画阅读器本地副本缓存（localStorage "mangaReaderCache"）：
+/* 漫画阅读器本地存的副本（localStorage "mangaReaderCache"）：
    用户 2026-11-24 14:39：“好像是再拉取漫画插件 漫画插件不是下载了吗”——
    书籍 hub 的漫画入口每次都去 GitHub 重新拉清单+阅读器，点一下要等几秒，
    页面只多一行“正在拉取…”、看起来像没反应，用户就再点一下（第二下被
    mangaBusy 吞掉，第一下的拉取完成后才进，用户就觉得“要点两次”）。
    漫画插件明明已经下载在本机，入口却不用。修法：漫画阅读器启动时把自己
-   的全文存进本地缓存；书籍 hub 的漫画入口优先载入这份本地副本（见
+   的全文存进本地存储；书籍 hub 的漫画入口优先载入这份本地副本（见
    book_reader.html 的 enterManga），没有副本时才联网拉取并顺手存一份。
-   缓存只含“已下载的本机副本”，更新仍走更新按钮。 */
+   存的只含“已下载的本机副本”，更新就覆盖旧版，更新仍走更新按钮。
+   用户 2026-11-24 15:31：“下载回来不是缓存，是真存，更新就覆盖”——
+   这份是真存的副本，不是缓存。 */
 var MANGA_READER_CACHE_KEY = "mangaReaderCache";
-/* 从书籍 hub 点漫画直接进阅读器的标志（localStorage "mangaDirectEntry"）：
-   用户 2026-11-24 15:12：“是这里跳 不知道什么原因 漫画还是要点击两次才能进”——
-   书籍 hub 点漫画，enterManga 载入漫画阅读器后，漫画阅读器启动时默认先显示
-   入口页（showHub），header 从书/书籍插件跳成漫/插件 v8，用户还得在漫画入口页
-   上再点一次漫画才进阅读器——这就是“点两次”。v8 只解决了“第一下重拉”，
-   没解决“第一下落在入口页”。修法：书籍阅读器的 enterManga 在载入前先写
-   "mangaDirectEntry"="1"；这里启动时读到就清掉并直接 enterManga()，不经入口页。
-   正常从壳子进（无此标志）仍先显示入口页。 */
-var MANGA_DIRECT_ENTRY_KEY = "mangaDirectEntry";
+/* v10：mangaDirectEntry 标记已退役。用户 2026-11-24 15:37“点击哪个插件，
+   就运行哪个下载的插件，进入界面”——启动默认直接进漫画界面（见 boot 末尾），
+   不再靠标记区分“从书籍 hub 进”还是“从壳子进”。书籍阅读器的 enterManga
+   仍会写这个标记（无害，没人再读它）。 */
 function saveMangaReaderCache(version, readerText) {
   try { if (window.localStorage) window.localStorage.setItem(MANGA_READER_CACHE_KEY, JSON.stringify({ version: version, readerText: readerText })); } catch (e) { /* 存储不可用时忽略 */ }
 }
@@ -373,6 +368,17 @@ function fetchTextTimeout(url, ms) {
     return res.text();
   });
 }
+/* 清单/阅读器拉取绕过 HTTP 缓存。用户 2026-11-24 15:31“下载回来不是缓存
+   是真存，更新就覆盖”——更新检查必须看到最新的清单。raw.githubusercontent.com
+   回 Cache-Control: max-age=300，裸 fetch 会在 5 分钟内读到缓存里的旧清单，
+   导致点“更新插件”显示“已是最新 v8”却升不到 v9（2026-11-24 15:24 真机）。
+   时间戳查询串让每次拉取都是新地址，既绕过 WebView 的 HTTP 缓存，
+   也绕过 CDN 边缘节点的旧清单。清单地址常量本身不变（壳子共用同一地址），
+   只在拉取时拼查询串。清单只在用户主动点“更新插件”（或手动添加/更新
+   插件）时拉，启动时不拉。 */
+function manifestUrlFresh(url) {
+  return url + (url.indexOf("?") === -1 ? "?" : "&") + "t=" + Date.now();
+}
 function validatePluginManifest(m) {
   if (!m || typeof m !== "object") return "清单不是有效的 JSON 对象";
   if (typeof m.version !== "number") return "清单缺少 version（数字）";
@@ -385,11 +391,11 @@ function validatePluginManifest(m) {
    任一步失败即 throw，调用方不得保存半拉的条目；更新失败时旧条目原样不动。 */
 function pullPluginFromManifest(manifestUrl, customName) {
   var m;
-  return fetchTextTimeout(manifestUrl).then(function (text) {
+  return fetchTextTimeout(manifestUrlFresh(manifestUrl)).then(function (text) {
     try { m = JSON.parse(text); } catch (e) { throw new Error("清单 JSON 解析失败"); }
     var bad = validatePluginManifest(m);
     if (bad) throw new Error(bad);
-    return fetchTextTimeout(m.reader.url);
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url));
   }).then(function (readerText) {
     if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上，拒绝保存");
     var entry = { name: "", url: manifestUrl, version: m.version, rules: m.rules.length, updated: m.updated || "", readerText: readerText, readerSha256: String(m.reader.sha256).toLowerCase(), ruleTexts: {} };
@@ -496,7 +502,7 @@ function showHub() {
   var hub = $("hub"), app = $("app");
   if (hub) hub.classList.remove("hidden");
   if (app) app.classList.add("hidden");
-  var v = $("hubVer"); if (v) v.textContent = "插件 v" + (window.PLUGIN_VERSION || 1);
+  /* v10：入口页顶栏已去掉（改由 APK 固定显示），这里不再写版本徽标。 */
   renderExtraList();
   hubSetBridgeVisible(true);
   window.scrollTo(0, 0);
@@ -519,7 +525,7 @@ function checkPluginUpdate() {
   if (btn) btn.disabled = true;
   if (st) st.textContent = "正在检查更新…";
   function done() { hubUpdating = false; if (btn) btn.disabled = false; }
-  fetchTextTimeout(PLUGIN_MANIFEST_URL).then(function (text) {
+  fetchTextTimeout(manifestUrlFresh(PLUGIN_MANIFEST_URL)).then(function (text) {
     var m;
     try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
     var bad = validatePluginManifest(m);
@@ -534,20 +540,21 @@ function checkPluginUpdate() {
       try { window.ComicBridge.checkForUpdate(); } catch (e) { /* no bridge */ }
       if (st) st.textContent = "已更新到 v" + m.version;
       done();
-      /* v8：壳子下载替换的是文件，本地副本缓存不同步——下载时就把新版原字节
+      /* v8：壳子下载替换的是文件，本地存的副本不同步——下载时就把新版原字节
          存进 mangaReaderCache，不等到下次打开漫画才由 boot 存。否则更新
-         完没打开过漫画，书籍 hub 点漫画读到的还是旧版（或空缓存又重拉）。
-         拉不到也不影响更新本身（下次打开漫画时 boot 再存）。 */
-      fetchTextTimeout(m.reader.url).then(function (readerText) {
+         完没打开过漫画，书籍 hub 点漫画读到的还是旧版（或存的副本为空又重拉）。
+         拉不到也不影响更新本身（下次打开漫画时 boot 再存）。
+         v10：阅读器下载也加时间戳，绕过 HTTP 缓存，存的必须是新版原字节。 */
+      fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
         if (sha256Hex(readerText) === String(m.reader.sha256).toLowerCase()) {
           saveMangaReaderCache(m.version, readerText);
         }
-      }).catch(function () { /* 缓存存不上时忽略 */ });
+      }).catch(function () { /* 存不上时忽略 */ });
       return;
     }
-    return fetchTextTimeout(m.reader.url).then(function (readerText) {
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
       if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
-      saveMangaReaderCache(m.version, readerText); /* 新版原字节存进本地副本缓存，供书籍 hub 直接载入 */
+      saveMangaReaderCache(m.version, readerText); /* 新版原字节存进本地副本（覆盖旧版），供书籍 hub 直接载入 */
       if (st) st.textContent = "已更新到 v" + m.version;
       done();
       loadReaderText(readerText);
@@ -557,40 +564,11 @@ function checkPluginUpdate() {
     done();
   });
 }
-/* v5：启动时从 GitHub 清单拉六条规则 JSON，用 ruleDefFromJson 重新解析，
-   刷新内置规则的分类/榜单/作者（规则文件改了也不用等新版阅读器）。
-   拉不到（离线/清单挂了）就用内嵌快照，照常用。 */
-function loadRulesFromManifest() {
-  fetchTextTimeout(PLUGIN_MANIFEST_URL, 20000).then(function (text) {
-    var m;
-    try { m = JSON.parse(text); } catch (e) { return; }
-    if (!m || !Array.isArray(m.rules)) return;
-    var chain = Promise.resolve();
-    m.rules.forEach(function (r) {
-      chain = chain.then(function () {
-        return fetchTextTimeout(r.url, 20000).then(function (rt) {
-          var raw;
-          try { raw = JSON.parse(rt); } catch (e) { return; }
-          var def = ruleDefFromJson(raw, r.file || "");
-          if (!def) return;
-          for (var i = 0; i < RULES.length; i++) {
-            if (RULES[i].kind === def.kind) {
-              def.id = RULES[i].id;
-              if (def.kind === "wanman" && RULES[i].wmCats && RULES[i].wmCats.length) def.wmCats = RULES[i].wmCats;
-              RULES[i] = def;
-              break;
-            }
-          }
-        }).catch(function () { /* 单条规则拉不到，留内嵌快照 */ });
-      });
-    });
-    return chain.then(function () {
-      pushLog({ label: "规则清单", url: PLUGIN_MANIFEST_URL, ok: true, detail: "GitHub 规则已刷新 · " + RULES.length + " 条规则", ms: 0 });
-      renderRuleRow();
-      if (state.view.kind === "browse") render();
-    });
-  }).catch(function () { /* 清单拉不到，留内嵌快照 */ });
-}
+/* v10：loadRulesFromManifest 已删。用户 2026-11-24 15:33“不再检查，除非我
+   主动更新”——启动时不再从清单拉规则刷新（原来这里拉清单还会把旧清单
+   留在 WebView 缓存里，导致更新检查读到旧清单、显示“已是最新”却升不了版）。
+   规则只用阅读器里内嵌的快照（与 GitHub 当前规则一致）；清单只在用户
+   主动点“更新插件”时拉（checkPluginUpdate）。 */
 /* 每条加进来的插件自带的更新按钮：按各自清单地址查新版。
    有新版 → 下载验 sha256 后替换并更新显示的版本；已是最新 → “已是最新 vX”；
    失败 → “检查失败，请稍后重试”，已保存的旧包原样不动。 */
@@ -2020,10 +1998,11 @@ var DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (
 var MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
 
 /* v5：六条规则全内置。dd/kk/xa 的分类表取自规则 exploreUrl 原文
-   （KK_EXPLORE_RAW / XA_EXPLORE_RAW 是 GitHub rules/ 文件的快照；
-   启动时 loadRulesFromManifest() 再从清单拉最新规则 JSON 刷新一次，
-   拉不到就用这份内嵌快照，离线也能用）。蛙漫分类是 @js，选中时从
-   live /category 页现算，wmCats 初始为空。 */
+   （KK_EXPLORE_RAW / XA_EXPLORE_RAW 是 GitHub rules/ 文件的快照，
+   与 GitHub 当前规则一致）。用户 2026-11-24 15:33“不再检查，除非我
+   主动更新”：启动时不再从清单拉规则刷新，规则只用这份内嵌快照，
+   离线也能用；清单只在用户主动点“更新插件”时拉。蛙漫分类是 @js，
+   选中时从 live /category 页现算，wmCats 初始为空。 */
 var RULES = [
   { id: "gs", title: "光社漫画", author: "WorkBuddy", kind: "guangse", fileName: "_____2_i9q0.json", badge: "光", tone: "gs", cats: GS_CATS },
   { id: "mt", title: "漫画台", author: "zhao", kind: "manhuatai", fileName: "___1_9dfy.json", badge: "漫", tone: "mt", mtCats: MT_CATS, mtListTemplate: MT_LIST_TEMPLATE },
@@ -2942,7 +2921,7 @@ function openShellDeepLink(url, title) {
 }
 /* ---------------- 启动 ---------------- */
 function boot() {
-  /* 启动时把本阅读器全文存进本地副本缓存（只在缓存缺失或更旧时存；
+  /* 启动时把本阅读器全文存进本地存储（只在存的副本缺失或更旧时存；
      已有同版的精确字节副本时不覆盖——那份是更新通道下载的原字节）。
      供书籍 hub 的漫画入口直接载入，不再每次都去 GitHub 重拉。 */
   try {
@@ -2952,7 +2931,9 @@ function boot() {
     }
   } catch (e) { /* 存储不可用时忽略 */ }
   renderRuleRow();
-  loadRulesFromManifest();
+  /* 用户 2026-11-24 15:33“不再检查，除非我主动更新”：启动时不再拉清单
+     （loadRulesFromManifest 已删）。规则只用内嵌快照；清单只在用户主动
+     点“更新插件”时拉。 */
   var pi = $("pasteImport"); if (pi) pi.addEventListener("click", importPastedJson);
   var pc = $("pasteCancel"); if (pc) pc.addEventListener("click", function () { var p = $("pastePanel"); if (p) p.classList.add("hidden"); $("importErr").textContent = ""; });
   $("logToggle").addEventListener("click", function () { state.logOpen = !state.logOpen; renderLog(); });
@@ -3003,16 +2984,11 @@ function boot() {
     hubSetBridgeVisible(false);
     return;
   }
-  /* v9：从书籍 hub 点漫画进来时直接进阅读器，不经入口页（见上 MANGA_DIRECT_ENTRY_KEY）。
-     正常从壳子进（无此标志）仍先显示入口页。 */
-  var _de = false;
-  try {
-    _de = window.localStorage && window.localStorage.getItem(MANGA_DIRECT_ENTRY_KEY) === "1";
-    if (_de) window.localStorage.removeItem(MANGA_DIRECT_ENTRY_KEY);
-  } catch (e) { /* no storage */ }
-  if (_de) { enterManga(); return; }
-  /* 主界面先行：不拉任何列表，等用户点“漫画”才进阅读器 */
-  showHub();
+  /* 用户 2026-11-24 15:37“点击哪个插件，就运行哪个下载的插件，进入界面”：
+     启动默认直接进漫画界面（六张规则卡），不经入口页；入口页只在点
+     “‹ 主页”时出现（goHome → showHub）。深链仍优先（上一步已处理）。
+     v9 的 mangaDirectEntry 标记不再需要（启动本来就直接进界面）。 */
+  enterManga();
 }
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
