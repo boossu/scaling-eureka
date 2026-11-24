@@ -40,6 +40,14 @@ img{display:block}
 .rule-dot.mt{background:var(--warm)}
 .import-btn{flex:1;min-width:140px;display:flex;align-items:center;justify-content:center;padding:12px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);font-size:14px;color:var(--dim)}
 .import-btn:active{color:var(--text)}
+.home-btn{flex:none;display:flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--text)}
+.home-btn:active{transform:scale(.98)}
+#pastePanel{margin-top:10px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:12px}
+#pasteJson{width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+.paste-btns{display:flex;gap:8px;margin-top:10px}
+.paste-btns button{flex:1;border-radius:10px;padding:10px;font-size:14px;font-weight:600}
+#pasteImport{background:var(--fill-gs);color:#fff}
+#pasteCancel{background:var(--surface2);color:var(--dim);box-shadow:inset 0 0 0 1px var(--border)}
 #importErr{margin-top:8px;font-size:14px;color:var(--bad)}
 /* ---------- chips ---------- */
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding-top:16px}
@@ -160,7 +168,7 @@ img{display:block}
 </head>
 <body>
 <div id="app">
-  <section id="rules" aria-label="已导入规则"><div class="rule-row" id="ruleRow"></div><div id="importErr"></div></section>
+  <section id="rules" aria-label="已导入规则"><div class="rule-row" id="ruleRow"></div><div id="importErr"></div><div id="pastePanel" class="hidden"><textarea id="pasteJson" rows="6" placeholder="粘贴小程序规则 JSON（把规则文件全文粘贴到这里）…" spellcheck="false"></textarea><div class="paste-btns"><button type="button" id="pasteImport">导入</button><button type="button" id="pasteCancel">取消</button></div></div></section>
   <main id="main"></main>
   <aside id="log" aria-label="请求日志">
     <div class="lh"><h2>请求日志 <span id="logCount">0 条</span></h2><div class="btns"><button type="button" id="logToggle">收起</button><button type="button" id="logClear">清空</button></div></div>
@@ -171,7 +179,7 @@ img{display:block}
 <input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 2;
+var PLUGIN_VERSION = 3;
 /* ============================================================
    漫画阅读器 JS —— 浏览器控制台（engine.ts + App.tsx）的完整复刻。
    纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
@@ -455,7 +463,7 @@ var state = {
   chapterDesc: false,
   logOpen: true
 };
-var logId = 0, toastTimer = null;
+var logId = 0, toastTimer = null, detailToken = 0;
 function rule() { for (var i = 0; i < RULES.length; i++) if (RULES[i].id === state.ruleId) return RULES[i]; return RULES[0]; }
 function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function $(id) { return document.getElementById(id); }
@@ -557,6 +565,7 @@ function loadMtList(cls, area, sort, page) {
   }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
 }
 function loadBrowseForRule(r) {
+  detailToken++;
   state.view = { kind: "browse" };
   state.chapterDesc = false;
   if (r.kind === "guangse") loadGsHome();
@@ -564,6 +573,7 @@ function loadBrowseForRule(r) {
 }
 /* ---------------- 详情 ---------------- */
 function openDetail(r, card) {
+  var myToken = ++detailToken;
   state.detailLoading = card.title; render();
   if (r.kind === "guangse") {
     request("详情页·光社", GS_HOST + "/manga/" + card.ref, "desktop", function (t) {
@@ -576,19 +586,21 @@ function openDetail(r, card) {
         var chapters = gsChaptersFromApi(jsonText);
         var apiMeta = gsApiMeta(jsonText);
         if (!chapters.length) throw new Error("接口没返回章节，重试一次");
+        if (myToken !== detailToken) return; /* 已点别的卡/回首页，过期响应不覆盖当前页 */
         state.view = { kind: "detail", detail: { ref: card.ref, title: meta.name || (apiMeta && apiMeta.title) || card.title, author: meta.author, cover: fixPic(meta.cover) || (apiMeta && apiMeta.cover) || card.pic, desc: meta.desc || (apiMeta && apiMeta.desc) || "", status: meta.status, tags: meta.tags, mid: meta.mid, chapters: chapters } };
         state.detailLoading = ""; render();
       });
-    }).catch(function (e) { state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+    }).catch(function (e) { if (myToken !== detailToken) return; state.detailLoading = ""; showToast(e.message || String(e)); render(); });
   } else {
     request("详情接口·漫画台", mtDetailUrl(card.ref), "mobile", function (t) {
       var d = mtParseDetail(t); return "章节 " + (d ? d.chapters.length : 0) + " 话";
     }).then(function (text) {
       var d = mtParseDetail(text);
       if (!d) throw new Error("详情接口没解析出数据，重试一次");
+      if (myToken !== detailToken) return; /* 已点别的卡/回首页，过期响应不覆盖当前页 */
       state.view = { kind: "detail", detail: { ref: d.comicId, title: d.name || card.title, author: "", cover: d.cover || card.pic, desc: d.desc, status: "", tags: [], mid: "", chapters: d.chapters } };
       state.detailLoading = ""; render();
-    }).catch(function (e) { state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+    }).catch(function (e) { if (myToken !== detailToken) return; state.detailLoading = ""; showToast(e.message || String(e)); render(); });
   }
 }
 /* ---------------- 阅读器 ---------------- */
@@ -651,7 +663,7 @@ function readerNavDirect(dir) {
 }
 /* ---------------- 渲染 ---------------- */
 function renderRuleRow() {
-  var html = "";
+  var html = '<button type="button" class="home-btn" id="homeBtn">‹ 主页</button>';
   for (var i = 0; i < RULES.length; i++) {
     var r = RULES[i], active = r.id === state.ruleId;
     var cls = "rule-card" + (active ? (r.warm ? " active-mt" : " active-gs") : "");
@@ -664,6 +676,7 @@ function renderRuleRow() {
       + '</button>';
   }
   html += '<button type="button" class="import-btn" id="importBtn">+ 导入规则文件</button>';
+  html += '<button type="button" class="import-btn" id="pasteBtn">粘贴 JSON</button>';
   $("ruleRow").innerHTML = html;
   var btns = $("ruleRow").querySelectorAll("[data-rule]");
   for (var j = 0; j < btns.length; j++) {
@@ -679,12 +692,18 @@ function renderRuleRow() {
      旧的 <label for> 指着 display:none 的输入框，手机浏览器点不开。 */
   var ib = $("importBtn");
   if (ib) ib.addEventListener("click", function () { $("fileInput").click(); });
+  var hb = $("homeBtn");
+  if (hb) hb.addEventListener("click", function () { goHome(); });
+  var pb = $("pasteBtn");
+  if (pb) pb.addEventListener("click", function () { var p = $("pastePanel"); if (p) p.classList.toggle("hidden"); });
 }
-function cardGridHtml(cards) {
+/* base：全局下标基数。首页多板块共用一个 data-card 命名空间时必须传，
+   否则各板块下标都从 0 开始重排，点第 2/3 板块的卡会按全局下标算进第 1 板块。 */
+function cardGridHtml(cards, base) {
   var html = '<div class="grid">';
   for (var i = 0; i < cards.length; i++) {
     var c = cards[i];
-    html += '<button type="button" class="card" data-card="' + i + '">'
+    html += '<button type="button" class="card" data-card="' + ((base || 0) + i) + '">'
       + imgHtml(c.pic, c.title, "cover")
       + '<span class="card-t">' + (state.detailLoading === c.title ? "加载中…" : esc(c.title)) + '</span>'
       + (c.desc ? '<span class="card-d">' + esc(c.desc) + '</span>' : '')
@@ -730,9 +749,11 @@ function renderBrowse() {
   } else if (b.error) {
     html += '<div class="errbox"><p>请求失败：' + esc(b.error) + '</p><button type="button" class="retry" id="btnRetry">重试</button></div>';
   } else if (r.kind === "guangse" && b.nav === "home" && b.sections) {
+    var off = 0;
     for (var g = 0; g < b.sections.length; g++) {
       var sec = b.sections[g];
-      html += '<div class="sec-h">' + esc(sec.title) + '</div>' + cardGridHtml(sec.items);
+      html += '<div class="sec-h">' + esc(sec.title) + '</div>' + cardGridHtml(sec.items, off);
+      off += sec.items.length;
       if (g < b.sections.length - 1) html += '<div style="height:24px"></div>';
     }
   } else {
@@ -814,6 +835,7 @@ function renderLog() {
 }
 function render() {
   var main = $("main"), v = state.view;
+  syncHubVisible(v.kind === "browse");
   var html = "";
   if (v.kind === "browse") html = renderBrowse();
   else if (v.kind === "detail") html = renderDetail();
@@ -862,28 +884,70 @@ function render() {
   var rc = $("btnRetryCh"); if (rc) rc.addEventListener("click", function () { loadChapterImages(rule(), state.view.detail, state.view.index, state.view.tableNote); });
   renderLog();
 }
+/* ---------------- 回首页（壳子返回键 + 主页按钮） ---------------- */
+/* v2 的 GitHub 文件里没有 showHub，壳子 ComicViewerActivity.onBackPressed 调
+   evaluateJavascript("showHub()") 是空转（ReferenceError），用户在阅读器里退不出去。
+   这里补上 showHub：回规则卡首页，并同步 ComicBridge.hubVisible——
+   首页时壳子下次按返回就 finish() 退出；详情/阅读页时返回键先回首页。 */
+function syncHubVisible(v) {
+  try { if (window.ComicBridge && typeof window.ComicBridge.setHubVisible === "function") window.ComicBridge.setHubVisible(v); } catch (e) { /* no bridge */ }
+}
+function goHome() {
+  detailToken++;
+  state.view = { kind: "browse" };
+  render();
+  window.scrollTo(0, 0);
+  syncHubVisible(true);
+}
+function showHub() { goHome(); }
 /* ---------------- 导入规则文件 ---------------- */
+function importRuleFromRaw(raw, fileName) {
+  var def = ruleDefFromJson(raw, fileName);
+  if (!def) throw new Error("这份规则不是光社（hs 库）或漫画台（kaimanhua）这两类形状，控制台跑不了");
+  RULES.push(def);
+  state.ruleId = def.id;
+  return def;
+}
+function importRuleDone(def, fileName, t0) {
+  pushLog({ label: "导入小程序", url: fileName, ok: true, detail: def.title + " · " + (def.author || "未知作者") + " · " + (def.kind === "guangse" ? def.cats.length + " 个分类" : "漫画台类"), ms: Date.now() - t0 });
+  $("importErr").textContent = "";
+  renderRuleRow();
+  loadBrowseForRule(def);
+}
+function importRuleFailed(fileName, msg, t0) {
+  $("importErr").textContent = "导入失败：" + msg;
+  pushLog({ label: "导入小程序", url: fileName, ok: false, detail: msg, ms: Date.now() - t0 });
+}
 function onImportFile(file) {
   var t0 = Date.now();
   var reader = new FileReader();
   reader.onload = function () {
     try {
       var raw = JSON.parse(reader.result);
-      var def = ruleDefFromJson(raw, file.name);
-      if (!def) throw new Error("这份规则不是光社（hs 库）或漫画台（kaimanhua）这两类形状，控制台跑不了");
-      RULES.push(def);
-      state.ruleId = def.id;
-      pushLog({ label: "导入小程序", url: file.name, ok: true, detail: def.title + " · " + (def.author || "未知作者") + " · " + (def.kind === "guangse" ? def.cats.length + " 个分类" : "漫画台类"), ms: Date.now() - t0 });
-      $("importErr").textContent = "";
-      renderRuleRow();
-      loadBrowseForRule(def);
+      var def = importRuleFromRaw(raw, file.name);
+      importRuleDone(def, file.name, t0);
     } catch (e) {
-      var msg = e.message || String(e);
-      $("importErr").textContent = "导入失败：" + msg;
-      pushLog({ label: "导入小程序", url: file.name, ok: false, detail: msg, ms: Date.now() - t0 });
+      importRuleFailed(file.name, e.message || String(e), t0);
     }
   };
   reader.readAsText(file);
+}
+/* 粘贴 JSON 导入：不走文件选择器（壳子 WebView 没有 onShowFileChooser，
+   点文件框永远打不开选择器），直接把规则全文粘进来走同一套解析。 */
+function importPastedJson() {
+  var t0 = Date.now();
+  var ta = $("pasteJson");
+  var text = ta ? ta.value : "";
+  try {
+    if (!text.trim()) throw new Error("先粘贴规则 JSON 再点导入");
+    var raw = JSON.parse(text);
+    var def = importRuleFromRaw(raw, "粘贴的规则.json");
+    importRuleDone(def, "粘贴的规则.json", t0);
+    if (ta) ta.value = "";
+    var p = $("pastePanel"); if (p) p.classList.add("hidden");
+  } catch (e) {
+    importRuleFailed("粘贴的规则.json", e.message || String(e), t0);
+  }
 }
 function ruleDefFromJson(raw, fileName) {
   var title = typeof raw.title === "string" ? raw.title : "";
@@ -982,6 +1046,8 @@ function openShellDeepLink(url, title) {
 /* ---------------- 启动 ---------------- */
 function boot() {
   renderRuleRow();
+  var pi = $("pasteImport"); if (pi) pi.addEventListener("click", importPastedJson);
+  var pc = $("pasteCancel"); if (pc) pc.addEventListener("click", function () { var p = $("pastePanel"); if (p) p.classList.add("hidden"); $("importErr").textContent = ""; });
   $("logToggle").addEventListener("click", function () { state.logOpen = !state.logOpen; renderLog(); });
   $("logClear").addEventListener("click", function () { state.logs = []; renderLog(); });
   $("fileInput").addEventListener("change", function () {
