@@ -87,11 +87,15 @@ img{display:block}
 .player-head{margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .player-head .crumb{font-size:14px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #playerWrap{position:relative;margin:0 auto;display:flex;aspect-ratio:9/16;width:100%;max-width:420px;touch-action:none;align-items:center;justify-content:center;overflow:hidden;background:#000}
+#playerWrap[data-orientation="landscape"]:not(.is-fs){aspect-ratio:16/9;max-width:640px}
 #playerWrap:fullscreen{width:100%;height:100%;max-width:none;aspect-ratio:auto}
+#playerWrap.is-fs{position:fixed;inset:0;z-index:100;width:100%;height:100vh;height:100dvh;max-width:none;aspect-ratio:auto;margin:0}
+#playerStage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#playerWrap.css-rotate #playerStage{width:100vh;width:100dvh;height:100vw;height:100dvw;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%) rotate(90deg)}
 #nativeVideo,#fbCanvas{max-height:100%;max-width:100%;object-fit:contain}
 #fbCanvas{width:100%;height:100%}
 .player-top{pointer-events:none;position:absolute;inset:0 0 auto 0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(to bottom,rgba(0,0,0,.7),transparent);padding:8px 12px 24px;transition:opacity .3s}
-.player-bottom{position:absolute;inset:auto 0 0 0;z-index:10;background:linear-gradient(to top,rgba(0,0,0,.75),transparent);padding:32px 12px 8px;transition:opacity .3s}
+.player-bottom{position:absolute;inset:auto 0 0 0;z-index:10;background:linear-gradient(to top,rgba(0,0,0,.75),transparent);padding:32px 8px 8px;transition:opacity .3s}
 .ctl-hidden{opacity:0}
 .ctl-none{pointer-events:none}
 .player-top .t{font-size:14px;color:#fff;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -111,10 +115,10 @@ img{display:block}
 .seekbar .fill{position:absolute;left:0;top:50%;height:4px;transform:translateY(-50%);border-radius:9999px;background:#fbbf24}
 .seekbar .dot{position:absolute;top:50%;width:14px;height:14px;transform:translate(-50%,-50%);border-radius:50%;background:#fbbf24}
 .time-row{margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#fff}
-.ctl-row{display:flex;align-items:center;gap:6px}
+.ctl-row{display:flex;align-items:center;gap:4px}
 .ctl-row .spacer{flex:1}
-.round-btn{display:flex;width:36px;height:36px;flex:none;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.15);color:#fff}
-.pill-btn{flex:none;border-radius:9999px;background:rgba(255,255,255,.15);padding:8px 10px;font-size:12px;color:#fff}
+.round-btn{display:flex;width:32px;height:32px;flex:none;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.15);color:#fff}
+.pill-btn{flex:none;border-radius:9999px;background:rgba(255,255,255,.15);padding:6px 8px;font-size:12px;color:#fff}
 .pill-btn:disabled{opacity:.4}
 .vol-row{margin-top:6px;display:flex;align-items:center;gap:8px}
 .vol-row input[type=range]{height:4px;width:96px;accent-color:#fbbf24}
@@ -190,7 +194,8 @@ img{display:block}
       <button type="button" class="back-btn" id="btnBackPlayerTop">‹ 返回详情</button>
       <span class="crumb" id="playerCrumb"></span>
     </div>
-    <div id="playerWrap" data-mode="native" data-orientation="portrait" data-audio="unknown">
+    <div id="playerWrap" data-mode="native" data-orientation="portrait" data-audio="unknown" data-css-rotate="0">
+      <div id="playerStage">
       <video id="nativeVideo" playsinline preload="metadata"></video>
       <canvas id="fbCanvas" class="hidden"></canvas>
       <div class="player-top" id="playerTop">
@@ -223,13 +228,14 @@ img{display:block}
         <div class="ep-sheet-head"><span id="epSheetTitle">选集</span><button type="button" class="pill-btn" id="btnEpSheetClose">关闭</button></div>
         <div class="ep-sheet-grid" id="epSheetGrid"></div>
       </div>
+      </div>
     </div>
     <p class="player-hint">点画面播 / 停 · 拖进度条快进 · 旋转按钮切横竖屏</p>
   </section>
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 1;
+var PLUGIN_VERSION = 2;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14349,7 +14355,8 @@ var player = {
   orientation: "portrait", showControls: true, volume: 1, muted: false,
   rate: 1, seekPreview: null, loadToken: 0, h264Redirect: false,
   fallback: null, fbEvents: {}, hideTimer: 0, flashTimer: 0, dragging: false,
-  progressTimer: 0
+  progressTimer: 0, fakeFullscreen: false, viewportPortrait: true,
+  lastInteractAt: 0, isPortraitVideo: true, _fsIcon: false
 };
 
 function playerEls() {
@@ -14372,24 +14379,58 @@ function lockOrientation(o) {
     if (so && so.lock) so.lock(o).catch(function () { /* 桌面浏览器不给锁：忽略，播放继续 */ });
   } catch (e) { /* 忽略 */ }
 }
+function isFs() { return player.fullscreen || player.fakeFullscreen; }
+function isCssRotate() {
+  return isFs() && player.orientation === "landscape" && player.viewportPortrait;
+}
+function applyFsClass() {
+  var w = $("playerWrap");
+  if (!w) return;
+  w.classList.toggle("is-fs", !!player.fakeFullscreen);
+  w.classList.toggle("is-fullscreen", isFs());
+  var cr = isCssRotate();
+  w.classList.toggle("css-rotate", cr);
+  w.setAttribute("data-css-rotate", cr ? "1" : "0");
+}
+function setFakeFs(on) {
+  player.fakeFullscreen = !!on;
+  try { document.body.style.overflow = on ? "hidden" : ""; } catch (e) {}
+  applyFsClass();
+  renderBottom();
+}
 function enterFullscreen(o) {
   var wrapEl = $("playerWrap");
-  if (!wrapEl) return Promise.resolve();
-  var p = Promise.resolve();
+  if (!wrapEl) return;
+  var v = $("nativeVideo");
+  var req = null, attempted = false;
   try {
-    if (!document.fullscreenElement) {
-      if (wrapEl.requestFullscreen) p = wrapEl.requestFullscreen();
-      else if (wrapEl.webkitRequestFullscreen) p = wrapEl.webkitRequestFullscreen();
-    }
-  } catch (e) { /* 全屏被拒就 inline 播，不报错 */ }
+    if (document.fullscreenElement || document.webkitFullscreenElement) { attempted = true; }
+    else if (wrapEl.requestFullscreen) { req = wrapEl.requestFullscreen(); attempted = true; }
+    else if (wrapEl.webkitRequestFullscreen) { req = wrapEl.webkitRequestFullscreen(); attempted = true; }
+    else if (v && v.webkitEnterFullscreen) { v.webkitEnterFullscreen(); attempted = true; }
+  } catch (e) { attempted = false; req = null; }
+  Promise.resolve(req).then(function () { setFakeFs(!attempted); }).catch(function () { setFakeFs(true); });
   lockOrientation(o);
-  return Promise.resolve(p).catch(function () { /* 忽略 */ });
 }
 function exitFullscreen() {
-  try {
-    if (document.fullscreenElement) { var r = document.exitFullscreen(); if (r && r.catch) r.catch(function () {}); }
-  } catch (e) {}
+  if (player.fakeFullscreen) {
+    setFakeFs(false);
+  } else {
+    try {
+      if (document.fullscreenElement) { var r = document.exitFullscreen(); if (r && r.catch) r.catch(function () {}); }
+      else if (document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } catch (e) {}
+  }
   try { var so = screen.orientation; if (so && so.unlock) so.unlock(); } catch (e) {}
+}
+/* smartFull：按视频宽高比决定全屏方向（竖片竖全屏、横片横全屏）。 */
+function smartFull() {
+  var v = $("nativeVideo");
+  var portrait = player.isPortraitVideo;
+  if (v && v.videoWidth > 0) portrait = v.videoHeight > v.videoWidth;
+  var o = portrait ? "portrait" : "landscape";
+  setOrientation(o);
+  enterFullscreen(o);
 }
 
 function getBackend() {
@@ -14435,12 +14476,14 @@ function setOrientation(o) {
   playerEls().wrap.setAttribute("data-orientation", o);
   $("orientLabel").textContent = o === "portrait" ? "竖屏" : "横屏";
   $("btnRotate").title = o === "portrait" ? "切横屏" : "切竖屏";
+  applyFsClass();
 }
 function setAudioStatus(s) {
   player.audioStatus = s;
   playerEls().wrap.setAttribute("data-audio", s);
 }
 function setPlaying(p) {
+  var changed = (player.playing !== p);
   player.playing = p;
   var E = playerEls();
   E.playBtn.innerHTML = p
@@ -14449,6 +14492,7 @@ function setPlaying(p) {
   E.playBtn.setAttribute("aria-label", p ? "暂停" : "播放");
   if (p) pokeControls();
   else { setShowControls(true); }
+  if (changed) renderCenter();
 }
 function setShowControls(show) {
   player.showControls = show;
@@ -14459,6 +14503,7 @@ function setShowControls(show) {
 }
 function pokeControls() {
   setShowControls(true);
+  player.lastInteractAt = Date.now();
   clearTimeout(player.hideTimer);
   if (player.playing) {
     player.hideTimer = setTimeout(function () { setShowControls(false); }, 3000);
@@ -14504,6 +14549,16 @@ function renderCenter() {
   }
 }
 
+var FS_ICON_EXPAND = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+var FS_ICON_MIN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+/* 中央播放按钮：播着就藏（play/playing/canplay/timeupdate 时 currentTime>0 即藏；
+   暂停/播完才由 renderCenter 重新画出来）。直接删节点，renderCenter 是唯一真相来源。 */
+function hideCenterBtn() {
+  var c = $("playerCenter");
+  if (!c) return;
+  var b = c.querySelector(".center-play");
+  if (b) b.remove();
+}
 function renderBottom() {
   var E = playerEls();
   var displayTime = player.seekPreview !== null ? player.seekPreview : player.time;
@@ -14520,7 +14575,13 @@ function renderBottom() {
   E.volBtn.textContent = player.muted ? "静音" : "音量";
   E.volRange.value = String(player.muted ? 0 : player.volume);
   E.topTitle.textContent = "第 " + player.detail.episodes[player.index].num + " 集";
-  E.closeBtn.textContent = player.fullscreen ? "退出全屏" : "‹ 返回详情";
+  E.closeBtn.textContent = isFs() ? "退出全屏" : "‹ 返回详情";
+  var fsNow = isFs();
+  if (player._fsIcon !== fsNow) {
+    player._fsIcon = fsNow;
+    E.fsBtn.setAttribute("aria-label", fsNow ? "退出全屏" : "全屏");
+    E.fsBtn.innerHTML = fsNow ? FS_ICON_MIN : FS_ICON_EXPAND;
+  }
   $("playerCrumb").textContent = player.detail.title + " · 第 " + (player.index + 1) + " / " + player.detail.episodes.length + " 集";
 }
 
@@ -14727,6 +14788,10 @@ function playEpisode(index) {
   renderCenter();
   renderBottom();
   renderEpSheet();
+  /* 切集先藏中央钮，双保险：下一帧再藏一次、120ms 后再藏一次（防事件又插回来）。 */
+  hideCenterBtn();
+  requestAnimationFrame(hideCenterBtn);
+  setTimeout(hideCenterBtn, 120);
   loadCurrentEpisode();
 }
 
@@ -14735,7 +14800,7 @@ function exitPlayer() {
   if (player.fallback) { try { player.fallback.destroy(); } catch (e) {} player.fallback = null; }
   var v = $("nativeVideo");
   if (v) { try { v.pause(); } catch (e) {} v.removeAttribute("src"); try { v.load(); } catch (e) {} }
-  if (document.fullscreenElement === $("playerWrap")) exitFullscreen();
+  if (isFs()) exitFullscreen();
   clearInterval(player.progressTimer);
   clearTimeout(player.hideTimer);
   clearTimeout(player.flashTimer);
@@ -14759,17 +14824,42 @@ function onVideoError() {
 
 function bindPlayer() {
   var E = playerEls();
+  player.viewportPortrait = window.innerHeight >= window.innerWidth;
   E.topBar = $("playerTop");
   E.video.addEventListener("click", togglePlay);
   E.canvas.addEventListener("click", togglePlay);
-  E.video.addEventListener("play", function () { setPlaying(true); });
-  E.video.addEventListener("playing", function () { setPlaying(true); setAudioStatus("ok"); });
+  var onVidTime = function () {
+    var v = E.video;
+    if (!v.paused && v.currentTime > 0) hideCenterBtn();
+    if (!player.dragging) player.time = v.currentTime;
+    if (Number.isFinite(v.duration) && v.duration > 0) player.duration = v.duration;
+    setPlaying(!v.paused);
+    var now = Date.now();
+    if (player.playing && player.lastInteractAt > 0 && now - player.lastInteractAt > 3000) setShowControls(false);
+    renderBottom();
+  };
+  E.video.addEventListener("play", function () { setPlaying(true); hideCenterBtn(); });
+  E.video.addEventListener("playing", function () { setPlaying(true); setAudioStatus("ok"); hideCenterBtn(); });
+  E.video.addEventListener("canplay", function () { var v = E.video; if (!v.paused && v.currentTime > 0) hideCenterBtn(); });
+  E.video.addEventListener("timeupdate", onVidTime);
+  E.video.addEventListener("loadedmetadata", function () {
+    var v = E.video;
+    if (Number.isFinite(v.duration) && v.duration > 0) player.duration = v.duration;
+    player.isPortraitVideo = v.videoHeight > v.videoWidth;
+    renderBottom();
+  });
   E.video.addEventListener("pause", function () { setPlaying(false); });
   E.video.addEventListener("ended", function () { setPlaying(false); });
   E.video.addEventListener("error", onVideoError);
+  E.video.addEventListener("webkitbeginfullscreen", function () {
+    player.fullscreen = true; hideCenterBtn(); lockOrientation(player.orientation); applyFsClass(); renderBottom();
+  });
+  E.video.addEventListener("webkitendfullscreen", function () {
+    player.fullscreen = false; applyFsClass(); renderBottom();
+  });
   E.closeBtn.addEventListener("click", function (e) {
     e.stopPropagation();
-    if (player.fullscreen) exitFullscreen();
+    if (isFs()) exitFullscreen();
     else { showView("detail"); renderDetail(); }
   });
   $("btnBackPlayerTop").addEventListener("click", function () { showView("detail"); renderDetail(); });
@@ -14783,12 +14873,12 @@ function bindPlayer() {
   E.rotBtn.addEventListener("click", function () {
     var next = player.orientation === "portrait" ? "landscape" : "portrait";
     setOrientation(next);
-    if (document.fullscreenElement) lockOrientation(next);
+    if (isFs()) lockOrientation(next);
     else enterFullscreen(next);
   });
   E.fsBtn.addEventListener("click", function () {
-    if (player.fullscreen) exitFullscreen();
-    else enterFullscreen(player.orientation);
+    if (isFs()) exitFullscreen();
+    else smartFull();
   });
   E.volBtn.addEventListener("click", function () { applyVolume(player.volume, !player.muted); });
   E.volRange.addEventListener("input", function () { applyVolume(Number(E.volRange.value), false); });
@@ -14796,7 +14886,12 @@ function bindPlayer() {
 
   var onSeekPointer = function (e) {
     var rect = E.seekBar.getBoundingClientRect();
-    var ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    var ratio;
+    if (isCssRotate()) {
+      ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / Math.max(1, rect.height)));
+    } else {
+      ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
+    }
     var t = ratio * (player.duration || 0);
     if (e.type === "pointerdown") {
       player.dragging = true;
@@ -14818,18 +14913,33 @@ function bindPlayer() {
   E.seekBar.addEventListener("pointerup", onSeekPointer);
   E.seekBar.addEventListener("pointercancel", onSeekPointer);
 
-  document.addEventListener("fullscreenchange", function () {
-    player.fullscreen = !!document.fullscreenElement;
+  var onFsChange = function () {
+    var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    player.fullscreen = !!fsEl;
+    if (fsEl) {
+      var v = $("nativeVideo");
+      if (v && !v.paused && v.currentTime > 0) hideCenterBtn();
+      lockOrientation(player.orientation);
+    }
+    applyFsClass();
     renderBottom();
-  });
+  };
+  document.addEventListener("fullscreenchange", onFsChange);
+  document.addEventListener("webkitfullscreenchange", onFsChange);
   var onOrient = function () {
-    if (!document.fullscreenElement) return;
+    player.viewportPortrait = window.innerHeight >= window.innerWidth;
+    applyFsClass();
+    if (!isFs()) return;
     var t = (screen.orientation && screen.orientation.type) || "";
     if (t.indexOf("landscape") === 0) setOrientation("landscape");
     else if (t.indexOf("portrait") === 0) setOrientation("portrait");
   };
   try { if (screen.orientation) screen.orientation.addEventListener("change", onOrient); } catch (e) {}
   window.addEventListener("orientationchange", onOrient);
+  window.addEventListener("resize", function () {
+    player.viewportPortrait = window.innerHeight >= window.innerWidth;
+    applyFsClass();
+  });
 
   player.progressTimer = setInterval(function () {
     if (!$("viewPlayer") || $("viewPlayer").classList.contains("hidden")) return;
@@ -14839,6 +14949,7 @@ function bindPlayer() {
     var d = b.getDuration();
     if (d > 0) player.duration = d;
     setPlaying(!b.isPaused());
+    if (player.playing && player.lastInteractAt > 0 && Date.now() - player.lastInteractAt > 3000) setShowControls(false);
     renderBottom();
   }, 250);
 }
