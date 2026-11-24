@@ -85,7 +85,7 @@ img{display:block}
 .hub-entry-arrow{margin-left:auto;flex:none;font-size:20px;color:var(--faint)}
 .hub-update{flex:none;width:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--dim);box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .hub-update:disabled{opacity:.5}
-.hub-status{margin-top:8px;font-size:14px;color:var(--dim);min-height:1.2em}
+.hub-status{margin-top:8px;font-size:14px;line-height:1.5;height:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
 .hub-add{width:100%;margin-top:16px;display:flex;align-items:center;justify-content:center;padding:14px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);font-size:14px;color:var(--dim)}
 .hub-addpanel{margin-top:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:16px}
 .hub-add-title{font-size:15px;font-weight:700;color:#fff}
@@ -229,7 +229,7 @@ img{display:block}
     <div class="hub-head-row">
       <span class="hub-badge" aria-hidden>漫</span>
       <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">插件 v5</span>
+      <span class="hub-ver" id="hubVer">插件 v6</span>
     </div>
     <p class="hub-desc">漫画小程序：分类、详情、章节全是真请求。</p>
   </section>
@@ -270,7 +270,7 @@ img{display:block}
 <input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 5;
+var PLUGIN_VERSION = 6;
 var PLUGIN_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
 /* ---------------- 主界面 hub（入口页，v479 壳子版同款，v4 起做到 GitHub 阅读器里） ---------------- */
 /* v3 的教训：GitHub 阅读器里根本没有 hub，goHome() 只回规则卡首页；
