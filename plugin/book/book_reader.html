@@ -43,7 +43,7 @@ img{display:block}
 .hub-entry-arrow{margin-left:auto;flex:none;font-size:20px;color:var(--faint)}
 .hub-update{flex:none;width:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--dim);box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .hub-update:disabled{opacity:.5}
-.hub-status{margin-top:8px;font-size:14px;color:var(--dim);min-height:1.2em}
+.hub-status{margin-top:8px;font-size:14px;line-height:1.5;height:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
 .hub-add{width:100%;margin-top:16px;display:flex;align-items:center;justify-content:center;padding:14px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);font-size:14px;color:var(--dim)}
 .hub-addpanel{margin-top:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:16px}
 .hub-add-title{font-size:15px;font-weight:700;color:#fff}
@@ -213,22 +213,13 @@ img{display:block}
     <div class="hub-head-row">
       <span class="hub-badge" aria-hidden>书</span>
       <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">书籍插件 v4</span>
+      <span class="hub-ver" id="hubVer">书籍插件 v5</span>
     </div>
     <p class="hub-desc">书籍小程序：分类、详情、章节全是真请求。</p>
   </section>
   <section aria-label="插件列表">
     <div class="hub-list">
       <div class="hub-row">
-        <button type="button" class="hub-entry" id="btnEnterBooks">
-          <span class="hub-entry-badge" aria-hidden>书</span>
-          <span class="hub-entry-text"><span class="hub-entry-title">书籍</span><span class="hub-entry-sub">点此进入书籍插件</span></span>
-          <span class="hub-entry-arrow" aria-hidden>›</span>
-        </button>
-        <button type="button" class="hub-update" id="btnUpdatePlugin" aria-label="更新插件"><span aria-hidden>↓</span><span>更新插件</span></button>
-      </div>
-      <p class="hub-status" id="updateStatus" role="status"></p>
-      <div class="hub-row" style="margin-top:12px">
         <button type="button" class="hub-entry" id="btnEnterManga">
           <span class="hub-entry-badge" aria-hidden>漫</span>
           <span class="hub-entry-text"><span class="hub-entry-title">漫画</span><span class="hub-entry-sub">点此进入漫画插件</span></span>
@@ -237,6 +228,15 @@ img{display:block}
         <button type="button" class="hub-update" id="btnUpdateManga" aria-label="更新漫画插件"><span aria-hidden>↓</span><span>更新插件</span></button>
       </div>
       <p class="hub-status" id="mangaUpdateStatus" role="status"></p>
+      <div class="hub-row" style="margin-top:12px">
+        <button type="button" class="hub-entry" id="btnEnterBooks">
+          <span class="hub-entry-badge" aria-hidden>书</span>
+          <span class="hub-entry-text"><span class="hub-entry-title">书籍</span><span class="hub-entry-sub">点此进入书籍插件</span></span>
+          <span class="hub-entry-arrow" aria-hidden>›</span>
+        </button>
+        <button type="button" class="hub-update" id="btnUpdatePlugin" aria-label="更新插件"><span aria-hidden>↓</span><span>更新插件</span></button>
+      </div>
+      <p class="hub-status" id="updateStatus" role="status"></p>
       <div id="extraList"></div>
       <button type="button" class="hub-add" id="btnAddPlugin">＋ 添加其它插件</button>
       <div class="hub-addpanel hidden" id="addPanel">
@@ -263,7 +263,7 @@ img{display:block}
 <div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
 <script>
 "use strict";
-var PLUGIN_VERSION = 4;
+var PLUGIN_VERSION = 5;
 /* ============================================================
    书籍阅读器 JS —— 浏览器控制台（bookEngine.ts + BookPlugin.tsx）
    的完整复刻。纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
