@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "updated": "2026-11-24",
+  "reader": {
+    "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/video_reader.html",
+    "sha256": "82a386e6ed52f7e008cee17b8d88511432cb5dce8611267416612e216686605e"
+  },
+  "rules": [
+    {
+      "name": "星芽短剧",
+      "file": "xingya.json",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/xingya.json",
+      "sha256": "a3b8b33fff34b1402562101d54a80c9b9709d8d453ec903de7f75406f4e50205"
+    }
+  ]
+}
