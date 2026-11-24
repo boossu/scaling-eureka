@@ -213,7 +213,7 @@ img{display:block}
     <div class="hub-head-row">
       <span class="hub-badge" aria-hidden>书</span>
       <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">书籍插件 v3</span>
+      <span class="hub-ver" id="hubVer">书籍插件 v4</span>
     </div>
     <p class="hub-desc">书籍小程序：分类、详情、章节全是真请求。</p>
   </section>
@@ -228,6 +228,15 @@ img{display:block}
         <button type="button" class="hub-update" id="btnUpdatePlugin" aria-label="更新插件"><span aria-hidden>↓</span><span>更新插件</span></button>
       </div>
       <p class="hub-status" id="updateStatus" role="status"></p>
+      <div class="hub-row" style="margin-top:12px">
+        <button type="button" class="hub-entry" id="btnEnterManga">
+          <span class="hub-entry-badge" aria-hidden>漫</span>
+          <span class="hub-entry-text"><span class="hub-entry-title">漫画</span><span class="hub-entry-sub">点此进入漫画插件</span></span>
+          <span class="hub-entry-arrow" aria-hidden>›</span>
+        </button>
+        <button type="button" class="hub-update" id="btnUpdateManga" aria-label="更新漫画插件"><span aria-hidden>↓</span><span>更新插件</span></button>
+      </div>
+      <p class="hub-status" id="mangaUpdateStatus" role="status"></p>
       <div id="extraList"></div>
       <button type="button" class="hub-add" id="btnAddPlugin">＋ 添加其它插件</button>
       <div class="hub-addpanel hidden" id="addPanel">
@@ -254,7 +263,7 @@ img{display:block}
 <div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
 <script>
 "use strict";
-var PLUGIN_VERSION = 3;
+var PLUGIN_VERSION = 4;
 /* ============================================================
    书籍阅读器 JS —— 浏览器控制台（bookEngine.ts + BookPlugin.tsx）
    的完整复刻。纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
@@ -891,6 +900,12 @@ function renderExtraList() {
   var html = "";
   for (var i = 0; i < list.length; i++) {
     var p = list[i];
+    /* v4：跳过与本插件同一清单的条目——书籍插件自己就是内置入口，
+       再列一次就是用户截图里的两个“书籍”。下标 i 保持原列表下标，
+       data-extra / extraStatus 仍对得上 openAddedPlugin / updateAddedPlugin。
+       条目只在显示时跳过，不从 localStorage 删：checkBookUpdate 还要靠
+       那份存着的条目同步 APK hub 里的书籍副本。 */
+    if (p.url === BOOK_MANIFEST_URL) continue;
     html += '<div class="hub-row" style="margin-top:12px">'
       + '<button type="button" class="hub-entry" data-extra="' + i + '">'
       + '<span class="hub-entry-badge extra" aria-hidden>' + esc(String(p.name || "插").charAt(0)) + '</span>'
@@ -1026,6 +1041,82 @@ function checkBookUpdate() {
           }
         }
         hubSaveExtraPlugins(list);
+      } catch (e) { /* 存储不可用时忽略，当场载入照常 */ }
+      if (st) st.textContent = "已更新到 v" + m.version;
+      done();
+      loadReaderText(readerText);
+    });
+  }).catch(function (e) {
+    if (st) st.textContent = "检查失败，请稍后重试";
+    done();
+  });
+}
+/* v4：入口页加内置“漫画”入口。用户 2026-11-24 13:17：一点书籍漫画就没了——
+   书籍阅读器是 document.write 载入的，整个页面被换成书籍阅读器，内置 hub 里
+   又没有漫画入口，等于回不去漫画。漫画插件本身没丢（GitHub 清单仍是 v5），
+   缺的是从书籍 hub 回漫画的路。这里直接拉漫画清单、验 sha256 后载入。 */
+var MANGA_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
+var mangaBusy = false;
+function enterManga() {
+  if (mangaBusy) return;
+  mangaBusy = true;
+  var st = $("mangaUpdateStatus");
+  if (st) st.textContent = "正在拉取漫画插件…";
+  fetchTextTimeout(MANGA_MANIFEST_URL).then(function (text) {
+    var m;
+    try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
+    var bad = validatePluginManifest(m);
+    if (bad) throw new Error(bad);
+    return fetchTextTimeout(m.reader.url).then(function (readerText) {
+      if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
+      mangaBusy = false;
+      loadReaderText(readerText);
+    });
+  }).catch(function (e) {
+    mangaBusy = false;
+    if (st) st.textContent = "";
+    showToast("漫画插件拉取失败，请稍后重试");
+  });
+}
+/* 漫画入口的更新按钮：查漫画清单。本地存着漫画条目且已是最新 → “已是最新 vX”；
+   有新版（或本地没存漫画）→ 下载验 sha256 后当场载入新漫画阅读器。
+   不调 ComicBridge.checkForUpdate()——那是漫画插件自己的更新通道，书籍 hub 里没有漫画插件可调。 */
+function checkMangaUpdate() {
+  if (mangaBusy) return;
+  mangaBusy = true;
+  var btn = $("btnUpdateManga"), st = $("mangaUpdateStatus");
+  if (btn) btn.disabled = true;
+  if (st) st.textContent = "正在检查更新…";
+  function done() { mangaBusy = false; if (btn) btn.disabled = false; }
+  fetchTextTimeout(MANGA_MANIFEST_URL).then(function (text) {
+    var m;
+    try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
+    var bad = validatePluginManifest(m);
+    if (bad) throw new Error(bad);
+    var stored = null;
+    try {
+      var list = hubExtraPlugins();
+      for (var i = 0; i < list.length; i++) if (list[i].url === MANGA_MANIFEST_URL) stored = list[i];
+    } catch (e) { /* 存储不可用时当作本地没存 */ }
+    if (stored && m.version <= (stored.version || 0)) {
+      if (st) st.textContent = "已是最新 v" + (stored.version || 0);
+      done();
+      return;
+    }
+    return fetchTextTimeout(m.reader.url).then(function (readerText) {
+      if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
+      try {
+        var l2 = hubExtraPlugins();
+        for (var j = 0; j < l2.length; j++) {
+          if (l2[j].url === MANGA_MANIFEST_URL) {
+            l2[j].version = m.version;
+            l2[j].rules = Array.isArray(m.rules) ? m.rules.length : l2[j].rules;
+            l2[j].updated = m.updated || l2[j].updated;
+            l2[j].readerText = readerText;
+            l2[j].readerSha256 = String(m.reader.sha256).toLowerCase();
+          }
+        }
+        hubSaveExtraPlugins(l2);
       } catch (e) { /* 存储不可用时忽略，当场载入照常 */ }
       if (st) st.textContent = "已更新到 v" + m.version;
       done();
@@ -1289,6 +1380,8 @@ pushLog({ label: "导入书籍", url: "_____26_3g3h.json（页面内嵌）", ok:
 /* hub 按钮接线 */
 var be = $("btnEnterBooks"); if (be) be.addEventListener("click", function () { enterBooks(); });
 var bu = $("btnUpdatePlugin"); if (bu) bu.addEventListener("click", function () { checkBookUpdate(); });
+var bm = $("btnEnterManga"); if (bm) bm.addEventListener("click", function () { enterManga(); });
+var bmu = $("btnUpdateManga"); if (bmu) bmu.addEventListener("click", function () { checkMangaUpdate(); });
 var ba = $("btnAddPlugin"); if (ba) ba.addEventListener("click", function () {
   var p = $("addPanel"); if (p) p.classList.toggle("hidden");
   var e = $("addErr"); if (e) e.textContent = "";
@@ -1301,8 +1394,10 @@ var bx = $("btnAddCancel"); if (bx) bx.addEventListener("click", function () {
   var p = $("addPanel"); if (p) p.classList.add("hidden");
 });
 render();
-/* 主界面先行：不拉任何列表，等用户点“书籍”才进阅读器（第一次进才拉默认分类） */
-showHub();
+/* v4：点书籍直接进书籍插件——打开就进阅读器（第一次进拉默认分类），
+   不先停在入口页。入口页（hub）只在点“‹ 主页”时回，不再是打开时的首屏。
+   用户 2026-11-24 13:20：“应该是点击书籍 直接进入书籍插件才对”。 */
+enterBooks();
 </script>
 </body>
 </html>
