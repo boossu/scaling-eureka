@@ -27,6 +27,10 @@ img{display:block}
 .bk-head h1{font-size:20px;font-weight:700;color:#fff}
 .bk-head p{font-size:12px;color:var(--dim)}
 .bk-head .ver{margin-left:auto;font-size:11px;color:var(--faint)}
+/* ---------- 返回主页（与漫画插件同款式、同位置：左上） ---------- */
+.home-btn{flex:none;display:flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--text)}
+.home-btn:active{transform:scale(.98)}
+.bk-head .home-btn{align-self:center}
 /* ---------- rule cards ---------- */
 #rules{padding-top:12px}
 .rule-row{display:flex;flex-wrap:wrap;gap:10px}
@@ -166,7 +170,7 @@ img{display:block}
 </head>
 <body>
 <div id="app">
-  <div class="bk-head"><h1>书籍插件</h1><p>书籍阅读器</p><span class="ver" id="bkVer"></span></div>
+  <div class="bk-head"><button type="button" class="home-btn" id="bkHomeBtn" onclick="goHome()">‹ 主页</button><h1>书籍插件</h1><p>书籍阅读器</p><span class="ver" id="bkVer"></span></div>
   <section id="rules" aria-label="已导入书源"><div class="rule-row" id="ruleRow"></div></section>
   <main id="main"></main>
   <aside id="log" aria-label="请求日志">
@@ -177,7 +181,7 @@ img{display:block}
 <div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
 <script>
 "use strict";
-var PLUGIN_VERSION = 1;
+var PLUGIN_VERSION = 2;
 /* ============================================================
    书籍阅读器 JS —— 浏览器控制台（bookEngine.ts + BookPlugin.tsx）
    的完整复刻。纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
@@ -689,6 +693,19 @@ function readerNext() {
   openChapter(v.index + 1);
 }
 function backToBrowse() { state.view = { kind: "browse" }; render(); }
+/* 回入口页（hub）：本书阅读器在壳子里跑在父 hub 页的 iframe（srcdoc，同源）里，
+   父页面有全局 showHub()（隐藏插件框、显示 hub、同步 ComicBridge.hubVisible）。
+   直接调 window.parent.showHub()；没有父 hub（如直接在浏览器打开本页）时只提示，
+   不抛错、不跳走。 */
+function goHome() {
+  try {
+    if (window.parent && window.parent !== window && typeof window.parent.showHub === "function") {
+      window.parent.showHub();
+      return;
+    }
+  } catch (e) { /* 跨域时忽略 */ }
+  showToast("没有可返回的主页");
+}
 function backToDetail() {
   var v = state.view;
   if (v.kind !== "reader") return;
@@ -829,6 +846,7 @@ function renderReader() {
   var ch = d.chapters[v.index];
   var html = '<section id="reader" aria-label="章节阅读器">';
   html += '<div class="r-top" id="readerTop"><div class="r-top-row">';
+  html += '<button type="button" class="r-back" id="rHomeBtn" onclick="goHome()">‹ 主页</button>';
   html += '<button type="button" class="r-back" onclick="backToDetail()">‹ 目录</button>';
   html += '<div class="r-mid"><p class="t">' + esc((ch && ch.name) || "") + '</p>';
   html += '<p class="s">' + esc(d.name) + ' · ' + (v.index + 1) + '/' + total + ' 章' + (v.pageNo > 1 ? ' · 第 ' + v.pageNo + ' 页' : '') + '</p></div>';
