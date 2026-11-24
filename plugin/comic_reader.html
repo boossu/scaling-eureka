@@ -12,6 +12,8 @@
   --text:#eef1ee; --dim:#9aa39b; --faint:#666e67; --border:#262c2f;
   --accent:#3dd68c; --accent-dim:#123325; --fill-gs:#0e9f6e;
   --warm:#f2a93b; --warm-dim:#38280e; --fill-mt:#d97c16;
+  --fill-dd:#4f6fd8; --fill-dd-dim:#16233d; --fill-kk:#d6336c; --fill-kk-dim:#33101f;
+  --fill-wm:#7c3aed; --fill-wm-dim:#221040; --fill-xa:#0891b2; --fill-xa-dim:#0b2b33;
   --amber:#e8a33d; --bad:#e5604f; --radius:10px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -28,9 +30,17 @@ img{display:block}
 .rule-card:active{transform:scale(.98)}
 .rule-card.active-gs{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .rule-card.active-mt{border-color:var(--warm);background:var(--warm-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.rule-card.active-dd{border-color:var(--fill-dd);background:var(--fill-dd-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.rule-card.active-kk{border-color:var(--fill-kk);background:var(--fill-kk-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.rule-card.active-wm{border-color:var(--fill-wm);background:var(--fill-wm-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.rule-card.active-xa{border-color:var(--fill-xa);background:var(--fill-xa-dim);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .rule-badge{flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:20px;font-weight:700;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .rule-badge.gs{background:var(--fill-gs)}
 .rule-badge.mt{background:var(--fill-mt)}
+.rule-badge.dd{background:var(--fill-dd)}
+.rule-badge.kk{background:var(--fill-kk)}
+.rule-badge.wm{background:var(--fill-wm)}
+.rule-badge.xa{background:var(--fill-xa)}
 .rule-meta{min-width:0;flex:1}
 .rule-title{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:600;color:#fff}
 .rule-author{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--dim)}
@@ -38,6 +48,10 @@ img{display:block}
 .rule-dot{flex:none;width:8px;height:8px;border-radius:50%;margin-left:auto}
 .rule-dot.gs{background:var(--accent)}
 .rule-dot.mt{background:var(--warm)}
+.rule-dot.dd{background:var(--fill-dd)}
+.rule-dot.kk{background:var(--fill-kk)}
+.rule-dot.wm{background:var(--fill-wm)}
+.rule-dot.xa{background:var(--fill-xa)}
 .import-btn{flex:1;min-width:140px;display:flex;align-items:center;justify-content:center;padding:12px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);font-size:14px;color:var(--dim)}
 .import-btn:active{color:var(--text)}
 .home-btn{flex:none;display:flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--text)}
@@ -94,6 +108,10 @@ img{display:block}
 .chip:active{transform:scale(.95)}
 .chip.on-gs{background:var(--fill-gs);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(14,159,110,.4)}
 .chip.on-mt{background:var(--fill-mt);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(217,124,22,.4)}
+.chip.on-dd{background:var(--fill-dd);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(79,111,216,.45)}
+.chip.on-kk{background:var(--fill-kk);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(214,51,108,.45)}
+.chip.on-wm{background:var(--fill-wm);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(124,58,237,.45)}
+.chip.on-xa{background:var(--fill-xa);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(8,145,178,.45)}
 .mt-rows{padding-top:16px;display:flex;flex-direction:column;gap:10px}
 .mt-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .mt-row .lbl{flex:none;width:36px;font-size:12px;font-weight:500;color:var(--faint)}
@@ -211,7 +229,7 @@ img{display:block}
     <div class="hub-head-row">
       <span class="hub-badge" aria-hidden>漫</span>
       <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">插件 v4</span>
+      <span class="hub-ver" id="hubVer">插件 v5</span>
     </div>
     <p class="hub-desc">漫画小程序：分类、详情、章节全是真请求。</p>
   </section>
@@ -252,7 +270,7 @@ img{display:block}
 <input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 4;
+var PLUGIN_VERSION = 5;
 var PLUGIN_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
 /* ---------------- 主界面 hub（入口页，v479 壳子版同款，v4 起做到 GitHub 阅读器里） ---------------- */
 /* v3 的教训：GitHub 阅读器里根本没有 hub，goHome() 只回规则卡首页；
@@ -498,6 +516,40 @@ function checkPluginUpdate() {
     if (st) st.textContent = "检查失败，请稍后重试";
     done();
   });
+}
+/* v5：启动时从 GitHub 清单拉六条规则 JSON，用 ruleDefFromJson 重新解析，
+   刷新内置规则的分类/榜单/作者（规则文件改了也不用等新版阅读器）。
+   拉不到（离线/清单挂了）就用内嵌快照，照常用。 */
+function loadRulesFromManifest() {
+  fetchTextTimeout(PLUGIN_MANIFEST_URL, 20000).then(function (text) {
+    var m;
+    try { m = JSON.parse(text); } catch (e) { return; }
+    if (!m || !Array.isArray(m.rules)) return;
+    var chain = Promise.resolve();
+    m.rules.forEach(function (r) {
+      chain = chain.then(function () {
+        return fetchTextTimeout(r.url, 20000).then(function (rt) {
+          var raw;
+          try { raw = JSON.parse(rt); } catch (e) { return; }
+          var def = ruleDefFromJson(raw, r.file || "");
+          if (!def) return;
+          for (var i = 0; i < RULES.length; i++) {
+            if (RULES[i].kind === def.kind) {
+              def.id = RULES[i].id;
+              if (def.kind === "wanman" && RULES[i].wmCats && RULES[i].wmCats.length) def.wmCats = RULES[i].wmCats;
+              RULES[i] = def;
+              break;
+            }
+          }
+        }).catch(function () { /* 单条规则拉不到，留内嵌快照 */ });
+      });
+    });
+    return chain.then(function () {
+      pushLog({ label: "规则清单", url: PLUGIN_MANIFEST_URL, ok: true, detail: "GitHub 规则已刷新 · " + RULES.length + " 条规则", ms: 0 });
+      renderRuleRow();
+      if (state.view.kind === "browse") render();
+    });
+  }).catch(function () { /* 清单拉不到，留内嵌快照 */ });
 }
 /* 每条加进来的插件自带的更新按钮：按各自清单地址查新版。
    有新版 → 下载验 sha256 后替换并更新显示的版本；已是最新 → “已是最新 vX”；
@@ -763,8 +815,8 @@ var MT_CATS = {
   areas: [["全部", ""], ["连载", "1"], ["完结", "2"]],
   sorts: [["最近更新", "update_time"], ["人气最高", "total_view_num"]]
 };
-function mtListUrl(cls, area, sort, page) {
-  return MT_LIST_TEMPLATE.replace("fyclass", encodeURIComponent(cls)).replace("fyarea", encodeURIComponent(area)).replace("fysort", encodeURIComponent(sort)).replace("fypage", String(page));
+function mtListUrl(template, cls, area, sort, page) {
+  return template.replace("fyclass", encodeURIComponent(cls)).replace("fyarea", encodeURIComponent(area)).replace("fysort", encodeURIComponent(sort)).replace("fypage", String(page));
 }
 function mtParseList(jsonText) {
   var j; try { j = JSON.parse(jsonText); } catch (e) { return []; }
@@ -805,6 +857,1104 @@ function mtImagesFromApi(jsonText) {
   if (!Array.isArray(list)) return [];
   return list.filter(function (x) { return typeof x === "string" && x.length > 0; });
 }
+/* ---------------- v5：Legado 四规则引擎（engine.ts 原样移植，香草 JS） ----------------
+   滴答 / 快看 / 蛙漫 / 新爱。请求走 request()（直接 fetch，不走代理）；
+   AES 解密用 WebCrypto（WebView 与 jsdom 都有 crypto.subtle）。
+   规则 JSON 本身不改：分类/榜单/筛选表从规则 exploreUrl 原样取，
+   解析逻辑按各站规则字段逐行移植，不硬编码站名与参数值。 */
+
+/* ---- 共用：base64 → AES-128-CBC 解密（IV = 前 16 字节）---- */
+function aesCbcDecryptB64(b64, keyStr) {
+  var bin;
+  try { bin = atob(b64); } catch (e) { return Promise.resolve(null); }
+  var raw = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
+  if (raw.length <= 16) return Promise.resolve(null);
+  var iv = raw.slice(0, 16), ct = raw.slice(16);
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(keyStr), { name: "AES-CBC" }, false, ["decrypt"])
+    .then(function (key) { return crypto.subtle.decrypt({ name: "AES-CBC", iv: iv }, key, ct); })
+    .then(function (plain) { return new TextDecoder().decode(plain); })
+    .catch(function () { return null; });
+}
+
+/* ---------------- 滴答漫画（Buding，ddmanhua.com） ---------------- */
+var DD_HOST = "https://ddmanhua.com";
+var DD_IMG_FALLBACK = "https://img1.baipiaoguai.org";
+/* exploreUrl 四个分类，URL 模板照规则原文（欧美那条是 page{{page}}，无斜杠） */
+var DD_CATS = [
+  { k: "/category/list/page/{{page}}", n: "国产漫画" },
+  { k: "/category/list/2/page/{{page}}", n: "日本漫画" },
+  { k: "/category/list/3/page/{{page}}", n: "韩国漫画" },
+  { k: "/category/list/4/page{{page}}", n: "欧美漫画" }
+];
+function ddExploreUrl(template, page) { return DD_HOST + template.replace("{{page}}", String(page)); }
+function ddSearchUrl(key) { return DD_HOST + "/index.php/search?key=" + encodeURIComponent(key); }
+function ddAbs(u) {
+  var s = String(u || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.indexOf("//") === 0) return "https:" + s;
+  return DD_HOST + (s.charAt(0) === "/" ? s : "/" + s);
+}
+/* ruleSearch / ruleExplore 共用列表解析：.lists-content@ul@li */
+function ddParseList(html) {
+  var out = [];
+  if (!html) return out;
+  var start = html.indexOf("lists-content");
+  if (start < 0) return out;
+  var seg = html.slice(start);
+  var blocks = seg.split(/<li>/);
+  var seen = {};
+  for (var i = 1; i < blocks.length; i++) {
+    var b = (blocks[i] || "").split("</li>")[0] || "";
+    var am = b.match(/<a[^>]*href="([^"]+)"/);
+    if (!am || !am[1]) continue;
+    var url = ddAbs(am[1]);
+    if (url.indexOf("/book/") < 0 || seen[url]) continue;
+    seen[url] = 1;
+    var cover = ddAbs(((b.match(/data-original="([^"]+)"/) || [])[1] || ""));
+    var name = norm(((b.match(/<h2[^>]*>([\s\S]*?)<\/h2>/) || [])[1] || ""));
+    var status = "";
+    var cm = b.match(/class="countrie"[^>]*>([\s\S]*?)<\/div>/);
+    if (cm && cm[1]) {
+      var spans = [], sre = /<span[^>]*>([\s\S]*?)<\/span>/g, sm;
+      while ((sm = sre.exec(cm[1])) !== null) spans.push(norm(sm[1] || ""));
+      status = spans[1] || "";
+    }
+    var rate = norm(((b.match(/class="rate"[^>]*>([\s\S]*?)<\//) || [])[1] || ""));
+    var note = norm(((b.match(/class="note"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || ""));
+    var kind = [status, rate ? rate + "分" : ""].filter(Boolean).join("，");
+    var desc = [note, kind].filter(Boolean).join(" · ");
+    out.push({ title: name || url, desc: desc, pic: cover, ref: url });
+  }
+  return out;
+}
+/* 搜索被站方限流时返回 {"msg":"搜索繁忙","code":-1}，不是列表 HTML */
+function ddIsSearchBusy(text) {
+  var t = String(text || "").trim();
+  if (t.charAt(0) !== "{") return false;
+  try {
+    var j = JSON.parse(t);
+    return j.code === -1 || (typeof j.msg === "string" && j.msg.indexOf("繁忙") >= 0);
+  } catch (e) { return false; }
+}
+/* ruleBookInfo + ruleToc，都在详情页一份 HTML 里 */
+function ddParseDetail(html, nameHint) {
+  if (!html || html.length <= 1000) return null;
+  var h1m = html.match(/<h1[^>]*class="[^"]*product-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/);
+  var h1 = (h1m && h1m[1]) || "";
+  var name = norm((h1.split("<")[0] || "")) || norm(h1) || nameHint;
+  var rate = norm(((h1.match(/class="rate"[^>]*>([\s\S]*?)<\//) || [])[1] || ""));
+  var excerpts = [], ere = /<div class="product-excerpt">([\s\S]*?)<\/div>/g, em;
+  while ((em = ere.exec(html)) !== null) excerpts.push(em[1] || "");
+  var excerptSpan = function (idx) {
+    var e = excerpts[idx];
+    if (!e) return "";
+    var sm = e.match(/<span[^>]*>([\s\S]*?)<\/span>/);
+    return sm && sm[1] != null ? norm(sm[1]) : "";
+  };
+  var author = excerptSpan(0);
+  var status = excerptSpan(1);
+  var tags = [], e2 = excerpts[2] || "";
+  var are = /<a[^>]*>([\s\S]*?)<\/a>/g, am2;
+  while ((am2 = are.exec(e2)) !== null) {
+    var t = norm(am2[1] || "");
+    if (t && tags.indexOf(t) < 0) tags.push(t);
+  }
+  var updatedRaw = excerptSpan(3);
+  var updated = (updatedRaw.split(/\s/)[0] || "");
+  if (rate) tags.push(rate + "分");
+  if (updated) tags.push("更新 " + updated);
+  var desc = excerptSpan(4);
+  var imgs = [], ire = /<img[^>]*src="([^"]+)"/g, im;
+  while ((im = ire.exec(html)) !== null) imgs.push(im[1] || "");
+  var cover = ddAbs(imgs[1] || imgs[0] || "");
+  var chapters = [];
+  var tocStart = html.indexOf('id="myList"');
+  if (tocStart >= 0) {
+    var tocEnd = html.indexOf("</ul>", tocStart);
+    var seg = html.slice(tocStart, tocEnd > tocStart ? tocEnd : undefined);
+    var cre = /<li>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, cm2;
+    while ((cm2 = cre.exec(seg)) !== null) {
+      var url = ddAbs(cm2[1] || "");
+      if (!url) continue;
+      chapters.push({ id: url, name: norm(cm2[2] || "") || url });
+    }
+  }
+  return { name: name, author: author, cover: cover, desc: desc, status: status, tags: tags, chapters: chapters };
+}
+/* pic.js decryptParams 的密钥（原站脚本里写死的 AES-128 key） */
+var DD_AES_KEY = "9S8$vJnU2ANeSRoF";
+function ddExtractParams(html) {
+  var m = html.match(/params\s*=\s*'([A-Za-z0-9+/=]+)'/) || html.match(/params\s*=\s*"([A-Za-z0-9+/=]+)"/);
+  return (m && m[1]) || "";
+}
+/* ruleContent #cp_img@html 的真实来源：params 解密 → JSON.images。
+   base64 → 字节；IV = 前 16 字节；其余 AES-128-CBC 解密；
+   JSON 的 host 必须等于字面量 "ddmanhua.com" 才认；
+   相对路径按 pic.js 回落到 DD_IMG_FALLBACK。 */
+function ddImagesFromChapterHtml(html) {
+  var b64 = ddExtractParams(html);
+  if (!b64) return Promise.resolve([]);
+  return aesCbcDecryptB64(b64, DD_AES_KEY).then(function (text) {
+    if (!text) return [];
+    var j;
+    try { j = JSON.parse(text); } catch (e) { return []; }
+    if (j.host !== "ddmanhua.com") return [];
+    if (!Array.isArray(j.images)) return [];
+    var out = [];
+    for (var i = 0; i < j.images.length; i++) {
+      var x = j.images[i];
+      if (typeof x !== "string" || !x) continue;
+      if (/^https?:\/\//i.test(x)) out.push(x);
+      else if (x.indexOf("//") === 0) out.push("https:" + x);
+      else out.push(DD_IMG_FALLBACK + (x.charAt(0) === "/" ? x : "/" + x));
+    }
+    return out;
+  });
+}
+
+/* ---------------- 快看漫画（coco，m.kuaikanmanhua.com） ----------------
+   exploreUrl 是榜单 + 状态 + 分类的混合表：url 为空的条目是分组标题头，
+   其余是 rank_list（榜单）与 multi_filter（状态/分类）接口，
+   模板里 {{24*(page-1)}} 先算成数字再替 {{page}}。
+   详情与章节表照 ruleBookInfo / ruleToc 的 JS——规则本身是 eval 详情页
+   __NUXT__ 取 data[0] 的 topicInfo 与 comicList，这里用等价的数据表达
+   式求值器解同一段脚本；章节图照 ruleContent 的 class.ComicPics@img，
+   另加用户钉死的回落（2026-11-02）：章节页 __NUXT__ 的
+   data[0].comicInfo.images 存在且比选择器结果长时用它当全章图集。
+   请求一律走 mobile UA（规则 header 里的 UA 本身就是手机 Chrome）。 */
+var KK_HOST = "http://m.kuaikanmanhua.com";
+/* exploreUrl 在规则 JSON 里是一段 JSON 字符串，解析成条目表（原样保留顺序） */
+function kkExploreFromRule(rule) {
+  var parsed = rule["exploreUrl"];
+  try { if (typeof parsed === "string") parsed = JSON.parse(parsed); } catch (e) { return []; }
+  if (!Array.isArray(parsed)) return [];
+  var out = [];
+  for (var i = 0; i < parsed.length; i++) {
+    var o = parsed[i] || {};
+    out.push({ title: typeof o.title === "string" ? o.title : "", url: typeof o.url === "string" ? o.url : "" });
+  }
+  return out;
+}
+function kkQueryParams(url) {
+  var out = {};
+  var q = (url.split("?")[1] || "");
+  var parts = q.split("&");
+  for (var i = 0; i < parts.length; i++) {
+    var eq = parts[i].indexOf("=");
+    if (eq > 0) out[parts[i].slice(0, eq)] = parts[i].slice(eq + 1);
+  }
+  return out;
+}
+/* 快看多维筛选（漫画台式组合筛选）：规则 exploreUrl 里 multi_filter 条目
+   每条只动一个维度参数（tag_id / update_status / pay_status / sort），
+   其余取默认值。按“哪个参数非默认”把条目归到四个维度；rank_list 条目归榜单。
+   组合 URL 由规则原样的 base 与固定参数（size / fav_filter / gender）拼成。 */
+function kkFiltersFromRule(rule) {
+  var entries = kkExploreFromRule(rule);
+  var ranks = [], tags = [], statuses = [], sorts = [], pays = [];
+  var multiBase = "", multiFixed = { size: "24", favFilter: "0", gender: "0" };
+  var pushUnique = function (arr, name, value) {
+    for (var i = 0; i < arr.length; i++) if (arr[i].value === value) return;
+    arr.push({ name: name, value: value });
+  };
+  var hasVal = function (arr, value) {
+    for (var i = 0; i < arr.length; i++) if (arr[i].value === value) return true;
+    return false;
+  };
+  for (var e = 0; e < entries.length; e++) {
+    var en = entries[e];
+    if (!en.url) continue;
+    if (en.url.indexOf("rank_list") >= 0) {
+      var rankId = kkQueryParams(en.url)["rank_id"] || "";
+      var dup = false;
+      for (var r = 0; r < ranks.length; r++) if (ranks[r].rankId === rankId) dup = true;
+      if (rankId && !dup) ranks.push({ name: en.title.trim(), rankId: rankId, template: en.url });
+      continue;
+    }
+    if (en.url.indexOf("multi_filter") < 0) continue;
+    if (!multiBase) {
+      multiBase = (en.url.split("?")[0] || "");
+      var qp0 = kkQueryParams(en.url);
+      multiFixed = { size: qp0["size"] || "24", favFilter: qp0["fav_filter"] || "0", gender: qp0["gender"] || "0" };
+    }
+    var qp = kkQueryParams(en.url);
+    var tag = qp["tag_id"] || "0", status = qp["update_status"] || "0";
+    var pay = qp["pay_status"] || "0", sort = qp["sort"] || "1";
+    var name = en.title.trim().replace(/^►/, "");
+    if (tag !== "0") pushUnique(tags, name, tag);
+    else if (status !== "0") pushUnique(statuses, name, status);
+    else if (pay !== "0") pushUnique(pays, name, pay);
+    else pushUnique(sorts, name, sort);
+  }
+  if (!hasVal(tags, "0")) tags.unshift({ name: "全部", value: "0" });
+  if (!hasVal(statuses, "0")) statuses.unshift({ name: "全部", value: "0" });
+  if (!hasVal(pays, "0")) pays.unshift({ name: "全部", value: "0" });
+  return { ranks: ranks, tags: tags, statuses: statuses, sorts: sorts, pays: pays, multiBase: multiBase, multiFixed: multiFixed };
+}
+/* 四维组合拼 multi_filter URL（参数顺序与规则原样一致） */
+function kkMultiFilterUrl(filters, tag, status, pay, sort, page) {
+  if (!filters.multiBase) return "";
+  var f = filters.multiFixed;
+  return filters.multiBase + "?page=" + page + "&size=" + f.size + "&tag_id=" + tag + "&update_status=" + status + "&pay_status=" + pay + "&sort=" + sort + "&fav_filter=" + f.favFilter + "&gender=" + f.gender;
+}
+/* ---- 数据表达式求值器（不用 eval / Function）----
+   规则的详情/章节 JS 是 eval(__NUXT__ 脚本)，但页面运行环境禁止动态执行
+   代码。__NUXT__ 的载荷本身是纯数据：(function(参数…){return {数据字面量}})
+   (字面量参数…)。这里写一个只认数据语法的递归下降求值器：对象/数组/
+   字符串/数字/布尔/null、参数引用、成员访问、括号与四则/比较运算，
+   遇到函数调用等数据之外的语法就抛错，调用方当没取到。 */
+function DataExprParser(src, env) {
+  this.src = src;
+  this.env = env;
+  this.pos = 0;
+}
+DataExprParser.prototype.ws = function () {
+  while (this.pos < this.src.length && /\s/.test(this.src.charAt(this.pos))) this.pos++;
+};
+DataExprParser.prototype.peek = function () { this.ws(); return this.src.charAt(this.pos); };
+DataExprParser.prototype.expect = function (ch) {
+  this.ws();
+  if (this.src.charAt(this.pos) !== ch) throw new Error("数据表达式：期望 " + ch);
+  this.pos++;
+};
+DataExprParser.prototype.parseValue = function () { return this.parseTernary(); };
+DataExprParser.prototype.parseTernary = function () {
+  var cond = this.parseBinary(0);
+  if (this.peek() === "?") {
+    this.pos++;
+    var a = this.parseTernary();
+    this.expect(":");
+    var b = this.parseTernary();
+    return cond ? a : b;
+  }
+  return cond;
+};
+DataExprParser.prototype.parseBinary = function (minPrec) {
+  var OPS = [["||", 1], ["&&", 2], ["===", 3], ["!==", 3], ["==", 3], ["!=", 3], ["<=", 4], [">=", 4], ["<", 4], [">", 4], ["+", 5], ["-", 5], ["*", 6], ["/", 6], ["%", 6]];
+  var left = this.parseUnary();
+  for (;;) {
+    this.ws();
+    var matched = null;
+    for (var i = 0; i < OPS.length; i++) {
+      if (OPS[i][1] >= minPrec && this.src.indexOf(OPS[i][0], this.pos) === this.pos) { matched = OPS[i]; break; }
+    }
+    if (!matched) return left;
+    var op = matched[0], prec = matched[1];
+    this.pos += op.length;
+    var right = this.parseBinary(prec + 1);
+    if (op === "||") left = left || right;
+    else if (op === "&&") left = left && right;
+    else if (op === "===") left = left === right;
+    else if (op === "!==") left = left !== right;
+    else if (op === "==") left = left == right;
+    else if (op === "!=") left = left != right;
+    else if (op === "<=") left = left <= right;
+    else if (op === ">=") left = left >= right;
+    else if (op === "<") left = left < right;
+    else if (op === ">") left = left > right;
+    else if (op === "+") left = (typeof left === "string" || typeof right === "string") ? String(left) + String(right) : left + right;
+    else if (op === "-") left = left - right;
+    else if (op === "*") left = left * right;
+    else if (op === "/") left = left / right;
+    else if (op === "%") left = left % right;
+  }
+};
+DataExprParser.prototype.parseUnary = function () {
+  this.ws();
+  var ch = this.src.charAt(this.pos);
+  if (ch === "-") { this.pos++; return -(this.parseUnary()); }
+  if (ch === "+") { this.pos++; return +(this.parseUnary()); }
+  if (ch === "!") { this.pos++; return !this.parseUnary(); }
+  if (ch === "~") { this.pos++; return ~(this.parseUnary()); }
+  return this.parsePostfix();
+};
+DataExprParser.prototype.parsePostfix = function () {
+  var v = this.parsePrimary();
+  for (;;) {
+    this.ws();
+    var ch = this.src.charAt(this.pos);
+    if (ch === ".") {
+      this.pos++;
+      var name = this.parseIdentName();
+      v = (v == null ? undefined : v[name]);
+    } else if (ch === "[") {
+      this.pos++;
+      var key = this.parseTernary();
+      this.expect("]");
+      v = (v == null ? undefined : v[key]);
+    } else if (ch === "(") {
+      throw new Error("数据表达式：不支持函数调用");
+    } else {
+      return v;
+    }
+  }
+};
+DataExprParser.prototype.parseListUntil = function (close) {
+  var out = [];
+  this.ws();
+  if (this.src.charAt(this.pos) === close) { this.pos++; return out; }
+  for (;;) {
+    out.push(this.parseTernary());
+    this.ws();
+    if (this.src.charAt(this.pos) === ",") { this.pos++; continue; }
+    this.expect(close);
+    return out;
+  }
+};
+DataExprParser.prototype.parseIdentName = function () {
+  this.ws();
+  var m = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(this.src.slice(this.pos));
+  if (!m) throw new Error("数据表达式：期望标识符");
+  this.pos += m[0].length;
+  return m[0];
+};
+DataExprParser.prototype.parseString = function () {
+  var quote = this.src.charAt(this.pos);
+  this.pos++;
+  var out = "";
+  while (this.pos < this.src.length) {
+    var c = this.src.charAt(this.pos++);
+    if (c === quote) return out;
+    if (c === "\\") {
+      var e = this.src.charAt(this.pos++);
+      if (e === "n") out += "\n";
+      else if (e === "t") out += "\t";
+      else if (e === "r") out += "\r";
+      else if (e === "b") out += "\b";
+      else if (e === "f") out += "\f";
+      else if (e === "v") out += "\v";
+      else if (e === "0") out += "\0";
+      else if (e === "u") { var hex = this.src.slice(this.pos, this.pos + 4); out += String.fromCharCode(parseInt(hex, 16) || 0); this.pos += 4; }
+      else if (e === "x") { var hex2 = this.src.slice(this.pos, this.pos + 2); out += String.fromCharCode(parseInt(hex2, 16) || 0); this.pos += 2; }
+      else out += e;
+    } else {
+      out += c;
+    }
+  }
+  throw new Error("数据表达式：字符串未闭合");
+};
+DataExprParser.prototype.parseNumber = function () {
+  var m = /^-?(?:0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)/.exec(this.src.slice(this.pos));
+  if (!m) throw new Error("数据表达式：期望数字");
+  this.pos += m[0].length;
+  return Number(m[0]);
+};
+DataExprParser.prototype.parsePrimary = function () {
+  this.ws();
+  var ch = this.src.charAt(this.pos);
+  if (ch === "(") {
+    this.pos++;
+    var v = this.parseTernary();
+    this.expect(")");
+    return v;
+  }
+  if (ch === "[") {
+    this.pos++;
+    var arr = [];
+    for (;;) {
+      this.ws();
+      if (this.src.charAt(this.pos) === "]") { this.pos++; return arr; }
+      arr.push(this.parseTernary());
+      this.ws();
+      if (this.src.charAt(this.pos) === ",") { this.pos++; continue; }
+      this.expect("]");
+      return arr;
+    }
+  }
+  if (ch === "{") {
+    this.pos++;
+    var obj = {};
+    for (;;) {
+      this.ws();
+      if (this.src.charAt(this.pos) === "}") { this.pos++; return obj; }
+      var key;
+      var kc = this.src.charAt(this.pos);
+      if (kc === '"' || kc === "'") key = this.parseString();
+      else if (/[0-9]/.test(kc)) key = String(this.parseNumber());
+      else key = this.parseIdentName();
+      this.ws();
+      if (this.src.charAt(this.pos) === ":") {
+        this.pos++;
+        obj[key] = this.parseTernary();
+      } else {
+        obj[key] = this.env.get(key);
+      }
+      this.ws();
+      if (this.src.charAt(this.pos) === ",") { this.pos++; continue; }
+      this.expect("}");
+      return obj;
+    }
+  }
+  if (ch === '"' || ch === "'") return this.parseString();
+  if (/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(this.src.charAt(this.pos + 1)))) return this.parseNumber();
+  if (/[A-Za-z_$]/.test(ch)) {
+    var name = this.parseIdentName();
+    if (name === "Array" && !this.env.has("Array") && this.peek() === "(") {
+      this.pos++;
+      var args = this.parseListUntil(")");
+      return (args.length === 1 && typeof args[0] === "number") ? new Array(args[0]).fill(undefined) : args;
+    }
+    if (name === "true") return true;
+    if (name === "false") return false;
+    if (name === "null") return null;
+    if (name === "undefined" || name === "void") {
+      if (name === "void") this.parseUnary();
+      return undefined;
+    }
+    return this.env.get(name);
+  }
+  throw new Error("数据表达式：意外字符 " + (ch || "(结束)"));
+};
+DataExprParser.prototype.parseList = function () {
+  var out = [];
+  this.ws();
+  if (this.pos >= this.src.length) return out;
+  for (;;) {
+    out.push(this.parseTernary());
+    this.ws();
+    if (this.src.charAt(this.pos) === ",") { this.pos++; continue; }
+    return out;
+  }
+};
+/* 模板求值：先把 {{算式}}（如 24*(page-1)）算成数字，再替 {{page}} */
+function kkBuildUrl(template, page) {
+  return template.replace(/\{\{([^}]*)\}\}/g, function (_m, exprRaw) {
+    var expr = String(exprRaw).trim();
+    try {
+      var env = new Map([["page", page]]);
+      var v = new DataExprParser(expr, env).parseValue();
+      return (typeof v === "number" && isFinite(v)) ? String(v) : expr;
+    } catch (e) { return expr; }
+  });
+}
+/* searchUrl 原样：/search/mini/topic/title_and_author?page={{page}}&size=24&q={{key}} */
+function kkSearchUrl(key, page) {
+  return KK_HOST + "/search/mini/topic/title_and_author?page=" + page + "&size=24&q=" + encodeURIComponent(key);
+}
+function kkStr(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
+/* ruleSearch 的 bookList 四路回落：$.data.topics || $.data.cards || $.hits.topicMessageList || $.hits */
+function kkPickList(root) {
+  var r = root || {};
+  var candidates = [
+    r.data && r.data.topics,
+    r.data && r.data.cards,
+    (Array.isArray(r.hits) ? undefined : (r.hits && r.hits.topicMessageList)),
+    r.hits
+  ];
+  for (var i = 0; i < candidates.length; i++) {
+    if (Array.isArray(candidates[i]) && candidates[i].length) return candidates[i];
+  }
+  for (var j = 0; j < candidates.length; j++) {
+    if (Array.isArray(candidates[j])) return candidates[j];
+  }
+  return [];
+}
+/* 一条列表记录 → 卡片（ruleSearch 各字段原样） */
+function kkParseList(jsonText) {
+  var root;
+  try { root = JSON.parse(jsonText); } catch (e) { return []; }
+  var list = kkPickList(root);
+  var out = [], seen = {};
+  for (var i = 0; i < list.length; i++) {
+    var it = list[i] || {};
+    var id = kkStr(it["id"] != null ? it["id"] : it["topic_id"]);
+    if (!id || seen[id]) continue;
+    seen[id] = 1;
+    var titleRaw = it["title"];
+    var name = (titleRaw && typeof titleRaw === "object") ? kkStr(titleRaw.text) : kkStr(titleRaw);
+    var cover = kkStr(it["vertical_image_url"]) || kkStr(it["image_url"]);
+    if (!cover) {
+      var info = it["cover_image_info"];
+      var imgs = (info && Array.isArray(info.images)) ? info.images : [];
+      for (var k = 0; k < imgs.length; k++) {
+        var u = kkStr(imgs[k] && imgs[k].url);
+        if (u) { cover = u; break; }
+      }
+    }
+    var cat = it["category"], kind = "";
+    if (Array.isArray(cat)) kind = cat.map(function (c) { return kkStr(c); }).filter(Boolean).join(" ");
+    else kind = kkStr(cat);
+    if (!kind) {
+      var tags = it["recommend_tag"];
+      if (Array.isArray(tags)) kind = kkStr(tags[1] && tags[1].title);
+    }
+    var author = kkStr(it["author_name"]);
+    var last = kkStr(it["latest_comic_title"]);
+    var desc = [author, last, kind].filter(Boolean).join(" · ");
+    out.push({ title: name || id, desc: desc, pic: cover, ref: KK_HOST + "/mobile/" + id + "/list/" });
+  }
+  return out;
+}
+function findMatchingBrace(src, openIdx) {
+  var depth = 0, i = openIdx;
+  while (i < src.length) {
+    var c = src.charAt(i);
+    if (c === '"' || c === "'") {
+      var q = c; i++;
+      while (i < src.length && src.charAt(i) !== q) { if (src.charAt(i) === "\\") i++; i++; }
+      i++;
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}") { depth--; if (depth === 0) return i; }
+    i++;
+  }
+  return -1;
+}
+/* 按顶层分号切语句（字符串与括号深度都算进去，对象字面量里的 ; 不切） */
+function splitStatements(body) {
+  var out = [], depth = 0, start = 0, i = 0;
+  while (i < body.length) {
+    var c = body.charAt(i);
+    if (c === '"' || c === "'") {
+      var q = c; i++;
+      while (i < body.length && body.charAt(i) !== q) { if (body.charAt(i) === "\\") i++; i++; }
+      i++;
+      continue;
+    }
+    if (c === "{" || c === "[" || c === "(") depth++;
+    else if (c === "}" || c === "]" || c === ")") depth--;
+    else if (c === ";" && depth === 0) { out.push(body.slice(start, i)); start = i + 1; }
+    i++;
+  }
+  var tail = body.slice(start).trim();
+  if (tail) out.push(tail);
+  return out;
+}
+/* 执行一句赋值语句（f[0]={…} / p.user_id=… / x=…），左值是标识符起头的成员/下标路径 */
+function execAssign(stmt, env) {
+  var depth = 0, eq = -1, i = 0;
+  while (i < stmt.length) {
+    var c = stmt.charAt(i);
+    if (c === '"' || c === "'") {
+      var q = c; i++;
+      while (i < stmt.length && stmt.charAt(i) !== q) { if (stmt.charAt(i) === "\\") i++; i++; }
+      i++;
+      continue;
+    }
+    if (c === "{" || c === "[" || c === "(") depth++;
+    else if (c === "}" || c === "]" || c === ")") depth--;
+    else if (c === "=" && depth === 0) {
+      var prev = stmt.charAt(i - 1), next = stmt.charAt(i + 1);
+      if (next !== "=" && prev !== "=" && prev !== "!" && prev !== "<" && prev !== ">") { eq = i; break; }
+    }
+    i++;
+  }
+  if (eq < 0) return false;
+  var lhs = stmt.slice(0, eq).trim();
+  var head = /^([A-Za-z_$][A-Za-z0-9_$]*)/.exec(lhs);
+  if (!head || !head[1]) return false;
+  var value = new DataExprParser(stmt.slice(eq + 1), env).parseValue();
+  var keys = [], rest = lhs.slice(head[0].length);
+  while (rest.trim()) {
+    rest = rest.trim();
+    if (rest.charAt(0) === ".") {
+      var km = /^\.([A-Za-z_$][A-Za-z0-9_$]*)/.exec(rest);
+      if (!km || !km[1]) return false;
+      keys.push(km[1]);
+      rest = rest.slice(km[0].length);
+    } else if (rest.charAt(0) === "[") {
+      var close = rest.indexOf("]");
+      if (close < 0) return false;
+      var inner = rest.slice(1, close);
+      var kv = new DataExprParser(inner, env).parseValue();
+      if (typeof kv !== "string" && typeof kv !== "number") return false;
+      keys.push(kv);
+      rest = rest.slice(close + 1);
+    } else {
+      return false;
+    }
+  }
+  if (!keys.length) { env.set(head[1], value); return true; }
+  var target = env.get(head[1]);
+  if (!target || typeof target !== "object") return false;
+  for (var k = 0; k < keys.length - 1; k++) {
+    target = target[keys[k]];
+    if (!target || typeof target !== "object") return false;
+  }
+  target[keys[keys.length - 1]] = value;
+  return true;
+}
+/* 规则 ruleBookInfo / ruleToc 的 JS 本身就是 eval(__NUXT__ 脚本) 后读 data[0]。
+   这里取同一段脚本（匹配方式与规则一致：取 __NUXT__ 起到下一个 < 为止），但页面环境禁止
+   动态执行代码，载荷又是纯数据，于是用上面的数据表达式求值器把
+   (function(参数…){return {…}})(参数…) 解出来，语义与 eval 这段数据脚本相同。 */
+function kkEvalNuxt(html) {
+  var m = String(html || "").match(/__NUXT__[^<]*/);
+  if (!m || !m[0]) return null;
+  try {
+    var src = m[0];
+    var eq = src.indexOf("=");
+    if (eq < 0) return null;
+    src = src.slice(eq + 1).trim();
+    if (src.charAt(0) === "(") src = src.slice(1).trim();
+    if (src.indexOf("function") !== 0) return null;
+    var paramsOpen = src.indexOf("(");
+    var paramsClose = src.indexOf(")", paramsOpen);
+    if (paramsOpen < 0 || paramsClose < 0) return null;
+    var params = src.slice(paramsOpen + 1, paramsClose).split(",").map(function (p) { return p.trim(); }).filter(Boolean);
+    var bodyOpen = src.indexOf("{", paramsClose);
+    if (bodyOpen < 0) return null;
+    var bodyClose = findMatchingBrace(src, bodyOpen);
+    if (bodyClose < 0) return null;
+    var body = src.slice(bodyOpen + 1, bodyClose);
+    var rest = src.slice(bodyClose + 1);
+    var argsOpen = rest.indexOf("(");
+    if (argsOpen < 0) return null;
+    var argsText = rest.slice(argsOpen + 1).trim();
+    if (argsText.charAt(argsText.length - 1) === ";") argsText = argsText.slice(0, -1).trim();
+    if (argsText.charAt(argsText.length - 1) === ")") argsText = argsText.slice(0, -1);
+    var args = new DataExprParser(argsText, new Map()).parseList();
+    var env = new Map();
+    params.forEach(function (p, i) { env.set(p, args[i]); });
+    var result, sawReturn = false;
+    var stmts = splitStatements(body);
+    for (var s = 0; s < stmts.length; s++) {
+      var t = stmts[s].trim();
+      if (!t) continue;
+      if (/^return\b/.test(t)) {
+        result = new DataExprParser(t.slice("return".length), env).parseValue();
+        sawReturn = true;
+        break;
+      }
+      try { execAssign(t, env); } catch (e) { /* 单句赋值失败不影响 return 取值 */ }
+    }
+    if (!sawReturn) return null;
+    if (result && typeof result === "object") return result;
+  } catch (e) { /* 脚本形状变了就当没取到 */ }
+  return null;
+}
+/* 详情页 = bookUrl（/mobile/{id}/list/）那份 HTML */
+function kkParseDetail(html, nameHint) {
+  var nuxt = kkEvalNuxt(html);
+  var d0 = (nuxt && nuxt.data && nuxt.data[0]) || null;
+  if (!d0 || !d0.topicInfo) return null;
+  var ti = d0.topicInfo;
+  var user = ti["user"] || {};
+  var updateStatus = kkStr(ti["update_status"]);
+  var tagsRaw = (ti["tags"] != null ? ti["tags"] : ti["category"]);
+  var tags = [];
+  if (Array.isArray(tagsRaw)) {
+    for (var i = 0; i < tagsRaw.length; i++) {
+      var t = tagsRaw[i];
+      var s = (t && typeof t === "object") ? kkStr(t.title) : kkStr(t);
+      if (s && tags.indexOf(s) < 0) tags.push(s);
+    }
+  }
+  var chapters = [];
+  var rawList = Array.isArray(d0.comicList) ? d0.comicList : [];
+  for (var j = 0; j < rawList.length; j++) {
+    var ch = rawList[j] || {};
+    var cid = kkStr(ch.id);
+    if (!cid) continue;
+    var isVip = !(ch.is_free === true || ch.is_free === "true");
+    chapters.push({ id: KK_HOST + "/mobile/comics/" + cid, name: norm(kkStr(ch.title) || cid) + (isVip ? " · VIP" : "") });
+  }
+  return {
+    name: kkStr(ti["title"]) || nameHint,
+    author: kkStr(user.nickname),
+    cover: kkStr(ti["vertical_image_url"]),
+    desc: norm(kkStr(ti["description"])),
+    status: updateStatus,
+    tags: tags,
+    lastChapter: updateStatus.replace(/^.*?已更/, ""),
+    chapters: chapters
+  };
+}
+/* 章节图：先照 ruleContent 的 class.ComicPics@img 取选择器结果；再按
+   用户钉死的回落（2026-11-02）：章节页 __NUXT__ 里 data[0].comicInfo.images
+   数组存在且比选择器结果长，就用它当全章图集，否则保持选择器结果。 */
+function kkImagesFromChapterHtml(html) {
+  var text = String(html || "");
+  var selector = [];
+  try {
+    var doc = new DOMParser().parseFromString(text, "text/html");
+    doc.querySelectorAll(".ComicPics img").forEach(function (el) {
+      var u = el.getAttribute("src") || el.getAttribute("data-src") || el.getAttribute("data-original") || "";
+      if (u && u.indexOf("data:") !== 0) selector.push(u);
+    });
+  } catch (e) { selector = []; }
+  if (!selector.length) {
+    var start = text.indexOf("ComicPics");
+    if (start >= 0) {
+      var seg = text.slice(start);
+      var ire = /<img[^>]*>/g, im;
+      while ((im = ire.exec(seg)) !== null) {
+        var tag = im[0];
+        var u = ((tag.match(/\bsrc="([^"]+)"/) || [])[1] || (tag.match(/\bdata-src="([^"]+)"/) || [])[1] || (tag.match(/\bdata-original="([^"]+)"/) || [])[1] || "");
+        if (u && u.indexOf("data:") !== 0) selector.push(u);
+      }
+    }
+  }
+  var nuxtImages = [];
+  var nuxt = kkEvalNuxt(text);
+  var d0 = (nuxt && nuxt.data && nuxt.data[0]) || null;
+  var rawImages = d0 && d0.comicInfo && d0.comicInfo.images;
+  if (Array.isArray(rawImages)) {
+    nuxtImages = rawImages.map(function (x) { return (typeof x === "string" ? x : kkStr(x && x.url)); }).filter(function (x) { return x.length > 0; });
+  }
+  if (nuxtImages.length > selector.length) {
+    return { images: nuxtImages, selectorCount: selector.length, nuxtCount: nuxtImages.length, usedNuxt: true };
+  }
+  return { images: selector, selectorCount: selector.length, nuxtCount: nuxtImages.length, usedNuxt: false };
+}
+
+/* ---------------- 蛙漫漫画（◎辞晨◎，manwamh.com） ----------------
+   exploreUrl 是 @js：分类从 live /category 页现算（地区/题材/状态三组）。
+   章节图 params 变量 AES 解密（与滴答同款花样、不同密钥与宿主）。
+   注意 params 在页里是 JSON 转义过的 JS 字面量，先还原 \u002b 与 \/
+   再解码，否则解密出乱码。解密出的 chapter_images 已是绝对地址，原样用。
+   six.mhpic.net 只认 Referer https://www.manwamh5.com/（图片请求走
+   fetch + referrer 选项，见 fetchImageBlobUrl）。 */
+var WM_HOST = "https://www.manwamh.com";
+var WM_IMG_HOST = "https://six.mhpic.net";
+var WM_AES_KEY = "5V&RoR%Jf@pJPydF";
+/* 规则 header @js 的动态头（baseUrl 即 bookSourceUrl）。
+   注意：fetch 禁设 User-Agent / Referer 头——UA 用 WebView 自身的，
+   Referer 走 fetch 的 referrer 选项（request() 的 opts.referrer）。 */
+var WM_HEADERS = {
+  "sec-ch-ua-platform": '"Android"',
+  origin: WM_HOST + "/",
+  "x-requested-with": "cn.mujiankeji.mbrowser",
+  "Accept-language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+};
+var WM_REFERRER = WM_HOST + "/";
+var WM_IMG_REFERRER = "https://www.manwamh5.com/";
+function wmAbs(u) {
+  var s = String(u || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.indexOf("//") === 0) return "https:" + s;
+  return WM_HOST + (s.charAt(0) === "/" ? s : "/" + s);
+}
+/* exploreUrl @js 原样：先推「全部🔖分类」头条目，再按 #area/#theme/#state 三组现算 */
+function wmParseCategories(html) {
+  var out = [{ group: "", title: "全部🔖分类", url: "" }];
+  var groups = [["area", "地区"], ["theme", "题材"], ["state", "状态"]];
+  for (var g = 0; g < groups.length; g++) {
+    var id = groups[g][0], group = groups[g][1];
+    var sec = String(html || "").match(new RegExp('<dl id="' + id + '">([\\s\\S]*?)</dl>'));
+    if (!sec || !sec[1]) continue;
+    var re = /<a[^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g, am;
+    while ((am = re.exec(sec[1])) !== null) {
+      var href = (am[1] || "").trim();
+      var title = norm(am[2] || "");
+      if (!href || !title) continue;
+      out.push({ group: group, title: title, url: href + "/page/{{page}}" });
+    }
+  }
+  return out;
+}
+/* 分类在界面上的唯一键：地区/题材/状态三组里都有「全部」（同 URL），只用 URL 会撞键 */
+function wmCatKey(cat) { return cat.group + ":" + (cat.url || "all"); }
+function wmCatUrl(cat, page) {
+  if (!cat.url) return page <= 1 ? WM_HOST + "/category" : WM_HOST + "/category/page/" + page;
+  return WM_HOST + cat.url.replace("{{page}}", String(page));
+}
+function wmSearchUrl(key) { return WM_HOST + "/search?q=" + encodeURIComponent(key); }
+/* ruleSearch / 分类列表共用：.comics-card */
+function wmParseList(html) {
+  var out = [];
+  if (!html) return out;
+  var blocks = String(html).split(/<div class="comics-card(?=[\s"])/);
+  var seen = {};
+  for (var i = 1; i < blocks.length; i++) {
+    var b = blocks[i] || "";
+    var am = b.match(/<a[^>]*href="(\/comic\/[^"?#]+)"/);
+    if (!am || !am[1]) continue;
+    var url = wmAbs(am[1]);
+    if (seen[url]) continue;
+    seen[url] = 1;
+    var cover = wmAbs(((b.match(/data-original="([^"]+)"/) || [])[1] || ""));
+    var name = norm(((b.match(/<h3[^>]*>([\s\S]*?)<\/h3>/) || [])[1] || ""));
+    var kind = norm(((b.match(/<span class="tab[^>]*>([\s\S]*?)<\/span>/) || [])[1] || ""));
+    var last = norm(((b.match(/<small[^>]*>([\s\S]*?)<\/small>/) || [])[1] || ""));
+    var desc = [kind, last].filter(Boolean).join(" · ");
+    out.push({ title: name || url, desc: desc, pic: cover, ref: url });
+  }
+  return out;
+}
+/* 从 openIdx 处的 <div …> 起，按 <div>/</div> 配对切出整块 div */
+function sliceDivFrom(html, openIdx) {
+  var gt = html.indexOf(">", openIdx);
+  if (gt < 0) return "";
+  var depth = 1, i = gt + 1;
+  while (i < html.length) {
+    var o = html.indexOf("<div", i);
+    var c = html.indexOf("</div>", i);
+    if (c < 0) break;
+    if (o >= 0 && o < c) { depth++; i = o + 4; }
+    else { depth--; i = c + 6; if (depth === 0) return html.slice(openIdx, i); }
+  }
+  return html.slice(openIdx);
+}
+/* 章节链接：<a href="/{漫画id}/{数字id}">…<span>话名</span>…</a> */
+function wmChapterLinks(seg) {
+  var out = [], seen = {};
+  var re = /<a[^>]*href="(\/[^"?#]+\/\d+)"[^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/g, m;
+  while ((m = re.exec(seg)) !== null) {
+    var href = m[1] || "";
+    if (!href || seen[href]) continue;
+    seen[href] = 1;
+    var name = norm(m[2] || "");
+    out.push({ id: wmAbs(href), name: name || href });
+  }
+  return out;
+}
+/* ruleBookInfo + ruleToc，都在详情页一份 HTML 里 */
+function wmParseDetail(html, nameHint) {
+  if (!html || html.length <= 1000) return null;
+  var h1s = [], h1re = /<h1[^>]*>([\s\S]*?)<\/h1>/g, hm;
+  while ((hm = h1re.exec(html)) !== null) h1s.push(hm[1] || "");
+  var name = norm(h1s[1] != null ? h1s[1] : (h1s[0] || "")) || nameHint;
+  if (!name) return null;
+  var author = norm(((html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/) || [])[1] || ""));
+  var cover = wmAbs(((html.match(/<img[^>]*src="([^"]+)"/) || [])[1] || ""));
+  var desc = norm(((html.match(/<p[^>]*>([\s\S]*?)<\/p>/) || [])[1] || ""));
+  var tags = [];
+  var tre = /class="tag"[^>]*>([^<]*)</g, tm;
+  while ((tm = tre.exec(html)) !== null) {
+    var t = norm(tm[1] || "");
+    if (t && t !== "漫画" && tags.indexOf(t) < 0) tags.push(t);
+  }
+  var ere = /<em[^>]*>([^<]*)<\/em>/g, em;
+  while ((em = ere.exec(html)) !== null) {
+    var t2 = norm(em[1] || "");
+    if (t2 && tags.indexOf(t2) < 0) tags.push(t2);
+  }
+  var firstTag = tags[0] || "";
+  var status = /下架|连载|完结/.test(firstTag) ? firstTag : "";
+  var chapters = [];
+  if (html.indexOf("查看全部") >= 0) {
+    var ci = html.indexOf('id="chapter-items"');
+    if (ci >= 0) {
+      var open = html.lastIndexOf("<div", ci);
+      chapters = wmChapterLinks(sliceDivFrom(html, open >= 0 ? open : ci));
+    }
+  } else {
+    var boxes = [], bre = /<div class="l-box"/g, bm;
+    while ((bm = bre.exec(html)) !== null) boxes.push(bm.index);
+    var second = boxes[1];
+    if (second !== undefined) {
+      var box = sliceDivFrom(html, second);
+      var pg = box.indexOf('<div class="pure-g"');
+      if (pg >= 0) chapters = wmChapterLinks(sliceDivFrom(box, pg)).reverse();
+    }
+  }
+  return { name: name, author: author, cover: cover, desc: desc, status: status, tags: tags, chapters: chapters };
+}
+/* ruleContent：params 变量 AES 解密（IV = 前 16 字节，其余 AES-128-CBC） */
+function wmImagesFromChapterHtml(html) {
+  var empty = { images: [], viaJson: false };
+  var m = html.match(/params\s*=\s*'([^']+)'/) || html.match(/params\s*=\s*"([^"]+)"/);
+  var raw = (m && m[1]) || "";
+  if (!raw) return Promise.resolve(empty);
+  var unescaped = raw
+    .replace(/\\u([0-9a-fA-F]{4})/g, function (_a, hex) { return String.fromCharCode(parseInt(hex, 16)); })
+    .replace(/\\\//g, "/").replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  return aesCbcDecryptB64(unescaped, WM_AES_KEY).then(function (text) {
+    if (!text) return empty;
+    var toUrl = function (x) {
+      var s = String(x || "").trim();
+      if (!s) return "";
+      if (/^https?:\/\//i.test(s)) return s;
+      if (s.indexOf("//") === 0) return "https:" + s;
+      return WM_IMG_HOST + (s.charAt(0) === "/" ? s : "/" + s);
+    };
+    try {
+      var j = JSON.parse(text);
+      if (j && Array.isArray(j.chapter_images)) {
+        var images = j.chapter_images.map(function (x) { return (typeof x === "string" ? toUrl(x) : ""); }).filter(function (x) { return x.length > 0; });
+        if (images.length) return { images: images, viaJson: true };
+      }
+    } catch (e) { /* 不是干净 JSON，走规则原样的字串刮取回落 */ }
+    var scrubbed = text.replace(/\\|"/g, "");
+    var arr = scrubbed.match(/.*\[(.*)\].*/);
+    if (!arr || !arr[1]) return empty;
+    var images2 = arr[1].split(",").map(function (x) { return toUrl(x); }).filter(function (x) { return x.length > 0; });
+    return { images: images2, viaJson: false };
+  });
+}
+
+/* ---------------- 新爱漫画（coco，xapi.xinmanhua.net） ----------------
+   纯 JSON API，header 只有 UA okhttp/3.10.0（fetch 禁设 UA——真 WebView 里
+   用 WebView 自身的 Chrome UA，jsdom 自测里按规则送 okhttp；见 request()）。
+   分类是 exploreUrl 的 14 行 title::url（catalog 接口）；搜索是 POST
+   /search/selfdefine；详情就是 worksinfos 接口本身（含 chapters.digests，
+   intro 与章节表同源）；章节图是 qualitywebs 接口的 url 串。
+   章节图带 80 字节站方包装头：图片请求走 fetch + 剥头 + blob（见
+   stripXaImage / fetchImageBlobUrl），浏览器直接 <img> 解不了。 */
+var XA_HOST = "https://xapi.xinmanhua.net";
+var XA_HEADERS = { "User-Agent": "okhttp/3.10.0" };
+var XA_UA = "okhttp/3.10.0";
+/* exploreUrl 原样：14 行「标题::https://xapi.xinmanhua.net/search/catalog?...」 */
+function xaCatsFromRule(rule) {
+  var raw = typeof rule["exploreUrl"] === "string" ? rule["exploreUrl"] : "";
+  var out = [];
+  var lines = raw.split("\n");
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i], idx = line.indexOf("::");
+    if (idx < 0) continue;
+    var title = line.slice(0, idx).trim(), url = line.slice(idx + 2).trim();
+    if (title && url) out.push({ title: title, url: url });
+  }
+  return out;
+}
+function xaExploreUrl(template, page) { return template.replace("{{page}}", String(page)); }
+function xaSearchBody(key, page) { return "keyword=" + encodeURIComponent(key) + "&page=" + page; }
+function xaSearchUrl() { return XA_HOST + "/search/selfdefine"; }
+function xaStr(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
+/* ruleSearch @JSon：bookList $.data.* */
+function xaParseSearch(jsonText) {
+  var root;
+  try { root = JSON.parse(jsonText); } catch (e) { return []; }
+  var data = root && root.data;
+  if (!Array.isArray(data)) return [];
+  var out = [], seen = {};
+  for (var i = 0; i < data.length; i++) {
+    var item = data[i] || {}, at = item.attributes || {};
+    var wid = xaStr(at["wid"]);
+    if (!wid || seen[wid]) continue;
+    seen[wid] = 1;
+    var title = xaStr(at["title"]);
+    var author = xaStr(at["author"]);
+    var kind = xaStr(at["workscate"]);
+    var last = xaStr(at["lastctitle"]);
+    var desc = [author, kind, last].filter(Boolean).join(" · ");
+    out.push({ title: title || wid, desc: desc, pic: xaStr(at["logo_detail"]), ref: XA_HOST + "/worksinfos/" + wid + "?include=chapters.digests" });
+  }
+  return out;
+}
+/* ruleBookInfo 只有 intro；ruleToc 的章节表也在同一份响应里：
+   chapterList $.included.*（只取 type=chapters，digests 是单页图不要） */
+function xaParseDetail(jsonText) {
+  var root;
+  try { root = JSON.parse(jsonText); } catch (e) { return null; }
+  var r = root || {};
+  var at = (r.data && r.data.attributes) || {};
+  var name = xaStr(at["title"]);
+  if (!name) return null;
+  var desc = xaStr(at["intro"]) || xaStr(at["description"]);
+  var chapters = [];
+  var included = Array.isArray(r.included) ? r.included : [];
+  for (var i = 0; i < included.length; i++) {
+    var item = included[i] || {};
+    if (item.type !== "chapters") continue;
+    var id = xaStr(item.id);
+    if (!id) continue;
+    var a = item.attributes || {};
+    var cname = xaStr(a["title"]) || xaStr(a["intro"]) || id;
+    chapters.push({ id: XA_HOST + "/chapters/" + id + "/qualitywebs", name: norm(cname) });
+  }
+  return { name: name, author: xaStr(at["author"]), cover: xaStr(at["logo_detail"]), desc: desc, chapters: chapters };
+}
+/* ruleContent：$.data[*].attributes.url，再按规则的 @js 以 \n 切开成图。
+   URL 本身已是绝对地址（works.xinmanhua.net），原样用。 */
+function xaImagesFromChapter(jsonText) {
+  var root;
+  try { root = JSON.parse(jsonText); } catch (e) { return []; }
+  var data = root && root.data;
+  if (!Array.isArray(data)) return [];
+  var out = [];
+  for (var i = 0; i < data.length; i++) {
+    var item = data[i] || {};
+    var url = xaStr(item.attributes && item.attributes["url"]);
+    if (url) out.push(url);
+  }
+  return out;
+}
+
+/* ---------------- 漫画台规则导入（engine.ts mtCatsFromRule 原样） ---------------- */
+function splitPairs(names, values) {
+  var ns = (names || "").split("&"), vs = (values || "").split("&"), out = [];
+  for (var i = 0; i < ns.length; i++) {
+    var n = (ns[i] || "").trim();
+    if (!n) continue;
+    out.push([n, vs[i] || ""]);
+  }
+  return out;
+}
+function mtCatsFromRule(rule) {
+  var url = typeof rule["url"] === "string" ? rule["url"] : "";
+  var template = url.indexOf("##") >= 0 ? (url.split("##")[1] || "") : url;
+  return {
+    classes: splitPairs(String(rule["class_name"] != null ? rule["class_name"] : ""), String(rule["class_url"] != null ? rule["class_url"] : "")),
+    areas: splitPairs(String(rule["area_name"] != null ? rule["area_name"] : ""), String(rule["area_url"] != null ? rule["area_url"] : "")),
+    sorts: splitPairs(String(rule["sort_name"] != null ? rule["sort_name"] : ""), String(rule["sort_url"] != null ? rule["sort_url"] : "")),
+    listTemplate: template
+  };
+}
+
+/* ---------------- 图片直取（蛙漫 Referer / 新爱剥 80 字节包装头） ----------------
+   蛙漫六.mhpic.net 只认 Referer https://www.manwamh5.com/：<img> 直挂
+   送的是本页地址，必 403，所以图走 fetch（referrer 选项）+ blob。
+   新爱章节图带 80 字节站方包装头：浏览器直接 <img> 解不了，控制台是
+   服务端代理剥头，这里在客户端同样剥——只有当字节开头不是已知图片魔数、
+   且前 512 字节内能找到 JPEG SOI（FF D8 FF）时才从 SOI 处切掉包装头。 */
+function stripXaImage(bytes) {
+  if (!bytes || bytes.length < 3) return bytes;
+  var isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  var isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  var isGif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46;
+  var isWebp = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+  if (isJpeg || isPng || isGif || isWebp) return bytes;
+  var limit = Math.min(512, bytes.length - 2);
+  for (var i = 0; i < limit; i++) {
+    if (bytes[i] === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff) return bytes.slice(i);
+  }
+  return bytes;
+}
+function guessImageType(bytes) {
+  if (!bytes || bytes.length < 4) return "image/jpeg";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return "image/webp";
+  return "image/jpeg";
+}
+/* mode "wanman"：Referer 用 https://www.manwamh5.com/；
+   mode "xinai"：取回字节后剥 80 字节包装头（无包装头时原样）。 */
+function fetchImageBlobUrl(url, mode) {
+  var opts = { signal: AbortSignal.timeout(30000) };
+  if (mode === "wanman") opts.referrer = WM_IMG_REFERRER;
+  return fetch(url, opts).then(function (res) {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.arrayBuffer();
+  }).then(function (buf) {
+    var bytes = new Uint8Array(buf);
+    if (mode === "xinai") bytes = stripXaImage(bytes);
+    var blob = new Blob([bytes], { type: guessImageType(bytes) });
+    return URL.createObjectURL(blob);
+  });
+}
+/* 某规则的图片加载方式：蛙漫/新爱走 fetch+blob，其余直接 <img> */
+function imgModeFor(r) {
+  if (!r) return "";
+  if (r.kind === "wanman") return "wanman";
+  if (r.kind === "xinai") return "xinai";
+  return "";
+}
+
+/* ---------------- 内嵌规则数据（GitHub rules/ 的快照，启动时再从清单刷新） ---------------- */
+/* 快看 exploreUrl 原文（榜单 + 多维筛选表）：规则文件 _____11_awkg.json 的 exploreUrl 一字未动。 */
+var KK_EXPLORE_RAW = "[{\"title\":\"✿　　　　　　　榜    单　　　　　　　✿\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"国漫榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=9\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"日漫榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=10\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"韩漫榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=11\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"少女榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=6\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"少年榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=5\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"青女榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=7\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"青年榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=8\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"新作榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=2\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"完结榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=12\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"口碑榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=3\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"畅销榜\",\"url\":\"http://m.kuaikanmanhua.com/mini/v1/comic/mkuaikan/rank_list?since={{24*(page-1)}}&limit=24&need_ranks=true&rank_id=4\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"————\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"🔹　　 　　　　状    态　 　　　　　🔹 \",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"推荐\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"最火热\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=0&pay_status=0&sort=2&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"新上架\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=0&pay_status=0&sort=3&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"连载中\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=1&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"已完结\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=2&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"————\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"►免费\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=0&pay_status=1&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"►付费\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=0&pay_status=2&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"►抢先看\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=0&update_status=0&pay_status=3&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"🔹　　 　　　　分    类　 　　　　　🔹 \",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"恋爱\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=20&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"强剧情\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=82&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"古风\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=46&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"校园\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=47&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"奇幻\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=22&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"唯美\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=58&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"热血\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=67&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"日漫\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=57&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"韩漫\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=60&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"大女主\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=77&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"完结\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=40&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"穿越\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=80&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"萌系\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=62&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"灵异\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=32&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"玄幻\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=63&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"搞笑\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=71&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"都市\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=48&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"正能量\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=54&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"总裁\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=52&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"投稿\",\"url\":\"http://m.kuaikanmanhua.com/search/mini/topic/multi_filter?page={{page}}&size=24&tag_id=76&update_status=0&pay_status=0&sort=1&fav_filter=0&gender=0\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"————\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]";
+/* 新爱 exploreUrl 原文（14 行 title::url）：规则文件 _____15_q8x4.json 的 exploreUrl 一字未动。 */
+var XA_EXPLORE_RAW = "全部::https://xapi.xinmanhua.net/search/catalog?keyword=all&ischarge=2&isfinish=2&order=0&page={{page}}\n治愈::https://xapi.xinmanhua.net/search/catalog?keyword=治愈&page={{page}}\n日常::https://xapi.xinmanhua.net/search/catalog?keyword=日常&page={{page}}\n都市::https://xapi.xinmanhua.net/search/catalog?keyword=都市&page={{page}}\n悬疑::https://xapi.xinmanhua.net/search/catalog?keyword=悬疑&page={{page}}\n科幻::https://xapi.xinmanhua.net/search/catalog?keyword=科幻&page={{page}}\n奇幻::https://xapi.xinmanhua.net/search/catalog?keyword=奇幻&page={{page}}\n热血::https://xapi.xinmanhua.net/search/catalog?keyword=热血&page={{page}}\n武侠::https://xapi.xinmanhua.net/search/catalog?keyword=武侠&page={{page}}\n古风::https://xapi.xinmanhua.net/search/catalog?keyword=古风&page={{page}}\n恋爱::https://xapi.xinmanhua.net/search/catalog?keyword=恋爱&page={{page}}\n少年::https://xapi.xinmanhua.net/search/catalog?keyword=少年&page={{page}}\n日漫::https://xapi.xinmanhua.net/search/catalog?keyword=日漫&page={{page}}\n原创::https://xapi.xinmanhua.net/search/catalog?keyword=原创&page={{page}}";
+
+/* v5 引擎的 node 测试导出（接上文 gs/mt 的导出，不覆盖） */
+if (typeof module !== "undefined" && module.exports) {
+  var v5exp = {
+    ddExploreUrl: ddExploreUrl, ddSearchUrl: ddSearchUrl, ddParseList: ddParseList, ddIsSearchBusy: ddIsSearchBusy, ddParseDetail: ddParseDetail, ddExtractParams: ddExtractParams, ddImagesFromChapterHtml: ddImagesFromChapterHtml, DD_CATS: DD_CATS, DD_HOST: DD_HOST,
+    kkExploreFromRule: kkExploreFromRule, kkFiltersFromRule: kkFiltersFromRule, kkBuildUrl: kkBuildUrl, kkMultiFilterUrl: kkMultiFilterUrl, kkSearchUrl: kkSearchUrl, kkParseList: kkParseList, kkEvalNuxt: kkEvalNuxt, kkParseDetail: kkParseDetail, kkImagesFromChapterHtml: kkImagesFromChapterHtml, KK_HOST: KK_HOST, KK_EXPLORE_RAW: KK_EXPLORE_RAW,
+    wmParseCategories: wmParseCategories, wmCatKey: wmCatKey, wmCatUrl: wmCatUrl, wmSearchUrl: wmSearchUrl, wmParseList: wmParseList, wmParseDetail: wmParseDetail, wmImagesFromChapterHtml: wmImagesFromChapterHtml, WM_HOST: WM_HOST, WM_HEADERS: WM_HEADERS,
+    xaCatsFromRule: xaCatsFromRule, xaExploreUrl: xaExploreUrl, xaSearchBody: xaSearchBody, xaSearchUrl: xaSearchUrl, xaParseSearch: xaParseSearch, xaParseDetail: xaParseDetail, xaImagesFromChapter: xaImagesFromChapter, XA_HOST: XA_HOST, XA_EXPLORE_RAW: XA_EXPLORE_RAW,
+    mtCatsFromRule: mtCatsFromRule, stripXaImage: stripXaImage, fetchImageBlobUrl: fetchImageBlobUrl, imgModeFor: imgModeFor
+  };
+  for (var ek in v5exp) { if (Object.prototype.hasOwnProperty.call(v5exp, ek)) module.exports[ek] = v5exp[ek]; }
+}
+
 /* ---------------- 章节表导航（插件同款逻辑） ---------------- */
 function rebuildChapters(page) { return (page && page.chapters) ? page.chapters : []; }
 function fillChaptersFromStack(stack) {
@@ -821,7 +1971,7 @@ function fillChaptersFromStack(stack) {
 
 /* ---------------- node 测试导出（浏览器里无用） ---------------- */
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { gsParseCards: gsParseCards, gsParseHome: gsParseHome, gsParseDetailHtml: gsParseDetailHtml, gsChaptersFromApi: gsChaptersFromApi, gsApiMeta: gsApiMeta, gsImagesFromApi: gsImagesFromApi, decodeImages: decodeImages, b64decode: b64decode, reorder7: reorder7, mtParseList: mtParseList, mtParseDetail: mtParseDetail, mtImagesFromApi: mtImagesFromApi, mtListUrl: mtListUrl, rebuildChapters: rebuildChapters, fillChaptersFromStack: fillChaptersFromStack, norm: norm, fixPic: fixPic };
+  Object.assign(module.exports, { gsParseCards: gsParseCards, gsParseHome: gsParseHome, gsParseDetailHtml: gsParseDetailHtml, gsChaptersFromApi: gsChaptersFromApi, gsApiMeta: gsApiMeta, gsImagesFromApi: gsImagesFromApi, decodeImages: decodeImages, b64decode: b64decode, reorder7: reorder7, mtParseList: mtParseList, mtParseDetail: mtParseDetail, mtImagesFromApi: mtImagesFromApi, mtListUrl: mtListUrl, rebuildChapters: rebuildChapters, fillChaptersFromStack: fillChaptersFromStack, norm: norm, fixPic: fixPic });
 }
 
 
@@ -829,14 +1979,23 @@ if (typeof module !== "undefined" && module.exports) {
 var DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 var MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
 
+/* v5：六条规则全内置。dd/kk/xa 的分类表取自规则 exploreUrl 原文
+   （KK_EXPLORE_RAW / XA_EXPLORE_RAW 是 GitHub rules/ 文件的快照；
+   启动时 loadRulesFromManifest() 再从清单拉最新规则 JSON 刷新一次，
+   拉不到就用这份内嵌快照，离线也能用）。蛙漫分类是 @js，选中时从
+   live /category 页现算，wmCats 初始为空。 */
 var RULES = [
-  { id: "gs", title: "光社漫画", author: "WorkBuddy", kind: "guangse", fileName: "_____2_i9q0.json", badge: "光", warm: false },
-  { id: "mt", title: "漫画台", author: "zhao", kind: "manhuatai", fileName: "___1_9dfy.json", badge: "漫", warm: true }
+  { id: "gs", title: "光社漫画", author: "WorkBuddy", kind: "guangse", fileName: "_____2_i9q0.json", badge: "光", tone: "gs", cats: GS_CATS },
+  { id: "mt", title: "漫画台", author: "zhao", kind: "manhuatai", fileName: "___1_9dfy.json", badge: "漫", tone: "mt", mtCats: MT_CATS, mtListTemplate: MT_LIST_TEMPLATE },
+  { id: "dd", title: "滴答漫画（优）", author: "Buding", kind: "dida", fileName: "_____10_vqy5.json", badge: "滴", tone: "dd", cats: DD_CATS },
+  { id: "kk", title: "快看漫画", author: "coco", kind: "kuaikan", fileName: "_____11_awkg.json", badge: "快", tone: "kk", kkExplore: kkExploreFromRule({ exploreUrl: KK_EXPLORE_RAW }), kkFilters: kkFiltersFromRule({ exploreUrl: KK_EXPLORE_RAW }) },
+  { id: "wm", title: "蛙漫漫画", author: "◎辞晨◎", kind: "wanman", fileName: "____14_uj7f.json", badge: "蛙", tone: "wm", wmCats: [] },
+  { id: "xa", title: "新爱漫画（优+）", author: "coco", kind: "xinai", fileName: "_____15_q8x4.json", badge: "新", tone: "xa", cats: xaCatsFromRule({ exploreUrl: XA_EXPLORE_RAW }).map(function (c) { return { k: c.url, n: c.title }; }) }
 ];
 var state = {
   ruleId: "gs",
   view: { kind: "browse" },
-  browse: { nav: "home", page: 1, cards: [], sections: null, hasMore: false, loading: false, error: "", mtCls: "", mtArea: "", mtSort: "update_time" },
+  browse: { nav: "home", page: 1, cards: [], sections: null, hasMore: false, loading: false, error: "", mtCls: "", mtArea: "", mtSort: "update_time", ddCat: "", kkMode: "rank", kkTag: "0", kkStatus: "0", kkSort: "1", kkPay: "0", wmCatKey: "", xaCat: "" },
   logs: [],
   toast: "",
   detailLoading: "",
@@ -861,14 +2020,25 @@ function showToast(msg) {
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(function () { t.classList.add("hidden"); }, 2200);
 }
-function request(label, url, ua, summarize) {
+/* opts（可选）：{ headers: {...}, referrer: "...", method: "GET"|"POST", body: "..." }。
+   ua 是 "desktop"/"mobile" 取内置 UA，别的字符串原样当 UA（新爱规则的 okhttp/3.10.0）。
+   注意 fetch 禁设 User-Agent / Referer 头：真 WebView 里这两项会被浏览器忽略，
+   改用 WebView 自身的真 Chrome UA；Referer 走 opts.referrer（fetch 的 referrer 选项，
+   蛙漫 HTML 请求用 manwamh.com，图片用 manwamh5.com——见 fetchImageBlobUrl）。
+   node/jsdom 自测里 UA 由这行送出真 UA——apikk 的 Cloudflare 会拦无 UA/undici 之类机器人 UA。 */
+function request(label, url, ua, summarize, opts) {
   var t0 = Date.now();
-  /* ua 决定 UA：光社用桌面 Chrome，漫画台用移动 Chrome。
-     真 WebView 里 fetch 的 User-Agent 是禁设头（浏览器忽略，改用 WebView 自身的真 Chrome UA）；
-     node/jsdom 自测里则由这行送出真 UA——apikk 的 Cloudflare 会拦无 UA/undici 之类机器人 UA。 */
-  var headers = { "User-Agent": ua === "desktop" ? DESKTOP_UA : MOBILE_UA, "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "zh-CN,zh;q=0.9" };
+  var uaStr = ua === "desktop" ? DESKTOP_UA : (ua === "mobile" ? MOBILE_UA : String(ua || MOBILE_UA));
+  var headers = { "User-Agent": uaStr, "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "zh-CN,zh;q=0.9" };
+  if (opts && opts.headers) {
+    for (var hk in opts.headers) { if (Object.prototype.hasOwnProperty.call(opts.headers, hk)) headers[hk] = opts.headers[hk]; }
+  }
   function attempt(n) {
-    return fetch(url, { headers: headers, signal: AbortSignal.timeout(30000) }).then(function (res) {
+    var fetchOpts = { headers: headers, signal: AbortSignal.timeout(30000) };
+    if (opts && opts.referrer) fetchOpts.referrer = opts.referrer;
+    if (opts && opts.method) fetchOpts.method = opts.method;
+    if (opts && opts.body != null) fetchOpts.body = opts.body;
+    return fetch(url, fetchOpts).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.text().then(function (text) {
         var extra = "";
@@ -886,17 +2056,20 @@ function request(label, url, ua, summarize) {
   }
   return attempt(1);
 }
-/* 直接 <img> 加载：成功显示图，失败留首字占位（手机 IP 不被 CDN 拦时正常出图） */
-function imgHtml(src, alt, cls) {
+/* 直接 <img> 加载：成功显示图，失败留首字占位（手机 IP 不被 CDN 拦时正常出图）。
+   mode 为 "wanman"/"xinai" 时不直接挂 <img>：蛙漫图要带 Referer、 新爱图要剥
+   80 字节包装头，都得先 fetch 成 blob 再挂（见 bindImgs + fetchImageBlobUrl）。 */
+function imgHtml(src, alt, cls, mode) {
   var initial = (String(alt || "漫").trim().charAt(0) || "漫");
   if (!src) return '<div class="' + cls + '"><div class="ph"><b>' + esc(initial) + '</b><span>无图</span></div></div>';
-  return '<div class="' + cls + '" data-src="' + esc(src) + '" data-alt="' + esc(alt || "") + '"><div class="ph"><b>' + esc(initial) + '</b><span>加载中</span></div></div>';
+  return '<div class="' + cls + '" data-src="' + esc(src) + '" data-alt="' + esc(alt || "") + '"' + (mode ? ' data-fetch="' + mode + '"' : '') + '><div class="ph"><b>' + esc(initial) + '</b><span>加载中</span></div></div>';
 }
 function bindImgs(root) {
   var holders = (root || document).querySelectorAll("[data-src]");
   for (var i = 0; i < holders.length; i++) {
     (function (h) {
       var src = h.getAttribute("data-src"), alt = h.getAttribute("data-alt") || "";
+      var mode = h.getAttribute("data-fetch") || "";
       var im = new Image();
       im.alt = alt;
       im.onload = function () {
@@ -908,7 +2081,11 @@ function bindImgs(root) {
         var initial = (alt.trim().charAt(0) || "漫");
         h.innerHTML = '<div class="ph"><b>' + esc(initial) + '</b><span>图片加载失败</span></div>';
       };
-      im.src = src;
+      if (mode) {
+        fetchImageBlobUrl(src, mode).then(function (blobUrl) { im.src = blobUrl; }).catch(function () { im.onerror(); });
+      } else {
+        im.src = src;
+      }
     })(holders[i]);
   }
 }
@@ -938,10 +2115,73 @@ function loadGsCategory(tag, page) {
 function loadMtList(cls, area, sort, page) {
   var b = state.browse;
   b.loading = true; b.error = ""; b.page = page; b.mtCls = cls; b.mtArea = area; b.mtSort = sort; render();
-  var url = mtListUrl(cls, area, sort, page);
+  var r = rule();
+  var url = mtListUrl(r.mtListTemplate || MT_LIST_TEMPLATE, cls, area, sort, page);
   request("分类·漫画台", url, "mobile", function (t) { return "find_rule 解析出 " + mtParseList(t).length + " 张卡片"; }).then(function (text) {
     var list = mtParseList(text);
     b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 24; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+/* ---------------- 滴答列表 ---------------- */
+function loadDdCategory(template, page) {
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.nav = template; b.page = page; b.ddCat = template; render();
+  var url = ddExploreUrl(template, page);
+  request("分类·滴答", url, "desktop", function (t) { return "列表解析出 " + ddParseList(t).length + " 张卡片"; }).then(function (html) {
+    var list = ddParseList(html);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 30; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+/* ---------------- 快看列表：榜单 / 四维组合筛选 ---------------- */
+function loadKkCategory(template, page) {
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.nav = template; b.page = page; b.kkMode = "rank"; render();
+  var url = kkBuildUrl(template, page);
+  request("分类·快看", url, "mobile", function (t) { return "bookList 四路回落解析出 " + kkParseList(t).length + " 张卡片"; }).then(function (text) {
+    var list = kkParseList(text);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 24; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+function loadKkMulti(r, tag, status, sort, pay, page) {
+  if (!r.kkFilters) return;
+  var url = kkMultiFilterUrl(r.kkFilters, tag, status, pay, sort, page);
+  if (!url) return;
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.nav = "multi"; b.page = page; b.kkMode = "multi"; b.kkTag = tag; b.kkStatus = status; b.kkSort = sort; b.kkPay = pay; render();
+  request("分类·快看", url, "mobile", function (t) { return "bookList 四路回落解析出 " + kkParseList(t).length + " 张卡片"; }).then(function (text) {
+    var list = kkParseList(text);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 24; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+/* ---------------- 蛙漫列表：分类是 @js，启动时从 live 分类页现算 ---------------- */
+function loadWmCategories(r) {
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.nav = ":all"; b.page = 1; b.wmCatKey = ":all"; render();
+  request("分类表·蛙漫", WM_HOST + "/category", "desktop", function (t) { return "现算出 " + wmParseCategories(t).length + " 个分类"; }, { headers: WM_HEADERS, referrer: WM_REFERRER }).then(function (html) {
+    var cats = wmParseCategories(html);
+    if (!cats.length) throw new Error("分类页没解析出分类，重试一次");
+    r.wmCats = cats;
+    var list = wmParseList(html);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 30; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+function loadWmCategory(cat, page) {
+  var b = state.browse;
+  var url = wmCatUrl(cat, page);
+  b.loading = true; b.error = ""; b.nav = wmCatKey(cat); b.page = page; b.wmCatKey = wmCatKey(cat); render();
+  request("分类·蛙漫", url, "desktop", function (t) { return "列表解析出 " + wmParseList(t).length + " 张卡片"; }, { headers: WM_HEADERS, referrer: WM_REFERRER }).then(function (html) {
+    var list = wmParseList(html);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 30; render();
+  }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
+}
+/* ---------------- 新爱列表 ---------------- */
+function loadXaCategory(template, page) {
+  var b = state.browse;
+  b.loading = true; b.error = ""; b.nav = template; b.page = page; b.xaCat = template; render();
+  var url = xaExploreUrl(template, page);
+  request("分类·新爱", url, XA_UA, function (t) { return "catalog 解析出 " + xaParseSearch(t).length + " 张卡片"; }).then(function (text) {
+    var list = xaParseSearch(text);
+    b.loading = false; b.sections = null; b.cards = list; b.hasMore = list.length >= 15; render();
   }).catch(function (e) { b.loading = false; b.error = e.message || String(e); render(); });
 }
 function loadBrowseForRule(r) {
@@ -949,7 +2189,18 @@ function loadBrowseForRule(r) {
   state.view = { kind: "browse" };
   state.chapterDesc = false;
   if (r.kind === "guangse") loadGsHome();
-  else loadMtList("", "", "update_time", 1);
+  else if (r.kind === "manhuatai") loadMtList("", "", "update_time", 1);
+  else if (r.kind === "dida") loadDdCategory((r.cats && r.cats[0]) ? r.cats[0].k : DD_CATS[0].k, 1);
+  else if (r.kind === "kuaikan") {
+    if (r.kkFilters && r.kkFilters.ranks.length) loadKkCategory(r.kkFilters.ranks[0].template, 1);
+    else if (r.kkExplore && r.kkExplore.length && r.kkExplore[0].url) loadKkCategory(r.kkExplore[0].url, 1);
+    else { state.browse.loading = false; state.browse.error = "快看规则没解析出榜单，重新导入规则试试"; render(); }
+  }
+  else if (r.kind === "wanman") {
+    if (r.wmCats && r.wmCats.length) loadWmCategory(r.wmCats[0], 1);
+    else loadWmCategories(r);
+  }
+  else if (r.kind === "xinai") loadXaCategory((r.cats && r.cats[0]) ? r.cats[0].k : "", 1);
 }
 /* ---------------- 详情 ---------------- */
 function openDetail(r, card) {
@@ -970,6 +2221,58 @@ function openDetail(r, card) {
         state.view = { kind: "detail", detail: { ref: card.ref, title: meta.name || (apiMeta && apiMeta.title) || card.title, author: meta.author, cover: fixPic(meta.cover) || (apiMeta && apiMeta.cover) || card.pic, desc: meta.desc || (apiMeta && apiMeta.desc) || "", status: meta.status, tags: meta.tags, mid: meta.mid, chapters: chapters } };
         state.detailLoading = ""; render();
       });
+    }).catch(function (e) { if (myToken !== detailToken) return; state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+  } else if (r.kind === "dida") {
+    /* 详情与章节表（#myList）都在详情页这一份 HTML 里，不另拉目录页 */
+    request("详情页·滴答", card.ref, "desktop", function (t) {
+      var d = ddParseDetail(t, card.title);
+      return d ? ("章节 " + d.chapters.length + " 话") : "未解析出章节表";
+    }).then(function (html) {
+      var d = ddParseDetail(html, card.title);
+      if (!d) throw new Error("详情页没解析出数据，重试一次");
+      if (!d.chapters.length) throw new Error("详情页没解析出章节表，重试一次");
+      if (myToken !== detailToken) return;
+      state.view = { kind: "detail", detail: { ref: card.ref, title: d.name || card.title, author: d.author, cover: d.cover || card.pic, desc: d.desc, status: d.status, tags: d.tags, mid: "", chapters: d.chapters } };
+      state.detailLoading = ""; render();
+    }).catch(function (e) { if (myToken !== detailToken) return; state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+  } else if (r.kind === "kuaikan") {
+    /* 详情与章节表都在详情页 HTML 的 __NUXT__ 里（规则的 JS 就是 eval 它） */
+    request("详情页·快看", card.ref, "mobile", function (t) {
+      var d = kkParseDetail(t, card.title);
+      return d ? ("__NUXT__ 解析出章节 " + d.chapters.length + " 话") : "未解析出 __NUXT__ 数据";
+    }).then(function (html) {
+      var d = kkParseDetail(html, card.title);
+      if (!d) throw new Error("详情页没解析出 __NUXT__ 数据，重试一次");
+      if (!d.chapters.length) throw new Error("详情页没解析出章节表，重试一次");
+      if (myToken !== detailToken) return;
+      state.view = { kind: "detail", detail: { ref: card.ref, title: d.name || card.title, author: d.author, cover: d.cover || card.pic, desc: d.desc, status: d.status, tags: (d.lastChapter && d.lastChapter !== d.status) ? d.tags.concat(["最新：" + d.lastChapter]) : d.tags, mid: "", chapters: d.chapters } };
+      state.detailLoading = ""; render();
+    }).catch(function (e) { if (myToken !== detailToken) return; state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+  } else if (r.kind === "wanman") {
+    /* 详情与章节表都在详情页这一份 HTML 里（ruleBookInfo + ruleToc） */
+    request("详情页·蛙漫", card.ref, "desktop", function (t) {
+      var d = wmParseDetail(t, card.title);
+      return d ? ("章节 " + d.chapters.length + " 话") : "未解析出详情";
+    }, { headers: WM_HEADERS, referrer: WM_REFERRER }).then(function (html) {
+      var d = wmParseDetail(html, card.title);
+      if (!d) throw new Error("详情页没解析出数据，重试一次");
+      if (!d.chapters.length) throw new Error("这部已下架或暂无章节（详情页无章节表），换一部试试");
+      if (myToken !== detailToken) return;
+      state.view = { kind: "detail", detail: { ref: card.ref, title: d.name || card.title, author: d.author, cover: d.cover || card.pic, desc: d.desc, status: d.status, tags: d.tags, mid: "", chapters: d.chapters } };
+      state.detailLoading = ""; render();
+    }).catch(function (e) { if (myToken !== detailToken) return; state.detailLoading = ""; showToast(e.message || String(e)); render(); });
+  } else if (r.kind === "xinai") {
+    /* 详情页即 worksinfos 接口响应本身：intro 与章节表同源 */
+    request("详情接口·新爱", card.ref, XA_UA, function (t) {
+      var d = xaParseDetail(t);
+      return d ? ("章节 " + d.chapters.length + " 话") : "未解析出详情";
+    }).then(function (text) {
+      var d = xaParseDetail(text);
+      if (!d) throw new Error("详情接口没解析出数据，重试一次");
+      if (!d.chapters.length) throw new Error("详情接口没返回章节，重试一次");
+      if (myToken !== detailToken) return;
+      state.view = { kind: "detail", detail: { ref: card.ref, title: d.name || card.title, author: d.author, cover: d.cover || card.pic, desc: d.desc, status: "", tags: [], mid: "", chapters: d.chapters } };
+      state.detailLoading = ""; render();
     }).catch(function (e) { if (myToken !== detailToken) return; state.detailLoading = ""; showToast(e.message || String(e)); render(); });
   } else {
     request("详情接口·漫画台", mtDetailUrl(card.ref), "mobile", function (t) {
@@ -992,6 +2295,28 @@ function loadChapterImages(r, detail, index, tableNote) {
   var p;
   if (r.kind === "guangse") {
     p = request("章节图·光社", gsChapterImagesApiUrl(detail.mid, ch.id), "desktop", function (t) { return "hs 解密出 " + gsImagesFromApi(t).length + " 张图"; }).then(function (t) { return gsImagesFromApi(t); });
+  } else if (r.kind === "dida") {
+    /* 章节页 HTML 里没有现成的图：pic.js 的 params 变量 AES 解密后才是图集 */
+    p = request("章节页·滴答", ch.id, "desktop").then(function (html) { return ddImagesFromChapterHtml(html); }).then(function (images) {
+      pushLog({ label: "章节图·滴答", url: ch.id, ok: images.length > 0, detail: images.length ? ("params AES 解密出 " + images.length + " 张图") : "params 解密没出图（host 不符或变量缺失）", ms: 0 });
+      return images;
+    });
+  } else if (r.kind === "kuaikan") {
+    /* 章节页先按 class.ComicPics@img 取图；__NUXT__ 的 comicInfo.images
+       更长时按用户钉死的回落用全章图集 */
+    p = request("章节页·快看", ch.id, "mobile").then(function (html) {
+      var res = kkImagesFromChapterHtml(html);
+      pushLog({ label: "章节图·快看", url: ch.id, ok: res.images.length > 0, detail: res.usedNuxt ? ("选择器 " + res.selectorCount + " 张 < __NUXT__ 全章 " + res.nuxtCount + " 张 → 用全章回落") : ("选择器取图 " + res.selectorCount + " 张（__NUXT__ " + res.nuxtCount + " 张，未更长）"), ms: 0 });
+      return res.images;
+    });
+  } else if (r.kind === "wanman") {
+    /* 章节页 params 变量 AES 解密（与滴答同款花样、不同密钥与宿主） */
+    p = request("章节页·蛙漫", ch.id, "desktop", undefined, { headers: WM_HEADERS, referrer: WM_REFERRER }).then(function (html) { return wmImagesFromChapterHtml(html); }).then(function (res) {
+      pushLog({ label: "章节图·蛙漫", url: ch.id, ok: res.images.length > 0, detail: res.images.length ? (res.viaJson ? ("params AES 解密出 " + res.images.length + " 张图（JSON chapter_images）") : ("params AES 解密出 " + res.images.length + " 张图（字串刮取回落）")) : "params 解密没出图（变量缺失或解密失败）", ms: 0 });
+      return res.images;
+    });
+  } else if (r.kind === "xinai") {
+    p = request("章节图·新爱", ch.id, XA_UA, function (t) { return "qualitywebs " + xaImagesFromChapter(t).length + " 张图"; }).then(function (t) { return xaImagesFromChapter(t); });
   } else {
     p = request("章节图·漫画台", mtChapterApiUrl(detail.ref, ch.id), "mobile", function (t) { return "chapter_img_list " + mtImagesFromApi(t).length + " 张图"; }).then(function (t) { return mtImagesFromApi(t); });
   }
@@ -1046,13 +2371,14 @@ function renderRuleRow() {
   var html = '<button type="button" class="home-btn" id="homeBtn">‹ 主页</button>';
   for (var i = 0; i < RULES.length; i++) {
     var r = RULES[i], active = r.id === state.ruleId;
-    var cls = "rule-card" + (active ? (r.warm ? " active-mt" : " active-gs") : "");
+    var tone = r.tone || (r.kind === "manhuatai" ? "mt" : "gs");
+    var cls = "rule-card" + (active ? (" active-" + tone) : "");
     html += '<button type="button" class="' + cls + '" data-rule="' + r.id + '">'
-      + '<span class="rule-badge ' + (r.warm ? "mt" : "gs") + '">' + esc(r.badge) + '</span>'
+      + '<span class="rule-badge ' + tone + '">' + esc(r.badge) + '</span>'
       + '<span class="rule-meta"><span class="rule-title">' + esc(r.title) + '</span>'
       + '<span class="rule-author">' + esc(r.author) + '</span>'
       + '<span class="rule-file">' + esc(r.fileName) + '</span></span>'
-      + (active ? '<span class="rule-dot ' + (r.warm ? "mt" : "gs") + '"></span>' : '')
+      + (active ? '<span class="rule-dot ' + tone + '"></span>' : '')
       + '</button>';
   }
   html += '<button type="button" class="import-btn" id="importBtn">+ 导入规则文件</button>';
@@ -1079,12 +2405,12 @@ function renderRuleRow() {
 }
 /* base：全局下标基数。首页多板块共用一个 data-card 命名空间时必须传，
    否则各板块下标都从 0 开始重排，点第 2/3 板块的卡会按全局下标算进第 1 板块。 */
-function cardGridHtml(cards, base) {
+function cardGridHtml(cards, base, mode) {
   var html = '<div class="grid">';
   for (var i = 0; i < cards.length; i++) {
     var c = cards[i];
     html += '<button type="button" class="card" data-card="' + ((base || 0) + i) + '">'
-      + imgHtml(c.pic, c.title, "cover")
+      + imgHtml(c.pic, c.title, "cover", mode)
       + '<span class="card-t">' + (state.detailLoading === c.title ? "加载中…" : esc(c.title)) + '</span>'
       + (c.desc ? '<span class="card-d">' + esc(c.desc) + '</span>' : '')
       + '</button>';
@@ -1094,20 +2420,93 @@ function cardGridHtml(cards, base) {
 function renderBrowse() {
   var r = rule(), b = state.browse, html = "";
   html += '<div style="text-align:right;font-size:11px;color:var(--faint);padding:2px 4px 0">插件 v' + (window.PLUGIN_VERSION || 1) + '</div>';
+  var imgMode = imgModeFor(r);
   if (r.kind === "guangse") {
     html += '<div class="chips">';
-    var chips = [{ k: "home", n: "首页" }].concat(GS_CATS);
+    var chips = [{ k: "home", n: "首页" }].concat(r.cats || GS_CATS);
     for (var i = 0; i < chips.length; i++) {
       var c = chips[i];
-      html += '<button type="button" class="chip' + (b.nav === c.k ? " on-gs" : "") + '" data-nav="' + c.k + '">' + esc(c.n) + '</button>';
+      html += '<button type="button" class="chip' + (b.nav === c.k ? " on-gs" : "") + '" data-nav="' + esc(c.k) + '">' + esc(c.n) + '</button>';
+    }
+    html += '</div>';
+  } else if (r.kind === "dida") {
+    html += '<div class="chips">';
+    var ddChips = r.cats || DD_CATS;
+    for (var j = 0; j < ddChips.length; j++) {
+      var dc = ddChips[j];
+      html += '<button type="button" class="chip' + (b.nav === dc.k ? " on-dd" : "") + '" data-nav="' + esc(dc.k) + '">' + esc(dc.n) + '</button>';
+    }
+    html += '</div>';
+  } else if (r.kind === "kuaikan") {
+    html += '<div class="mt-rows">';
+    if (r.kkFilters && r.kkFilters.ranks.length) {
+      html += '<div class="mt-row"><span class="lbl">榜单</span>';
+      for (var kr = 0; kr < r.kkFilters.ranks.length; kr++) {
+        var rk = r.kkFilters.ranks[kr];
+        html += '<button type="button" class="chip sm' + (b.nav === rk.template ? " on-kk" : "") + '" data-kkrank="' + esc(rk.template) + '">' + esc(rk.name) + '</button>';
+      }
+      html += '</div>';
+      var kkRows = [
+        { label: "分类", items: r.kkFilters.tags, dim: "tag", cur: b.kkTag },
+        { label: "状态", items: r.kkFilters.statuses, dim: "status", cur: b.kkStatus },
+        { label: "排序", items: r.kkFilters.sorts, dim: "sort", cur: b.kkSort },
+        { label: "付费", items: r.kkFilters.pays, dim: "pay", cur: b.kkPay }
+      ];
+      for (var krow = 0; krow < kkRows.length; krow++) {
+        var kkr = kkRows[krow];
+        html += '<div class="mt-row"><span class="lbl">' + kkr.label + '</span>';
+        for (var ki = 0; ki < kkr.items.length; ki++) {
+          var kki = kkr.items[ki];
+          var onKk = b.nav === "multi" && kkr.cur === kki.value;
+          html += '<button type="button" class="chip sm' + (onKk ? " on-kk" : "") + '" data-kkf="' + kkr.dim + ":" + esc(kki.value) + '">' + esc(kki.name) + '</button>';
+        }
+        html += '</div>';
+      }
+    } else if (r.kkExplore && r.kkExplore.length) {
+      html += '<div class="mt-row">';
+      for (var ke = 0; ke < r.kkExplore.length; ke++) {
+        var kke = r.kkExplore[ke];
+        if (!kke.url) { html += '<span class="lbl">' + esc(kke.title.trim()) + '</span>'; continue; }
+        html += '<button type="button" class="chip sm' + (b.nav === kke.url ? " on-kk" : "") + '" data-kkrank="' + esc(kke.url) + '">' + esc(kke.title.trim()) + '</button>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  } else if (r.kind === "wanman") {
+    html += '<div class="mt-rows">';
+    if (!r.wmCats || !r.wmCats.length) {
+      html += '<p style="font-size:14px;color:var(--dim)">正在从 live 分类页现算分类…</p>';
+    } else {
+      var wmGroups = ["", "地区", "题材", "状态"];
+      for (var wg = 0; wg < wmGroups.length; wg++) {
+        var wgName = wmGroups[wg];
+        var items = [];
+        for (var wi = 0; wi < r.wmCats.length; wi++) if (r.wmCats[wi].group === wgName) items.push({ cat: r.wmCats[wi], idx: wi });
+        if (!items.length) continue;
+        html += '<div class="mt-row">' + (wgName ? '<span class="lbl">' + wgName + '</span>' : '');
+        for (var wj = 0; wj < items.length; wj++) {
+          var wc = items[wj].cat;
+          html += '<button type="button" class="chip sm' + (b.nav === wmCatKey(wc) ? " on-wm" : "") + '" data-wmcat="' + items[wj].idx + '">' + esc(wc.title) + '</button>';
+        }
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  } else if (r.kind === "xinai") {
+    html += '<div class="chips">';
+    var xaChips = r.cats || [];
+    for (var x = 0; x < xaChips.length; x++) {
+      var xc = xaChips[x];
+      html += '<button type="button" class="chip' + (b.nav === xc.k ? " on-xa" : "") + '" data-nav="' + esc(xc.k) + '">' + esc(xc.n) + '</button>';
     }
     html += '</div>';
   } else {
     html += '<div class="mt-rows">';
+    var mtCats = r.mtCats || MT_CATS;
     var rows = [
-      { label: "分类", items: MT_CATS.classes, key: "mtCls" },
-      { label: "状态", items: MT_CATS.areas, key: "mtArea" },
-      { label: "排序", items: MT_CATS.sorts, key: "mtSort" }
+      { label: "分类", items: mtCats.classes, key: "mtCls" },
+      { label: "状态", items: mtCats.areas, key: "mtArea" },
+      { label: "排序", items: mtCats.sorts, key: "mtSort" }
     ];
     for (var ri = 0; ri < rows.length; ri++) {
       var row = rows[ri];
@@ -1132,7 +2531,7 @@ function renderBrowse() {
     var off = 0;
     for (var g = 0; g < b.sections.length; g++) {
       var sec = b.sections[g];
-      html += '<div class="sec-h">' + esc(sec.title) + '</div>' + cardGridHtml(sec.items, off);
+      html += '<div class="sec-h">' + esc(sec.title) + '</div>' + cardGridHtml(sec.items, off, imgMode);
       off += sec.items.length;
       if (g < b.sections.length - 1) html += '<div style="height:24px"></div>';
     }
@@ -1140,7 +2539,7 @@ function renderBrowse() {
     if (!b.cards.length) {
       html += '<div class="empty"><b>漫</b><p>这一页没解析出卡片。</p></div>';
     } else {
-      html += cardGridHtml(b.cards);
+      html += cardGridHtml(b.cards, 0, imgMode);
     }
     html += '<div class="pager"><button type="button" id="btnPrevPage"' + (b.page <= 1 ? " disabled" : "") + '>‹ 上一页</button><span>第 ' + b.page + ' 页</span><button type="button" id="btnNextPage"' + (!b.hasMore ? " disabled" : "") + '>下一页 ›</button></div>';
   }
@@ -1149,13 +2548,15 @@ function renderBrowse() {
 }
 function renderDetail() {
   var d = state.view.detail;
+  var r = rule();
+  var imgMode = imgModeFor(r);
   var total = d.chapters.length;
   var shown = [];
   if (state.chapterDesc) { for (var i = total - 1; i >= 0; i--) shown.push({ c: d.chapters[i], idx: i }); }
   else { for (var j = 0; j < total; j++) shown.push({ c: d.chapters[j], idx: j }); }
   var html = '<button type="button" class="backbtn" id="btnBackList">‹ 返回列表</button>'
     + '<div class="panel"><div class="panel-top">'
-    + imgHtml(d.cover, d.title, "panel-cover")
+    + imgHtml(d.cover, d.title, "panel-cover", imgMode)
     + '<div class="panel-info"><h2>' + esc(d.title) + '</h2>'
     + (d.author ? '<p class="au">作者：' + esc(d.author) + '</p>' : '')
     + (d.status ? '<p><span class="status-badge">' + esc(d.status) + '</span></p>' : '')
@@ -1184,8 +2585,9 @@ function renderReader() {
     html += '<div class="errbox" style="margin-top:24px;max-width:28rem;margin-left:auto;margin-right:auto"><p>' + esc(v.error) + '</p><button type="button" class="retry" id="btnRetryCh">重试这一话</button></div>';
   } else {
     html += '<div class="r-imgs">';
+    var readerMode = imgModeFor(rule());
     for (var i = 0; i < v.images.length; i++) {
-      html += imgHtml(v.images[i], (ch ? ch.name : "") + " 第 " + (i + 1) + " 页", "r-img-ph");
+      html += imgHtml(v.images[i], (ch ? ch.name : "") + " 第 " + (i + 1) + " 页", "r-img-ph", readerMode);
     }
     html += '</div>';
   }
@@ -1213,6 +2615,25 @@ function renderLog() {
   }
   ol.innerHTML = html;
 }
+/* 翻页：按当前规则与浏览状态重拉当前页 */
+function reloadBrowsePage(page) {
+  var r = rule(), b = state.browse;
+  if (page < 1) page = 1;
+  if (r.kind === "guangse") { if (b.nav === "home") loadGsHome(); else loadGsCategory(b.nav, page); }
+  else if (r.kind === "manhuatai") loadMtList(b.mtCls, b.mtArea, b.mtSort, page);
+  else if (r.kind === "dida") loadDdCategory(b.ddCat || (r.cats && r.cats[0] ? r.cats[0].k : DD_CATS[0].k), page);
+  else if (r.kind === "kuaikan") {
+    if (b.kkMode === "multi") loadKkMulti(r, b.kkTag, b.kkStatus, b.kkSort, b.kkPay, page);
+    else loadKkCategory(b.nav, page);
+  }
+  else if (r.kind === "wanman") {
+    var cat = null;
+    for (var i = 0; i < (r.wmCats || []).length; i++) if (wmCatKey(r.wmCats[i]) === b.wmCatKey) { cat = r.wmCats[i]; break; }
+    if (cat) loadWmCategory(cat, page);
+    else loadWmCategories(r);
+  }
+  else if (r.kind === "xinai") loadXaCategory(b.xaCat || (r.cats && r.cats[0] ? r.cats[0].k : ""), page);
+}
 function render() {
   var main = $("main"), v = state.view;
   var html = "";
@@ -1226,7 +2647,27 @@ function render() {
   var navBtns = main.querySelectorAll("[data-nav]");
   for (var i = 0; i < navBtns.length; i++) navBtns[i].addEventListener("click", function () {
     var k = this.getAttribute("data-nav");
-    if (k === "home") loadGsHome(); else loadGsCategory(k, 1);
+    if (r.kind === "guangse") { if (k === "home") loadGsHome(); else loadGsCategory(k, 1); }
+    else if (r.kind === "dida") loadDdCategory(k, 1);
+    else if (r.kind === "xinai") loadXaCategory(k, 1);
+  });
+  var kkRankBtns = main.querySelectorAll("[data-kkrank]");
+  for (var kr = 0; kr < kkRankBtns.length; kr++) kkRankBtns[kr].addEventListener("click", function () {
+    loadKkCategory(this.getAttribute("data-kkrank"), 1);
+  });
+  var kkFilterBtns = main.querySelectorAll("[data-kkf]");
+  for (var kf = 0; kf < kkFilterBtns.length; kf++) kkFilterBtns[kf].addEventListener("click", function () {
+    var spec = this.getAttribute("data-kkf") || "";
+    var dim = spec.split(":")[0], val = spec.split(":")[1] || "";
+    var tag = dim === "tag" ? val : b.kkTag, status = dim === "status" ? val : b.kkStatus;
+    var sort = dim === "sort" ? val : b.kkSort, pay = dim === "pay" ? val : b.kkPay;
+    loadKkMulti(r, tag, status, sort, pay, 1);
+  });
+  var wmCatBtns = main.querySelectorAll("[data-wmcat]");
+  for (var wc = 0; wc < wmCatBtns.length; wc++) wmCatBtns[wc].addEventListener("click", function () {
+    var idx = parseInt(this.getAttribute("data-wmcat"), 10);
+    var cat = (r.wmCats || [])[idx];
+    if (cat) loadWmCategory(cat, 1);
   });
   var mtBtns = main.querySelectorAll("[data-mt]");
   for (var j = 0; j < mtBtns.length; j++) mtBtns[j].addEventListener("click", function () {
@@ -1248,8 +2689,8 @@ function render() {
     if (card) openDetail(r, card);
   });
   var retry = $("btnRetry"); if (retry) retry.addEventListener("click", function () { loadBrowseForRule(rule()); });
-  var pp = $("btnPrevPage"); if (pp) pp.addEventListener("click", function () { if (r.kind === "guangse") loadGsCategory(b.nav, b.page - 1); else loadMtList(b.mtCls, b.mtArea, b.mtSort, b.page - 1); });
-  var np = $("btnNextPage"); if (np) np.addEventListener("click", function () { if (r.kind === "guangse") loadGsCategory(b.nav, b.page + 1); else loadMtList(b.mtCls, b.mtArea, b.mtSort, b.page + 1); });
+  var pp = $("btnPrevPage"); if (pp) pp.addEventListener("click", function () { reloadBrowsePage(b.page - 1); });
+  var np = $("btnNextPage"); if (np) np.addEventListener("click", function () { reloadBrowsePage(b.page + 1); });
   var bl = $("btnBackList"); if (bl) bl.addEventListener("click", function () { state.view = { kind: "browse" }; render(); });
   var bs = $("btnSort"); if (bs) bs.addEventListener("click", function () { state.chapterDesc = !state.chapterDesc; render(); });
   var chBtns = main.querySelectorAll("[data-ch]");
@@ -1270,13 +2711,24 @@ function render() {
 /* ---------------- 导入规则文件 ---------------- */
 function importRuleFromRaw(raw, fileName) {
   var def = ruleDefFromJson(raw, fileName);
-  if (!def) throw new Error("这份规则不是光社（hs 库）或漫画台（kaimanhua）这两类形状，控制台跑不了");
+  if (!def) throw new Error("这份规则不是光社、漫画台、滴答、快看、蛙漫、新爱这六类形状，阅读器跑不了");
+  for (var i = 0; i < RULES.length; i++) {
+    if (RULES[i].kind === def.kind) {
+      /* 同类规则已存在：用导入的这份刷新它的分类/榜单/作者，不重复加卡 */
+      def.id = RULES[i].id;
+      RULES[i] = def;
+      state.ruleId = def.id;
+      return def;
+    }
+  }
   RULES.push(def);
   state.ruleId = def.id;
   return def;
 }
 function importRuleDone(def, fileName, t0) {
-  pushLog({ label: "导入小程序", url: fileName, ok: true, detail: def.title + " · " + (def.author || "未知作者") + " · " + (def.kind === "guangse" ? def.cats.length + " 个分类" : "漫画台类"), ms: Date.now() - t0 });
+  var kindName = { guangse: "光社", manhuatai: "漫画台", dida: "滴答", kuaikan: "快看", wanman: "蛙漫", xinai: "新爱" }[def.kind] || def.kind;
+  var catNote = def.cats ? (def.cats.length + " 个分类") : (def.kkFilters ? (def.kkFilters.ranks.length + " 个榜单") : (def.kind === "wanman" ? "分类从 live 页现算" : "漫画台类"));
+  pushLog({ label: "导入小程序", url: fileName, ok: true, detail: def.title + " · " + (def.author || "未知作者") + " · " + kindName + " · " + catNote, ms: Date.now() - t0 });
   $("importErr").textContent = "";
   renderRuleRow();
   loadBrowseForRule(def);
@@ -1316,9 +2768,14 @@ function importPastedJson() {
     importRuleFailed("粘贴的规则.json", e.message || String(e), t0);
   }
 }
+/* v5：六类形状都认（控制台 ruleDefFromJson 的香草 JS 移植）。
+   光社 hs 库 / 漫画台 kaimanhua / 滴答 ddmanhua.com / 快看 kuaikanmanhua.com /
+   蛙漫 manwamh.com / 新爱 xinmanhua.net。六类都不沾才返回 null，调用方报“跑不了”。 */
 function ruleDefFromJson(raw, fileName) {
   var title = typeof raw.title === "string" ? raw.title : "";
   var author = typeof raw.author === "string" ? raw.author : "";
+  var srcUrl = typeof raw.bookSourceUrl === "string" ? raw.bookSourceUrl : "";
+  var badgeOf = function (t, fb) { return (t || fb || "漫").charAt(0); };
   var pages = [];
   try { var parsed = typeof raw.pages === "string" ? JSON.parse(raw.pages) : raw.pages; if (Array.isArray(parsed)) pages = parsed; } catch (e) { pages = []; }
   var hs = null;
@@ -1327,11 +2784,44 @@ function ruleDefFromJson(raw, fileName) {
     var cats = [];
     var re = /\{\s*k:\s*'([^']+)',\s*n:\s*'([^']+)'\s*\}/g, m;
     while ((m = re.exec(hs.rule)) !== null) if (m[1] && m[2]) cats.push({ k: m[1], n: m[2] });
-    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: title || "光社类规则", author: author, kind: "guangse", cats: cats.length ? cats : GS_CATS, fileName: fileName, badge: (title || "光").charAt(0), warm: false };
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: title || "光社类规则", author: author, kind: "guangse", tone: "gs", cats: cats.length ? cats : GS_CATS, fileName: fileName, badge: badgeOf(title, "光") };
+  }
+  if (srcUrl.indexOf("ddmanhua.com") >= 0) {
+    var ddCats = [];
+    try {
+      var ddParsed = typeof raw.exploreUrl === "string" ? JSON.parse(raw.exploreUrl) : raw.exploreUrl;
+      if (Array.isArray(ddParsed)) {
+        for (var d = 0; d < ddParsed.length; d++) {
+          var o = ddParsed[d] || {};
+          var k = typeof o.url === "string" ? o.url : "", n = typeof o.title === "string" ? o.title : "";
+          if (k && n) ddCats.push({ k: k, n: n });
+        }
+      }
+    } catch (e) { ddCats = []; }
+    var ddTitle = (typeof raw.bookSourceName === "string" ? raw.bookSourceName : "") || "滴答漫画";
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: ddTitle, author: "Buding", kind: "dida", tone: "dd", cats: ddCats.length ? ddCats : DD_CATS, fileName: fileName, badge: badgeOf(ddTitle, "滴") };
+  }
+  if (srcUrl.indexOf("kuaikanmanhua.com") >= 0) {
+    var kkTitle = (typeof raw.bookSourceName === "string" ? raw.bookSourceName : "") || "快看漫画";
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: kkTitle, author: "coco", kind: "kuaikan", tone: "kk", kkExplore: kkExploreFromRule(raw), kkFilters: kkFiltersFromRule(raw), fileName: fileName, badge: badgeOf(kkTitle, "快") };
+  }
+  if (srcUrl.indexOf("manwamh.com") >= 0) {
+    var wmComment = typeof raw.bookSourceComment === "string" ? raw.bookSourceComment : "";
+    var wmAuthor = (/by\.([^\s\n]+)/.exec(wmComment) || [])[1] || "◎辞晨◎";
+    var wmTitle = (typeof raw.bookSourceName === "string" ? raw.bookSourceName : "") || "蛙漫漫画";
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: wmTitle, author: wmAuthor, kind: "wanman", tone: "wm", wmCats: [], fileName: fileName, badge: badgeOf(wmTitle, "蛙") };
+  }
+  if (srcUrl.indexOf("xinmanhua.net") >= 0) {
+    var xaGroup = typeof raw.bookSourceGroup === "string" ? raw.bookSourceGroup : "";
+    var xaAuthor = (/by-([^\s,，]+)/.exec(xaGroup) || [])[1] || "coco";
+    var xaTitle = (typeof raw.bookSourceName === "string" ? raw.bookSourceName : "") || "新爱漫画（优+）";
+    var xaCats = xaCatsFromRule(raw).map(function (c) { return { k: c.url, n: c.title }; });
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: xaTitle, author: xaAuthor, kind: "xinai", tone: "xa", cats: xaCats, fileName: fileName, badge: badgeOf(xaTitle, "新") };
   }
   var url = typeof raw.url === "string" ? raw.url : "";
   if (url.indexOf("getcomicserch") >= 0 || url.indexOf("kaimanhua") >= 0) {
-    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: title || "漫画台类规则", author: author, kind: "manhuatai", fileName: fileName, badge: (title || "漫").charAt(0), warm: true };
+    var mtCats = mtCatsFromRule(raw);
+    return { id: "rule-" + Math.random().toString(36).slice(2, 9), title: title || "漫画台类规则", author: author, kind: "manhuatai", tone: "mt", mtCats: mtCats, mtListTemplate: mtCats.listTemplate || MT_LIST_TEMPLATE, fileName: fileName, badge: badgeOf(title, "漫") };
   }
   return null;
 }
@@ -1413,6 +2903,7 @@ function openShellDeepLink(url, title) {
 /* ---------------- 启动 ---------------- */
 function boot() {
   renderRuleRow();
+  loadRulesFromManifest();
   var pi = $("pasteImport"); if (pi) pi.addEventListener("click", importPastedJson);
   var pc = $("pasteCancel"); if (pc) pc.addEventListener("click", function () { var p = $("pastePanel"); if (p) p.classList.add("hidden"); $("importErr").textContent = ""; });
   $("logToggle").addEventListener("click", function () { state.logOpen = !state.logOpen; renderLog(); });
@@ -1437,6 +2928,10 @@ function boot() {
   });
   pushLog({ label: "导入小程序", url: "_____2_i9q0.json（页面内嵌）", ok: true, detail: "光社漫画 · WorkBuddy · " + GS_CATS.length + " 个分类", ms: 0 });
   pushLog({ label: "导入小程序", url: "___1_9dfy.json（页面内嵌）", ok: true, detail: "漫画台 · zhao · 16 个分类", ms: 0 });
+  pushLog({ label: "导入小程序", url: "_____10_vqy5.json（页面内嵌）", ok: true, detail: "滴答漫画（优） · Buding · " + DD_CATS.length + " 个分类", ms: 0 });
+  pushLog({ label: "导入小程序", url: "_____11_awkg.json（页面内嵌）", ok: true, detail: "快看漫画 · coco · " + (RULES[3].kkFilters ? RULES[3].kkFilters.ranks.length : 0) + " 个榜单", ms: 0 });
+  pushLog({ label: "导入小程序", url: "____14_uj7f.json（页面内嵌）", ok: true, detail: "蛙漫漫画 · ◎辞晨◎ · 分类从 live 页现算", ms: 0 });
+  pushLog({ label: "导入小程序", url: "_____15_q8x4.json（页面内嵌）", ok: true, detail: "新爱漫画（优+） · coco · " + (RULES[5].cats ? RULES[5].cats.length : 0) + " 个分类", ms: 0 });
   /* 壳子传入（WebView 桥）优先；其次 URL 参数（浏览器自测用） */
   var initUrl = "", initTitle = "";
   try {
@@ -1465,6 +2960,19 @@ function boot() {
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
+}
+
+/* v5：App 层 node 测试导出（RULES / ruleDefFromJson 在 App 段才定义，放文件尾） */
+if (typeof module !== "undefined" && module.exports) {
+  module.exports.RULES = RULES;
+  module.exports.ruleDefFromJson = ruleDefFromJson;
+  module.exports.importRuleFromRaw = importRuleFromRaw;
+  module.exports.loadBrowseForRule = loadBrowseForRule;
+  module.exports.openDetail = openDetail;
+  module.exports.loadChapterImages = loadChapterImages;
+  module.exports.state = state;
+  module.exports.render = render;
+  module.exports.request = request;
 }
 
 </script>
