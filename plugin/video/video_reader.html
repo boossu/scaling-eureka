@@ -235,7 +235,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 2;
+var PLUGIN_VERSION = 3;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14392,11 +14392,25 @@ function applyFsClass() {
   w.classList.toggle("css-rotate", cr);
   w.setAttribute("data-css-rotate", cr ? "1" : "0");
 }
+/* v3 全屏通知（给 APK v482 用）：进/出全屏时同时发两个信号，都有存在性守卫；
+   桥方法不存在时不报错、顶栏保持旧行为（v3 可能先于 v482 到手机）。
+   桌面浏览器无影响。同一值只发一次。 */
+var lastFsNotified = null;
+function notifyFullscreen(on) {
+  on = !!on;
+  if (lastFsNotified === on) return;
+  lastFsNotified = on;
+  try { if (window.ComicBridge && typeof window.ComicBridge.setFullscreen === "function") window.ComicBridge.setFullscreen(on); } catch (e) {}
+  try { if (window.parent && window.parent.postMessage) window.parent.postMessage({type: "videoFullscreen", fullscreen: on}, "*"); } catch (e) {}
+}
 function setFakeFs(on) {
-  player.fakeFullscreen = !!on;
+  on = !!on;
+  var changed = (player.fakeFullscreen !== on);
+  player.fakeFullscreen = on;
   try { document.body.style.overflow = on ? "hidden" : ""; } catch (e) {}
   applyFsClass();
   renderBottom();
+  if (changed) notifyFullscreen(on);
 }
 function enterFullscreen(o) {
   var wrapEl = $("playerWrap");
@@ -14482,6 +14496,18 @@ function setAudioStatus(s) {
   player.audioStatus = s;
   playerEls().wrap.setAttribute("data-audio", s);
 }
+/* v3 隐藏计时：唯一真相来源是 hideTimer（见 armHideTimer），只由真实用户操作
+   （pokeControls）与播/停翻转驱动。timeupdate 与 250ms 轮询只做状态同步，
+   不再碰计时器——v2 的 3 秒藏条就是死在这两路每 ~250ms 调一次
+   setPlaying(true) -> pokeControls()，把 idle 时间戳与定时器不停刷新。 */
+var HIDE_DELAY_MS = 5000;
+function armHideTimer() {
+  clearTimeout(player.hideTimer);
+  player.hideTimer = 0;
+  if (player.playing) {
+    player.hideTimer = setTimeout(function () { setShowControls(false); }, HIDE_DELAY_MS);
+  }
+}
 function setPlaying(p) {
   var changed = (player.playing !== p);
   player.playing = p;
@@ -14490,24 +14516,28 @@ function setPlaying(p) {
     ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>'
     : '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
   E.playBtn.setAttribute("aria-label", p ? "暂停" : "播放");
-  if (p) pokeControls();
-  else { setShowControls(true); }
+  if (p) {
+    if (changed) { setShowControls(true); armHideTimer(); }
+  } else {
+    /* 暂停不藏：亮出控制条、停掉隐藏计时。 */
+    clearTimeout(player.hideTimer);
+    setShowControls(true);
+  }
   if (changed) renderCenter();
 }
 function setShowControls(show) {
   player.showControls = show;
   var E = playerEls();
   $("playerTop").classList.toggle("ctl-hidden", !show);
+  $("playerTop").classList.toggle("ctl-none", !show);
   E.bottom.classList.toggle("ctl-hidden", !show);
   E.bottom.classList.toggle("ctl-none", !show);
 }
 function pokeControls() {
-  setShowControls(true);
+  /* 真实用户操作入口（点按、拖进度/音量、按按钮）：亮出控制条，播着 5 秒无人碰再藏。 */
   player.lastInteractAt = Date.now();
-  clearTimeout(player.hideTimer);
-  if (player.playing) {
-    player.hideTimer = setTimeout(function () { setShowControls(false); }, 3000);
-  }
+  setShowControls(true);
+  armHideTimer();
 }
 
 function renderCenter() {
@@ -14826,16 +14856,19 @@ function bindPlayer() {
   var E = playerEls();
   player.viewportPortrait = window.innerHeight >= window.innerWidth;
   E.topBar = $("playerTop");
-  E.video.addEventListener("click", togglePlay);
-  E.canvas.addEventListener("click", togglePlay);
+  /* v3：控制条藏着时第一次点按只弹起、不切换播/停；显示时点按照旧播/停。 */
+  var onStageTap = function () {
+    if (!player.showControls) { pokeControls(); return; }
+    togglePlay();
+  };
+  E.video.addEventListener("click", onStageTap);
+  E.canvas.addEventListener("click", onStageTap);
   var onVidTime = function () {
     var v = E.video;
     if (!v.paused && v.currentTime > 0) hideCenterBtn();
     if (!player.dragging) player.time = v.currentTime;
     if (Number.isFinite(v.duration) && v.duration > 0) player.duration = v.duration;
     setPlaying(!v.paused);
-    var now = Date.now();
-    if (player.playing && player.lastInteractAt > 0 && now - player.lastInteractAt > 3000) setShowControls(false);
     renderBottom();
   };
   E.video.addEventListener("play", function () { setPlaying(true); hideCenterBtn(); });
@@ -14853,9 +14886,11 @@ function bindPlayer() {
   E.video.addEventListener("error", onVideoError);
   E.video.addEventListener("webkitbeginfullscreen", function () {
     player.fullscreen = true; hideCenterBtn(); lockOrientation(player.orientation); applyFsClass(); renderBottom();
+    notifyFullscreen(true);
   });
   E.video.addEventListener("webkitendfullscreen", function () {
     player.fullscreen = false; applyFsClass(); renderBottom();
+    notifyFullscreen(false);
   });
   E.closeBtn.addEventListener("click", function (e) {
     e.stopPropagation();
@@ -14863,7 +14898,10 @@ function bindPlayer() {
     else { showView("detail"); renderDetail(); }
   });
   $("btnBackPlayerTop").addEventListener("click", function () { showView("detail"); renderDetail(); });
-  E.wrap.addEventListener("pointermove", pokeControls);
+  E.wrap.addEventListener("pointerdown", function (e) {
+    var t = e.target;
+    if (t && t.closest && t.closest("#playerBottom, #playerTop")) pokeControls();
+  });
   E.playBtn.addEventListener("click", togglePlay);
   E.prevBtn.addEventListener("click", function () { if (player.index > 0) playEpisode(player.index - 1); });
   E.nextBtn.addEventListener("click", function () { if (player.index < player.detail.episodes.length - 1) playEpisode(player.index + 1); });
@@ -14916,6 +14954,7 @@ function bindPlayer() {
   var onFsChange = function () {
     var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     player.fullscreen = !!fsEl;
+    notifyFullscreen(!!fsEl);
     if (fsEl) {
       var v = $("nativeVideo");
       if (v && !v.paused && v.currentTime > 0) hideCenterBtn();
@@ -14949,7 +14988,6 @@ function bindPlayer() {
     var d = b.getDuration();
     if (d > 0) player.duration = d;
     setPlaying(!b.isPaused());
-    if (player.playing && player.lastInteractAt > 0 && Date.now() - player.lastInteractAt > 3000) setShowControls(false);
     renderBottom();
   }, 250);
 }

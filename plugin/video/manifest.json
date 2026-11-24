@@ -1,16 +1,16 @@
 {
-  "version": 2,
-  "updated": "2026-11-24",
   "reader": {
-    "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/video_reader.html",
-    "sha256": "8c8bf6189382348456a4058bd2c925df294f2a4f275c1d132c53c0f805f4018f"
+    "sha256": "bb47092cd936c826546ba84e875b1988f268a2f60550b0af015a0110d669cf63",
+    "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/video_reader.html"
   },
   "rules": [
     {
-      "name": "星芽短剧",
       "file": "xingya.json",
-      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/xingya.json",
-      "sha256": "a3b8b33fff34b1402562101d54a80c9b9709d8d453ec903de7f75406f4e50205"
+      "name": "星芽短剧",
+      "sha256": "a3b8b33fff34b1402562101d54a80c9b9709d8d453ec903de7f75406f4e50205",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/xingya.json"
     }
-  ]
+  ],
+  "updated": "2026-11-24",
+  "version": 3
 }
