@@ -168,10 +168,10 @@ img{display:block}
   </aside>
 </div>
 <div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
-<input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+<input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 1;
+var PLUGIN_VERSION = 2;
 /* ============================================================
    漫画阅读器 JS —— 浏览器控制台（engine.ts + App.tsx）的完整复刻。
    纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
@@ -663,7 +663,7 @@ function renderRuleRow() {
       + (active ? '<span class="rule-dot ' + (r.warm ? "mt" : "gs") + '"></span>' : '')
       + '</button>';
   }
-  html += '<label class="import-btn" for="fileInput">+ 导入规则文件</label>';
+  html += '<button type="button" class="import-btn" id="importBtn">+ 导入规则文件</button>';
   $("ruleRow").innerHTML = html;
   var btns = $("ruleRow").querySelectorAll("[data-rule]");
   for (var j = 0; j < btns.length; j++) {
@@ -675,6 +675,10 @@ function renderRuleRow() {
       loadBrowseForRule(rr);
     });
   }
+  /* 导入按钮是真 <button>，点它直接调文件框的 click()——
+     旧的 <label for> 指着 display:none 的输入框，手机浏览器点不开。 */
+  var ib = $("importBtn");
+  if (ib) ib.addEventListener("click", function () { $("fileInput").click(); });
 }
 function cardGridHtml(cards) {
   var html = '<div class="grid">';
