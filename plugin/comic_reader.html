@@ -229,7 +229,7 @@ img{display:block}
     <div class="hub-head-row">
       <span class="hub-badge" aria-hidden>漫</span>
       <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">插件 v7</span>
+      <span class="hub-ver" id="hubVer">插件 v8</span>
     </div>
     <p class="hub-desc">漫画小程序：分类、详情、章节全是真请求。</p>
   </section>
@@ -270,7 +270,7 @@ img{display:block}
 <input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 7;
+var PLUGIN_VERSION = 8;
 var PLUGIN_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
 /* ---------------- 主界面 hub（入口页，v479 壳子版同款，v4 起做到 GitHub 阅读器里） ---------------- */
 /* v3 的教训：GitHub 阅读器里根本没有 hub，goHome() 只回规则卡首页；
@@ -525,6 +525,15 @@ function checkPluginUpdate() {
       try { window.ComicBridge.checkForUpdate(); } catch (e) { /* no bridge */ }
       if (st) st.textContent = "已更新到 v" + m.version;
       done();
+      /* v8：壳子下载替换的是文件，本地副本缓存不同步——下载时就把新版原字节
+         存进 mangaReaderCache，不等到下次打开漫画才由 boot 存。否则更新
+         完没打开过漫画，书籍 hub 点漫画读到的还是旧版（或空缓存又重拉）。
+         拉不到也不影响更新本身（下次打开漫画时 boot 再存）。 */
+      fetchTextTimeout(m.reader.url).then(function (readerText) {
+        if (sha256Hex(readerText) === String(m.reader.sha256).toLowerCase()) {
+          saveMangaReaderCache(m.version, readerText);
+        }
+      }).catch(function () { /* 缓存存不上时忽略 */ });
       return;
     }
     return fetchTextTimeout(m.reader.url).then(function (readerText) {
