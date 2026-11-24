@@ -87,6 +87,16 @@ img{display:block}
 .rule-dot{flex:none;width:8px;height:8px;border-radius:50%;margin-left:auto}
 .rule-dot.wn{background:#d97706}
 .rule-dot.gx{background:#991b1b}
+/* ---------- 导入书源（漫画插件同款式：+ 导入规则文件 / 粘贴 JSON） ---------- */
+.import-btn{flex:1;min-width:140px;display:flex;align-items:center;justify-content:center;padding:12px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);font-size:14px;color:var(--dim)}
+.import-btn:active{color:var(--text)}
+#pastePanel{margin-top:10px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:12px}
+#pasteJson{width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+.paste-btns{display:flex;gap:8px;margin-top:10px}
+.paste-btns button{flex:1;border-radius:10px;padding:10px;font-size:14px;font-weight:600}
+#pasteImport{background:var(--fill-gs);color:#fff}
+#pasteCancel{background:var(--surface2);color:var(--dim);box-shadow:inset 0 0 0 1px var(--border)}
+#importErr{margin-top:8px;font-size:14px;color:var(--bad)}
 /* ---------- chips ---------- */
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding-top:16px}
 .chip{border-radius:9999px;padding:6px 14px;font-size:14px;background:var(--surface);color:var(--dim);box-shadow:inset 0 0 0 1px var(--border);transition:all .15s}
@@ -251,17 +261,18 @@ img{display:block}
 </div>
 <div id="app" class="hidden">
   <div class="bk-head"><button type="button" class="home-btn" id="bkHomeBtn" onclick="goHome()">‹ 主页</button><h1>书籍插件</h1><p>书籍阅读器</p><span class="ver" id="bkVer"></span></div>
-  <section id="rules" aria-label="已导入书源"><div class="rule-row" id="ruleRow"></div></section>
+  <section id="rules" aria-label="已导入书源"><div class="rule-row" id="ruleRow"></div><div id="importErr"></div><div id="pastePanel" class="hidden"><textarea id="pasteJson" rows="6" placeholder="粘贴书源规则 JSON（把规则文件全文粘贴到这里）…" spellcheck="false"></textarea><div class="paste-btns"><button type="button" id="pasteImport">导入</button><button type="button" id="pasteCancel">取消</button></div></div></section>
   <main id="main"></main>
   <aside id="log" aria-label="请求日志">
     <div class="lh"><h2>请求日志 <span id="logCount">0 条</span></h2><div class="btns"><button type="button" id="logToggle">收起</button><button type="button" id="logClear">清空</button></div></div>
     <ol id="logList"></ol>
   </aside>
 </div>
+<input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <div id="toast" class="hidden"><div class="in" id="toastIn"></div></div>
 <script>
 "use strict";
-var PLUGIN_VERSION = 8;
+var PLUGIN_VERSION = 9;
 /* ============================================================
    书籍阅读器 JS —— 浏览器控制台（bookEngine.ts + BookPlugin.tsx）
    的完整复刻。纯香草 JS，无外部依赖。直接 fetch 接口，不走任何代理。
@@ -282,8 +293,8 @@ var GX_HOST = "https://guoxue.wunpu.com";
 var GX_HEADERS = { "User-Agent": "Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36" };
 
 var BOOK_RULES = [
-  { id: "wunai", title: "无奈书库（优）", author: "小说 书源", site: "www.52shuku123.cc", fileName: "___25_767q.json", badge: "无", cls: "wn", raw: WUNAI_RULE },
-  { id: "guoxue", title: "国学经典（优+）", author: "小说 书源", site: "guoxue.wunpu.com", fileName: "_____26_3g3h.json", badge: "国", cls: "gx", raw: GUOXUE_RULE }
+  { id: "wunai", title: "无奈书库（优）", author: "小说 书源", site: "www.52shuku123.cc", fileName: "___25_767q.json", badge: "无", cls: "wn", engine: "wunai", raw: WUNAI_RULE },
+  { id: "guoxue", title: "国学经典（优+）", author: "小说 书源", site: "guoxue.wunpu.com", fileName: "_____26_3g3h.json", badge: "国", cls: "gx", engine: "guoxue", raw: GUOXUE_RULE }
 ];
 
 function norm(s) {
@@ -564,7 +575,17 @@ var state = {
 };
 var logId = 0, toastTimer = null;
 function bookRule() { for (var i = 0; i < BOOK_RULES.length; i++) if (BOOK_RULES[i].id === state.ruleId) return BOOK_RULES[i]; return BOOK_RULES[0]; }
-function cats() { return state.ruleId === "wunai" ? WN_CATS : GX_CATS; }
+/* 引擎按条目走，不再按 ruleId 硬编码 "wunai"：导入的书源与内置同站时
+   复用同一套解析（无奈站走 wn*，国学站走 gx*）。 */
+function ruleEngine(id) {
+  for (var i = 0; i < BOOK_RULES.length; i++) if (BOOK_RULES[i].id === id) return BOOK_RULES[i].engine || "guoxue";
+  return id === "wunai" ? "wunai" : "guoxue";
+}
+function catsForEntry(entry) {
+  if (!entry.cats) entry.cats = entry.engine === "wunai" ? wnExploreFromRule(entry.raw) : gxExploreFromRule(entry.raw);
+  return entry.cats;
+}
+function cats() { return catsForEntry(bookRule()); }
 function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function $(id) { return document.getElementById(id); }
 function nowTime() { var d = new Date(); function p(n) { return (n < 10 ? "0" : "") + n; } return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); }
@@ -670,17 +691,18 @@ function loadGuoxueCategory(path) {
   }).catch(function (e) { b.loading = false; b.cards = []; b.hasMore = false; b.error = (e && e.message) || String(e); render(); });
 }
 function loadCategory(ruleId, k, page) {
-  if (ruleId === "wunai") loadWunaiCategory(k, page);
+  if (ruleEngine(ruleId) === "wunai") loadWunaiCategory(k, page);
   else loadGuoxueCategory(k);
 }
 function loadCat(k, page) { loadCategory(state.ruleId, k, page); }
 function switchRule(ruleId) {
   state.ruleId = ruleId;
   state.view = { kind: "browse" };
-  if (ruleId === "wunai") loadWunaiCategory((WN_CATS[0] && WN_CATS[0].k) || "/all<,-{{page}}>.html", 1);
+  var cs = cats();
+  if (ruleEngine(ruleId) === "wunai") loadWunaiCategory((cs[0] && cs[0].k) || "/all<,-{{page}}>.html", 1);
   else {
     var first = null;
-    for (var i = 0; i < GX_CATS.length; i++) if (!GX_CATS[i].header) { first = GX_CATS[i]; break; }
+    for (var i = 0; i < cs.length; i++) if (!cs[i].header) { first = cs[i]; break; }
     if (first) loadGuoxueCategory(first.k);
   }
 }
@@ -703,7 +725,7 @@ function doWnSearch() {
 function retryBrowse() {
   var b = state.browse;
   if (b.nav === "search") { doWnSearch(); return; }
-  if (state.ruleId === "wunai") loadWunaiCategory(b.nav, b.page);
+  if (ruleEngine(state.ruleId) === "wunai") loadWunaiCategory(b.nav, b.page);
   else loadGuoxueCategory(b.nav);
 }
 
@@ -711,7 +733,7 @@ function retryBrowse() {
 function openBook(i) {
   var card = state.browse.cards[i];
   if (!card) return;
-  var isWn = state.ruleId === "wunai";
+  var isWn = ruleEngine(state.ruleId) === "wunai";
   state.detailLoading = card.title; render();
   request("详情·" + card.title, card.ref, isWn ? { ua: "desktop", charset: "gbk" } : { headers: GX_HEADERS }, function (t) {
     var d = isWn ? wnParseDetail(t, card.ref) : gxParseDetail(t, card.ref);
@@ -733,8 +755,8 @@ function openChapter(index) {
   if (v.kind === "reader") { v.loading = true; v.error = ""; render(); }
   else state.view = { kind: "reader", detail: detail, ruleId: ruleId, index: index, text: "", nextUrl: "", pageNo: 1, loading: true, error: "" };
   var view = state.view;
-  request("章节·" + ch.name, ch.id, ruleId === "wunai" ? { ua: "desktop", charset: "gbk" } : { headers: GX_HEADERS }).then(function (html) {
-    var parsed = ruleId === "wunai" ? wnParseChapter(html, ch.id) : gxParseChapter(html);
+  request("章节·" + ch.name, ch.id, ruleEngine(ruleId) === "wunai" ? { ua: "desktop", charset: "gbk" } : { headers: GX_HEADERS }).then(function (html) {
+    var parsed = ruleEngine(ruleId) === "wunai" ? wnParseChapter(html, ch.id) : gxParseChapter(html);
     if (!parsed.text) throw new Error("章节没解析出正文");
     state.view = { kind: "reader", detail: detail, ruleId: ruleId, index: index, text: parsed.text, nextUrl: parsed.nextUrl, pageNo: 1, loading: false, error: "" };
     render();
@@ -747,8 +769,8 @@ function loadNextPage() {
   var v = state.view;
   if (v.kind !== "reader" || !v.nextUrl || v.loading) return;
   v.loading = true; v.error = ""; render();
-  request("章节·下一页", v.nextUrl, v.ruleId === "wunai" ? { ua: "desktop", charset: "gbk" } : { headers: GX_HEADERS }).then(function (html) {
-    var parsed = v.ruleId === "wunai" ? wnParseChapter(html, v.nextUrl) : gxParseChapter(html);
+  request("章节·下一页", v.nextUrl, ruleEngine(v.ruleId) === "wunai" ? { ua: "desktop", charset: "gbk" } : { headers: GX_HEADERS }).then(function (html) {
+    var parsed = ruleEngine(v.ruleId) === "wunai" ? wnParseChapter(html, v.nextUrl) : gxParseChapter(html);
     if (!parsed.text) throw new Error("下一页没解析出正文");
     if (state.view.kind !== "reader") return;
     state.view.loading = false;
@@ -1031,7 +1053,7 @@ function enterBooks() {
   hubSetBridgeVisible(false);
   if (!hubEntered) {
     hubEntered = true;
-    loadWunaiCategory((WN_CATS[0] && WN_CATS[0].k) || "/all<,-{{page}}>.html", 1);
+    switchRule(state.ruleId);
   } else {
     render();
   }
@@ -1249,7 +1271,133 @@ function renderRuleRow() {
     if (active) html += '<span class="rule-dot ' + r.cls + '"></span>';
     html += '</button>';
   }
+  html += '<button type="button" class="import-btn" id="importBtn">+ 导入规则文件</button>';
+  html += '<button type="button" class="import-btn" id="pasteBtn">粘贴 JSON</button>';
   $("ruleRow").innerHTML = html;
+  /* 导入按钮是真 <button>，点它直接调文件框的 click()——
+     旧的 <label for> 指着 display:none 的输入框，手机浏览器点不开（漫画插件同款）。 */
+  var ib = $("importBtn");
+  if (ib) ib.addEventListener("click", function () { $("fileInput").click(); });
+  var pb = $("pasteBtn");
+  if (pb) pb.addEventListener("click", function () { var p = $("pastePanel"); if (p) p.classList.toggle("hidden"); });
+}
+/* ---------------- 导入书源（漫画插件同款：+ 导入规则文件 / 粘贴 JSON） ---------------- */
+/* 导入的书源存在 localStorage "bookExtraRules" 里（原 JSON 全文），启动时恢复。
+   注意：漫画插件的导入规则只放内存、不持久化；书籍这边按要求真存。
+   解析复用内置的两套引擎：按 bookSourceUrl 认站——52shuku123.cc 走 wn*，
+   guoxue.wunpu.com 走 gx*；两站都不沾的返回 null，调用方报“跑不了”。
+   不写通用 Legado 选择器引擎（控制台 bookEngine.ts 里也没有，只有 wn/gx 两套）。 */
+var BOOK_EXTRA_KEY = "bookExtraRules";
+function bookRuleDefFromJson(raw, fileName) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("这不是书源规则 JSON");
+  if (raw.bookSourceType !== undefined && raw.bookSourceType !== 0) throw new Error("这不是书源规则（bookSourceType 不是 0）");
+  var title = typeof raw.bookSourceName === "string" ? raw.bookSourceName.replace(/^\s+|\s+$/g, "") : "";
+  var srcUrl = typeof raw.bookSourceUrl === "string" ? raw.bookSourceUrl : "";
+  if (!title || !srcUrl || srcUrl.indexOf("://") < 0) throw new Error("这份规则缺书源名或书源地址");
+  if (typeof raw.exploreUrl !== "string" || !raw.exploreUrl.replace(/^\s+|\s+$/g, "")) throw new Error("这份规则没有探索地址（exploreUrl）");
+  var host = "";
+  try { host = new URL(srcUrl).host; } catch (e) { host = srcUrl.replace(/^https?:\/\//, "").split("/")[0]; }
+  var engine = null;
+  if (host.indexOf("52shuku123.cc") >= 0) engine = "wunai";
+  else if (host.indexOf("guoxue.wunpu.com") >= 0) engine = "guoxue";
+  if (!engine) throw new Error("这份规则不是无奈书库、国学经典这两类形状，阅读器跑不了");
+  var cats = engine === "wunai" ? wnExploreFromRule(raw) : gxExploreFromRule(raw);
+  var realCats = 0;
+  for (var i = 0; i < cats.length; i++) if (!cats[i].header) realCats++;
+  if (!realCats) throw new Error("这份规则没有解析出分类");
+  return {
+    id: "bk-" + Math.random().toString(36).slice(2, 9),
+    title: title,
+    author: (typeof raw.bookSourceGroup === "string" && raw.bookSourceGroup) ? raw.bookSourceGroup : "小说 书源",
+    site: host, fileName: fileName, badge: title.charAt(0),
+    cls: engine === "wunai" ? "wn" : "gx", engine: engine, raw: raw, cats: cats
+  };
+}
+function saveExtraBookRules() {
+  try {
+    if (!window.localStorage) return;
+    var list = [];
+    for (var i = 0; i < BOOK_RULES.length; i++) {
+      var r = BOOK_RULES[i];
+      if (r.id.indexOf("bk-") === 0) list.push({ fileName: r.fileName, raw: r.raw });
+    }
+    window.localStorage.setItem(BOOK_EXTRA_KEY, JSON.stringify(list));
+  } catch (e) { /* 存储不可用时忽略 */ }
+}
+function loadExtraBookRules() {
+  var raw = null;
+  try { raw = window.localStorage ? window.localStorage.getItem(BOOK_EXTRA_KEY) : null; } catch (e) { raw = null; }
+  if (!raw) return;
+  var list = null;
+  try { list = JSON.parse(raw); } catch (e) { return; }
+  if (!Array.isArray(list)) return;
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i] || {};
+    try { importBookFromRaw(item.raw, item.fileName || "导入的书源.json", true); } catch (e) { /* 坏条目跳过 */ }
+  }
+}
+function importBookFromRaw(raw, fileName, silent) {
+  var def = bookRuleDefFromJson(raw, fileName);
+  var url = String(def.raw.bookSourceUrl || "").replace(/\/+$/, "");
+  for (var i = 0; i < BOOK_RULES.length; i++) {
+    var old = BOOK_RULES[i];
+    /* 同名同站的书源已存在：用导入的这份刷新它，不重复加卡。
+       只改了名字、站相同的克隆算另一条，会新加一张卡。 */
+    if (old.title === def.title && String(old.raw.bookSourceUrl || "").replace(/\/+$/, "") === url) {
+      def.id = old.id;
+      BOOK_RULES[i] = def;
+      state.ruleId = def.id;
+      if (!silent) saveExtraBookRules();
+      return def;
+    }
+  }
+  BOOK_RULES.push(def);
+  state.ruleId = def.id;
+  if (!silent) saveExtraBookRules();
+  return def;
+}
+function importBookDone(def, fileName, t0) {
+  var cats = catsForEntry(def), realCats = 0;
+  for (var i = 0; i < cats.length; i++) if (!cats[i].header) realCats++;
+  var engineName = def.engine === "wunai" ? "无奈书库" : "国学经典";
+  pushLog({ label: "导入书源", url: fileName, ok: true, detail: def.title + " · " + (def.author || "未知作者") + " · " + engineName + " · " + realCats + " 个分类", ms: Date.now() - t0 });
+  $("importErr").textContent = "";
+  renderRuleRow();
+  switchRule(def.id);
+}
+function importBookFailed(fileName, msg, t0) {
+  $("importErr").textContent = "导入失败：" + msg;
+  pushLog({ label: "导入书源", url: fileName, ok: false, detail: msg, ms: Date.now() - t0 });
+}
+function onImportFile(file) {
+  var t0 = Date.now();
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var raw = JSON.parse(reader.result);
+      var def = importBookFromRaw(raw, file.name);
+      importBookDone(def, file.name, t0);
+    } catch (e) {
+      importBookFailed(file.name, e.message || String(e), t0);
+    }
+  };
+  reader.readAsText(file);
+}
+/* 粘贴 JSON 导入：不走文件选择器，直接把规则全文粘进来走同一套解析。 */
+function importPastedJson() {
+  var t0 = Date.now();
+  var ta = $("pasteJson");
+  var text = ta ? ta.value : "";
+  try {
+    if (!text.trim()) throw new Error("先粘贴书源规则 JSON 再点导入");
+    var raw = JSON.parse(text);
+    var def = importBookFromRaw(raw, "粘贴的书源.json");
+    importBookDone(def, "粘贴的书源.json", t0);
+    if (ta) ta.value = "";
+    var p = $("pastePanel"); if (p) p.classList.add("hidden");
+  } catch (e) {
+    importBookFailed("粘贴的书源.json", e.message || String(e), t0);
+  }
 }
 function renderLog() {
   var c = $("logCount");
@@ -1270,7 +1418,7 @@ function renderLog() {
 }
 function renderBrowse() {
   var b = state.browse;
-  var isWn = state.ruleId === "wunai";
+  var isWn = ruleEngine(state.ruleId) === "wunai";
   var isSearch = b.nav === "search";
   var html = "";
   /* 分类 chips：国学空 url 的条目是分组标题头，只显示、不点 */
@@ -1439,6 +1587,11 @@ var bc = $("btnAddConfirm"); if (bc) bc.addEventListener("click", function () {
 var bx = $("btnAddCancel"); if (bx) bx.addEventListener("click", function () {
   var p = $("addPanel"); if (p) p.classList.add("hidden");
 });
+/* 导入/粘贴接线（漫画插件同款）：启动时先恢复已存的导入书源，再首绘。 */
+loadExtraBookRules();
+var pi = $("pasteImport"); if (pi) pi.addEventListener("click", importPastedJson);
+var pc = $("pasteCancel"); if (pc) pc.addEventListener("click", function () { var p = $("pastePanel"); if (p) p.classList.add("hidden"); $("importErr").textContent = ""; });
+var fi = $("fileInput"); if (fi) fi.addEventListener("change", function () { var f = this.files && this.files[0]; if (f) onImportFile(f); this.value = ""; });
 render();
 /* v4：点书籍直接进书籍插件——打开就进阅读器（第一次进拉默认分类），
    不先停在入口页。入口页（hub）只在点“‹ 主页”时回，不再是打开时的首屏。
