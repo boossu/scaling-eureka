@@ -1,9 +1,9 @@
 {
-  "version": 8,
+  "version": 9,
   "updated": "2026-11-24",
   "reader": {
     "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/comic_reader.html",
-    "sha256": "90a273d24919cc67d2c05d18fa476e93857ddb04c417951652b0cd4842f079f2"
+    "sha256": "777f6ecdeafb16f718f009d7d037a90589daeb08007630a9fe71f6a75b955b29"
   },
   "rules": [
     {

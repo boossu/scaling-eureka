@@ -229,7 +229,7 @@ img{display:block}
     <div class="hub-head-row">
       <span class="hub-badge" aria-hidden>漫</span>
       <div class="hub-titles"><h1>聚合插件</h1><p>插件运行控制台</p></div>
-      <span class="hub-ver" id="hubVer">插件 v8</span>
+      <span class="hub-ver" id="hubVer">插件 v9</span>
     </div>
     <p class="hub-desc">漫画小程序：分类、详情、章节全是真请求。</p>
   </section>
@@ -270,7 +270,7 @@ img{display:block}
 <input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 8;
+var PLUGIN_VERSION = 9;
 var PLUGIN_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
 /* ---------------- 主界面 hub（入口页，v479 壳子版同款，v4 起做到 GitHub 阅读器里） ---------------- */
 /* v3 的教训：GitHub 阅读器里根本没有 hub，goHome() 只回规则卡首页；
@@ -303,6 +303,15 @@ function hubSetBridgeVisible(v) {
    book_reader.html 的 enterManga），没有副本时才联网拉取并顺手存一份。
    缓存只含“已下载的本机副本”，更新仍走更新按钮。 */
 var MANGA_READER_CACHE_KEY = "mangaReaderCache";
+/* 从书籍 hub 点漫画直接进阅读器的标志（localStorage "mangaDirectEntry"）：
+   用户 2026-11-24 15:12：“是这里跳 不知道什么原因 漫画还是要点击两次才能进”——
+   书籍 hub 点漫画，enterManga 载入漫画阅读器后，漫画阅读器启动时默认先显示
+   入口页（showHub），header 从书/书籍插件跳成漫/插件 v8，用户还得在漫画入口页
+   上再点一次漫画才进阅读器——这就是“点两次”。v8 只解决了“第一下重拉”，
+   没解决“第一下落在入口页”。修法：书籍阅读器的 enterManga 在载入前先写
+   "mangaDirectEntry"="1"；这里启动时读到就清掉并直接 enterManga()，不经入口页。
+   正常从壳子进（无此标志）仍先显示入口页。 */
+var MANGA_DIRECT_ENTRY_KEY = "mangaDirectEntry";
 function saveMangaReaderCache(version, readerText) {
   try { if (window.localStorage) window.localStorage.setItem(MANGA_READER_CACHE_KEY, JSON.stringify({ version: version, readerText: readerText })); } catch (e) { /* 存储不可用时忽略 */ }
 }
@@ -2994,6 +3003,14 @@ function boot() {
     hubSetBridgeVisible(false);
     return;
   }
+  /* v9：从书籍 hub 点漫画进来时直接进阅读器，不经入口页（见上 MANGA_DIRECT_ENTRY_KEY）。
+     正常从壳子进（无此标志）仍先显示入口页。 */
+  var _de = false;
+  try {
+    _de = window.localStorage && window.localStorage.getItem(MANGA_DIRECT_ENTRY_KEY) === "1";
+    if (_de) window.localStorage.removeItem(MANGA_DIRECT_ENTRY_KEY);
+  } catch (e) { /* no storage */ }
+  if (_de) { enterManga(); return; }
   /* 主界面先行：不拉任何列表，等用户点“漫画”才进阅读器 */
   showHub();
 }
