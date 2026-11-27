@@ -94,6 +94,10 @@ img{display:block}
 #playerWrap.css-rotate #playerStage{width:100vh;width:100dvh;height:100vw;height:100dvw;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%) rotate(90deg)}
 #nativeVideo,#fbCanvas{max-height:100%;max-width:100%;object-fit:contain}
 #fbCanvas{width:100%;height:100%}
+/* v9 铺满：fit-cover 时两个后端都走 object-fit: cover（裁边铺满），再点回 contain。 */
+#playerWrap.fit-cover #nativeVideo{width:100%;height:100%;object-fit:cover}
+#playerWrap.fit-cover #fbCanvas{object-fit:cover}
+#btnFill.on{background:var(--accent-dim);color:#fca5a5;box-shadow:inset 0 0 0 1px var(--accent)}
 .player-top{pointer-events:none;position:absolute;inset:0 0 auto 0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(to bottom,rgba(0,0,0,.7),transparent);padding:8px 12px 24px;transition:opacity .3s}
 .player-bottom{position:absolute;inset:auto 0 0 0;z-index:10;background:linear-gradient(to top,rgba(0,0,0,.75),transparent);padding:32px 8px 8px;transition:opacity .3s}
 .ctl-hidden{opacity:0}
@@ -303,6 +307,7 @@ img{display:block}
           <span class="spacer"></span>
           <button type="button" class="pill-btn" id="btnRate">1x</button>
           <button type="button" class="round-btn" id="btnRotate" aria-label="切换横竖屏" title="切横屏"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9a8 8 0 0 1 14.9-3M20 15a8 8 0 0 1-14.9 3"/><path d="M18.5 2.5v3.5H15M5.5 21.5v-3.5H9"/></svg></button>
+          <button type="button" class="round-btn" id="btnFill" aria-label="铺满" aria-pressed="false" title="铺满"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M8 9.5h8v5H8z" fill="currentColor" stroke="none"/></svg></button>
           <button type="button" class="round-btn" id="btnFullscreen" aria-label="全屏"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
         </div>
         <div class="vol-row">
@@ -326,7 +331,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 8;
+var PLUGIN_VERSION = 9;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14448,7 +14453,7 @@ var player = {
   rate: 1, seekPreview: null, loadToken: 0, h264Redirect: false,
   fallback: null, fbEvents: {}, hideTimer: 0, flashTimer: 0, dragging: false,
   progressTimer: 0, fakeFullscreen: false, viewportPortrait: true,
-  lastInteractAt: 0, isPortraitVideo: true, _fsIcon: false
+  lastInteractAt: 0, isPortraitVideo: true, userRotated: false, fill: false, _fsIcon: false
 };
 
 function playerEls() {
@@ -14459,7 +14464,7 @@ function playerEls() {
     seekBar: $("seekBar"), seekFill: $("seekFill"), seekDot: $("seekDot"),
     timeLabel: $("timeLabel"), countLabel: $("countLabel"),
     playBtn: $("btnPlay"), prevBtn: $("btnPrevEp"), nextBtn: $("btnNextEp"),
-    epBtn: $("btnEpisodes"), rateBtn: $("btnRate"), rotBtn: $("btnRotate"),
+    epBtn: $("btnEpisodes"), rateBtn: $("btnRate"), rotBtn: $("btnRotate"), fillBtn: $("btnFill"),
     fsBtn: $("btnFullscreen"), volBtn: $("btnVol"), volRange: $("volRange"),
     orientLabel: $("orientLabel"), sheet: $("epSheet"), sheetGrid: $("epSheetGrid")
   };
@@ -14531,12 +14536,25 @@ function exitFullscreen() {
 }
 /* smartFull：按视频宽高比决定全屏方向（竖片竖全屏、横片横全屏）。 */
 function smartFull() {
-  var v = $("nativeVideo");
-  var portrait = player.isPortraitVideo;
-  if (v && v.videoWidth > 0) portrait = v.videoHeight > v.videoWidth;
-  var o = portrait ? "portrait" : "landscape";
+  var o = videoIsPortrait() ? "portrait" : "landscape";
   setOrientation(o);
   enterFullscreen(o);
+}
+/* v9：按视频宽高比判断竖片（与 smartFull 同款判断：有真实宽高用真实宽高，
+   否则用 loadedmetadata 记下的 isPortraitVideo）。 */
+function videoIsPortrait() {
+  var v = $("nativeVideo");
+  if (v && v.videoWidth > 0) return v.videoHeight > v.videoWidth;
+  return player.isPortraitVideo;
+}
+/* v9：点集数的初始方向。同剧换集（player.detail 还是同一部剧）用上一个视频的
+   真实宽高；新剧按来源默认——星芽短剧竖屏，CMS（电影/剧集/综艺）横屏。 */
+function initialOrientation(detail) {
+  var v = $("nativeVideo");
+  if (player.detail === detail && v && v.videoWidth > 0) {
+    return v.videoHeight > v.videoWidth ? "portrait" : "landscape";
+  }
+  return detail && detail.cms ? "landscape" : "portrait";
 }
 
 function getBackend() {
@@ -14583,6 +14601,15 @@ function setOrientation(o) {
   $("orientLabel").textContent = o === "portrait" ? "竖屏" : "横屏";
   $("btnRotate").title = o === "portrait" ? "切横屏" : "切竖屏";
   applyFsClass();
+}
+/* v9：铺满切换——#playerWrap 上挂 fit-cover class，两个后端（原生 video 与
+   WASM 软解 canvas）都走 object-fit: cover；再点回 contain。 */
+function setFill(on) {
+  player.fill = !!on;
+  var w = $("playerWrap");
+  if (w) w.classList.toggle("fit-cover", player.fill);
+  var b = $("btnFill");
+  if (b) { b.classList.toggle("on", player.fill); b.setAttribute("aria-pressed", player.fill ? "true" : "false"); }
 }
 function setAudioStatus(s) {
   player.audioStatus = s;
@@ -14855,6 +14882,9 @@ function playEpisode(index) {
   var detail = currentDetail;
   if (!detail || !detail.episodes[index]) return;
   var token = ++player.loadToken;
+  /* v9：初始方向按内容定（同剧换集用上一个视频的真实宽高；新剧星芽竖屏、CMS 横屏），
+     不再写死竖屏。全屏请求仍在点按手势里立即发出，不等元数据。 */
+  var o = initialOrientation(detail);
   player.detail = detail;
   player.index = index;
   player.h264Redirect = false;
@@ -14863,12 +14893,13 @@ function playEpisode(index) {
   player.duration = detail.episodes[index].seconds || 0;
   player.loadState = ""; player.playError = ""; player.needGesture = false;
   player.seekPreview = null;
+  player.userRotated = false;
   setAudioStatus("unknown");
-  setOrientation("portrait");
+  setOrientation(o);
   $("epSheet").classList.add("hidden");
   showView("player");
-  /* 点集数 = 立即播 + 竖屏全屏（手势窗口内先把全屏要下来）。换集不掉出全屏。 */
-  enterFullscreen("portrait");
+  /* 点集数 = 立即播 + 全屏（手势窗口内先把全屏要下来）。换集不掉出全屏。 */
+  enterFullscreen(o);
   player.fbEvents = {
     onState: function (s, detailMsg) {
       if (token !== player.loadToken) return;
@@ -14985,6 +15016,16 @@ function bindPlayer() {
     var v = E.video;
     if (Number.isFinite(v.duration) && v.duration > 0) player.duration = v.duration;
     player.isPortraitVideo = v.videoHeight > v.videoWidth;
+    /* v9：元数据纠正——真实宽高与当前方向矛盾时纠正一次（setOrientation；
+       全屏中同时 lockOrientation）。用户手动旋转过（userRotated：旋转按钮
+       或逆向转动机身）则不纠正，手动旋转是 override。 */
+    if (!player.userRotated && v.videoWidth > 0) {
+      var want = v.videoHeight > v.videoWidth ? "portrait" : "landscape";
+      if (want !== player.orientation) {
+        setOrientation(want);
+        if (isFs()) lockOrientation(want);
+      }
+    }
     renderBottom();
   });
   E.video.addEventListener("pause", function () { setPlaying(false); });
@@ -15021,10 +15062,12 @@ function bindPlayer() {
   E.rateBtn.addEventListener("click", cycleRate);
   E.rotBtn.addEventListener("click", function () {
     var next = player.orientation === "portrait" ? "landscape" : "portrait";
+    player.userRotated = true; /* v9：手动旋转是 override，loadedmetadata 不再纠正回来 */
     setOrientation(next);
     if (isFs()) lockOrientation(next);
     else enterFullscreen(next);
   });
+  E.fillBtn.addEventListener("click", function () { setFill(!player.fill); });
   E.fsBtn.addEventListener("click", function () {
     if (isFs()) exitFullscreen();
     else smartFull();
@@ -15081,8 +15124,10 @@ function bindPlayer() {
     applyFsClass();
     if (!isFs()) return;
     var t = (screen.orientation && screen.orientation.type) || "";
-    if (t.indexOf("landscape") === 0) setOrientation("landscape");
-    else if (t.indexOf("portrait") === 0) setOrientation("portrait");
+    /* v9：机身逆向旋转也是手动 override（与当前方向矛盾时才记；锁屏方向
+       触发的同向事件不记，免得挡住元数据纠正）。 */
+    if (t.indexOf("landscape") === 0) { if (player.orientation !== "landscape") player.userRotated = true; setOrientation("landscape"); }
+    else if (t.indexOf("portrait") === 0) { if (player.orientation !== "portrait") player.userRotated = true; setOrientation("portrait"); }
   };
   try { if (screen.orientation) screen.orientation.addEventListener("change", onOrient); } catch (e) {}
   window.addEventListener("orientationchange", onOrient);
