@@ -1,6 +1,6 @@
 {
   "reader": {
-    "sha256": "bb47092cd936c826546ba84e875b1988f268a2f60550b0af015a0110d669cf63",
+    "sha256": "b31e0bcf521ec35acea520cb70040dc88ecdc7a1c696d961dad8ad74c9dea5a3",
     "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/video_reader.html"
   },
   "rules": [
@@ -11,6 +11,6 @@
       "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/xingya.json"
     }
   ],
-  "updated": "2026-11-24",
-  "version": 3
+  "updated": "2026-11-27",
+  "version": 4
 }

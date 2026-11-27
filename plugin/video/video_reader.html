@@ -235,7 +235,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 3;
+var PLUGIN_VERSION = 4;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14735,6 +14735,7 @@ function loadNative() {
 
 function loadCurrentEpisode() {
   var token = player.loadToken;
+  player.nativeToken = token;
   var ep = player.detail.episodes[player.index];
   player.sources = xyPlaySources(ep);
   player.srcIdx = 0;
@@ -14746,6 +14747,14 @@ function loadCurrentEpisode() {
   setMode("native");
   loadNative();
   return Promise.resolve();
+}
+
+/* v4：播完自动放下一集（原生 + WASM 回落两路都走这里）；已是最后一集则提示，不循环。 */
+function autoNextEpisode() {
+  var d = player.detail;
+  if (!d || !d.episodes || d.episodes.length === 0) return;
+  if (player.index < d.episodes.length - 1) { playEpisode(player.index + 1); return; }
+  showToast("已经是最后一集");
 }
 
 function playEpisode(index) {
@@ -14797,6 +14806,7 @@ function playEpisode(index) {
     onEnded: function () {
       if (token !== player.loadToken) return;
       setPlaying(false);
+      autoNextEpisode();
     },
     onLoadProgress: function (loaded, total) {
       if (token !== player.loadToken) return;
@@ -14882,7 +14892,12 @@ function bindPlayer() {
     renderBottom();
   });
   E.video.addEventListener("pause", function () { setPlaying(false); });
-  E.video.addEventListener("ended", function () { setPlaying(false); });
+  E.video.addEventListener("ended", function () {
+    setPlaying(false);
+    /* v4：原生播完自动放下一集；token 对不上说明已切集（旧 ended 迟到），不跳。 */
+    if (player.nativeToken !== player.loadToken) return;
+    autoNextEpisode();
+  });
   E.video.addEventListener("error", onVideoError);
   E.video.addEventListener("webkitbeginfullscreen", function () {
     player.fullscreen = true; hideCenterBtn(); lockOrientation(player.orientation); applyFsClass(); renderBottom();
@@ -15009,6 +15024,17 @@ function boot() {
     headersCache = null;
     if (browse.isSearch) loadSearch(browse.query);
     else if (cats[0]) loadCategory(browse.nav || cats[0].k, browse.page || 1);
+  });
+  /* v4：翻页按钮此前只渲染、从未绑过点击（点下一页无反应即此因）。 */
+  $("btnPrev").addEventListener("click", function () {
+    if (browse.loading || browse.page <= 1) return;
+    loadCategory(browse.nav, browse.page - 1);
+    window.scrollTo(0, 0);
+  });
+  $("btnNext").addEventListener("click", function () {
+    if (browse.loading || !browse.hasMore) return;
+    loadCategory(browse.nav, browse.page + 1);
+    window.scrollTo(0, 0);
   });
   $("btnBackDetail").addEventListener("click", function () { showView("browse"); });
   if (cats[0]) { browse.nav = cats[0].k; loadCategory(cats[0].k, 1); }
