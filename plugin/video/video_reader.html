@@ -178,6 +178,11 @@ img{display:block}
 <div id="app">
   <!-- 浏览：规则卡片 + 分类 + 搜索 + 列表（无聚合顶栏，顶栏由 APK 固定显示） -->
   <section id="viewBrowse">
+    <div class="src-tabs" id="srcTabs" role="group" aria-label="来源">
+      <button type="button" class="src-tab on" id="tabXy">星芽短剧</button>
+      <button type="button" class="src-tab" id="tabCms">CMS采集</button>
+    </div>
+    <div id="xyBrowse">
     <div id="rules"><div class="rule-row">
       <button type="button" class="rule-card" id="ruleCard">
         <span class="rule-badge">星</span>
@@ -187,11 +192,6 @@ img{display:block}
           <span class="rule-file">xingya.json</span>
         </span>
       </button>
-    <div class="src-tabs" id="srcTabs" role="group" aria-label="来源">
-      <button type="button" class="src-tab on" id="tabXy">星芽短剧</button>
-      <button type="button" class="src-tab" id="tabCms">CMS采集</button>
-    </div>
-    <div id="xyBrowse">
     </div></div>
     <p id="loginState" class="login-note" role="status"></p>
     <div class="chips" id="chips" role="group" aria-label="分类"></div>
@@ -326,7 +326,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 7;
+var PLUGIN_VERSION = 8;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -15410,28 +15410,34 @@ var cms = {
 var cmsHls = null;
 var cmsHlsLoading = null;
 
+/* v8：浏览区切换的唯一入口。name 为 "xy" | "registry" | "source"。
+   标签高亮与内容显隐在这里原子地一起改——v7 的 bug 是 #xyBrowse 本就是
+   空 div（星芽内容全在 #rules 里），cmsShowView 藏它等于什么都没藏，
+   标签亮了 CMS、上面却还是星芽的分类。HTML 已把星芽内容真正装进
+   #xyBrowse、标签挪到 viewBrowse 下常驻；这里再保证不许只改一半。 */
 function cmsShowView(name) {
   cms.view = name;
-  $("xyBrowse").classList.add("hidden");
+  var isCms = (name !== "xy");
+  $("tabXy").classList.toggle("on", !isCms);
+  $("tabCms").classList.toggle("on", isCms);
+  /* 用户 2026-11-28 定：CMS 界面里星芽的东西直接去掉。#rules（星芽卡片）
+     与 #xyBrowse（星芽分类/搜索/列表）同时藏；#srcTabs 保留。
+     #rules 现在虽已在 #xyBrowse 里面（藏 xyBrowse 即连卡片一起藏），
+     这里仍显式藏它——以后结构再动也不会让卡片漏到 CMS 上面。 */
+  $("xyBrowse").classList.toggle("hidden", isCms);
+  $("rules").classList.toggle("hidden", isCms);
   $("cmsRegistrySec").classList.toggle("hidden", name !== "registry");
   $("cmsSourceSec").classList.toggle("hidden", name !== "source");
 }
 function cmsShowXy() {
-  cms.view = "xy";
   cms.detailFrom = null;
-  $("xyBrowse").classList.remove("hidden");
-  $("cmsRegistrySec").classList.add("hidden");
-  $("cmsSourceSec").classList.add("hidden");
+  cmsShowView("xy");
 }
 function cmsShowTabCms() {
-  $("tabXy").classList.remove("on");
-  $("tabCms").classList.add("on");
   if (cms.registry) { cmsShowView(cms.view === "source" ? "source" : "registry"); }
   else { cmsShowView("registry"); loadCmsRegistry(); }
 }
 function cmsShowTabXy() {
-  $("tabCms").classList.remove("on");
-  $("tabXy").classList.add("on");
   cmsShowXy();
 }
 
@@ -15787,9 +15793,16 @@ function cmsPlayEpisode(i) {
 /* ---------------- HLS（只对 CMS 的 m3u8 生效，不动 v4 的软解路） ---------------- */
 
 function cmsCanPlayHlsNative() {
+  /* v8：Android WebView 与桌面 Chromium 对 HLS 只报 "maybe"（平台能解，
+     但不是 Safari 那种 "probably"）；v7 只认 "probably"，于是手机上
+     永远走 hls.js。而这些 CMS 的 CDN 不发 Access-Control-Allow-Origin，
+     hls.js 的 XHR 在 WebView 里直接被 CORS 拦掉拉不到清单
+     （manifestLoadError）。原生 <video> 不走 XHR、不受 CORS 约束，
+     所以 "maybe" 也算能原生播；真播不了再由 onVideoError 回落 hls.js。 */
   try {
     var v = document.createElement("video");
-    return v.canPlayType("application/vnd.apple.mpegurl") === "probably";
+    var r = v.canPlayType("application/vnd.apple.mpegurl");
+    return r === "probably" || r === "maybe";
   } catch (e) { return false; }
 }
 function cmsEnsureHls() {
@@ -15830,7 +15843,10 @@ function cmsLoadHls(url, token) {
       if (token !== player.loadToken) return;
       if (!data || !data.fatal) return;
       player.loadState = "";
-      player.playError = "HLS 播失败（" + (data.details || data.type || "error") + "），地址可能已失效或被 CDN 拦截。";
+      var code = (data.response && data.response.code) ? ("，HTTP " + data.response.code) : "";
+      var msg = "HLS 播失败（" + (data.details || data.type || "error") + code + "），地址可能已失效或被 CDN 拦截。";
+      player.playError = msg;
+      pushLog({ label: "播放·HLS 失败", url: url, ok: false, detail: msg, ms: 0 });
       renderCenter();
     });
     hls.on(HlsCtor.Events.MANIFEST_PARSED, function () {
@@ -15862,7 +15878,11 @@ function cmsSwitchToHls() {
 }
 function cmsOnVideoError() {
   var url = player.sources[player.srcIdx] || "";
-  if (cmsIsHlsUrl(url)) { cmsSwitchToHls(); return; }
+  if (cmsIsHlsUrl(url)) {
+    /* 已在 hls.js 路上时不再重建实例：hls.js 自己的 ERROR 回调已报过错。 */
+    if (player.mode === "hls") return;
+    cmsSwitchToHls(); return;
+  }
   player.playError = "原生播不了这一集（可能是地址过期）。";
   renderCenter();
 }
