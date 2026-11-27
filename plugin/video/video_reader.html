@@ -326,7 +326,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 6;
+var PLUGIN_VERSION = 7;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -15117,8 +15117,6 @@ function bindPlayer() {
 
 /* ---------------- 请求日志（漫画插件 comic_reader.html 原样） ---------------- */
 
-var DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
-var MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
 var cmsLogState = { logs: [], logOpen: true };
 var logId = 0;
 function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -15147,42 +15145,6 @@ function renderLog() {
   }
   ol.innerHTML = html;
 }
-/* opts（可选）：{ headers: {...}, referrer: "...", method: "GET"|"POST", body: "..." }。
-   ua 是 "desktop"/"mobile" 取内置 UA，别的字符串原样当 UA。
-   注意 fetch 禁设 User-Agent / Referer 头：真 WebView 里这两项会被浏览器忽略，
-   改用 WebView 自身的真 Chrome UA；Referer 走 opts.referrer（fetch 的 referrer 选项）。
-   node/jsdom 自测里 UA 由这行送出真 UA——站方会拦无 UA 之类机器人 UA。 */
-function request(label, url, ua, summarize, opts) {
-  var t0 = Date.now();
-  var uaStr = ua === "desktop" ? DESKTOP_UA : (ua === "mobile" ? MOBILE_UA : String(ua || MOBILE_UA));
-  var headers = { "User-Agent": uaStr, "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "zh-CN,zh;q=0.9" };
-  if (opts && opts.headers) {
-    for (var hk in opts.headers) { if (Object.prototype.hasOwnProperty.call(opts.headers, hk)) headers[hk] = opts.headers[hk]; }
-  }
-  function attempt(n) {
-    var fetchOpts = { headers: headers, signal: AbortSignal.timeout(30000) };
-    if (opts && opts.referrer) fetchOpts.referrer = opts.referrer;
-    if (opts && opts.method) fetchOpts.method = opts.method;
-    if (opts && opts.body != null) fetchOpts.body = opts.body;
-    return fetch(url, fetchOpts).then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.text().then(function (text) {
-        var extra = "";
-        if (summarize) { try { extra = summarize(text) || ""; } catch (e) { extra = ""; } }
-        pushLog({ label: label, url: url, ok: true, detail: "HTTP " + res.status + " · " + text.length + " 字符" + (extra ? " · " + extra : "") + (n > 1 ? " · 第 " + n + " 次重试成功" : ""), ms: Date.now() - t0 });
-        return text;
-      });
-    }).catch(function (e) {
-      if (n < 3) {
-        return new Promise(function (res2) { setTimeout(res2, 1500); }).then(function () { return attempt(n + 1); });
-      }
-      pushLog({ label: label, url: url, ok: false, detail: (e && e.message ? e.message : String(e)) + "（已重试 2 次）", ms: Date.now() - t0 });
-      throw e;
-    });
-  }
-  return attempt(1);
-}
-
 /* 星芽请求也记进日志：不改 fetchText 本体，只包一层（新增代码）。 */
 var _origFetchText = fetchText;
 fetchText = function (url, opts) {
@@ -15209,7 +15171,6 @@ var CMS_REGISTRY_URLS = [
 ];
 var HLS_CDN_URL = "https://cdn.jsdelivr.net/npm/hls.js@1.7.4/dist/hls.min.js";
 var CMS_ADULT_WORDS = ["成人", "伦理", "三级", "情色", "激情", "福利", "写真"];
-var cmsSchemeCache = {}; /* api 基址 -> "https" | "http"，记住哪个协议通 */
 
 function cmsIsHlsUrl(url) { return /\.m3u8([?#]|$)/i.test(String(url || "").trim()); }
 function cmsIsPlayable(url) {
@@ -15234,21 +15195,20 @@ function cmsListUrl(api, page, typeId) { var q = "ac=list&pg=" + page; if (typeI
 function cmsSearchUrl(api, keyword) { return cmsJoinQuery(api, "ac=list&wd=" + encodeURIComponent(keyword) + "&pg=1"); }
 function cmsDetailUrl(api, id) { var ac = api.indexOf("jisubt") >= 0 ? "detail" : "videolist"; return cmsJoinQuery(api, "ac=" + ac + "&ids=" + encodeURIComponent(String(id))); }
 
-/* CMS 接口请求：直接 fetch（不走代理）；http 地址先试 https，失败回落 http。 */
-function cmsApiRequest(label, apiUrl, summarize) {
-  var base = String(apiUrl).split("?")[0];
-  var httpsUrl = String(apiUrl).replace(/^http:\/\//i, "https://");
-  if (httpsUrl === apiUrl) return request(label, apiUrl, "mobile", summarize);
-  if (cmsSchemeCache[base] === "http") return request(label, apiUrl, "mobile", summarize);
-  return request(label, httpsUrl, "mobile", summarize).then(function (text) {
-    cmsSchemeCache[base] = "https";
+/* CMS 请求：走 v4 的 fetchText（与星芽点分类完全同一套：直接 fetch，
+   !res.ok 即抛错），只换标签记日志。URL 原样拉，不做 http→https 升级。
+   用 _origFetchText（v4 fetchText 本体）而不用包过日志的那层，避免同一请求
+   在日志里记两条且标签错写成“星芽·请求”。 */
+function cmsFetchText(label, url, summarize) {
+  var t0 = Date.now();
+  return _origFetchText(url).then(function (text) {
+    var extra = "";
+    if (summarize) { try { extra = summarize(text) || ""; } catch (e) { extra = ""; } }
+    pushLog({ label: label, url: url, ok: true, detail: "HTTP 200 · " + text.length + " 字符" + (extra ? " · " + extra : ""), ms: Date.now() - t0 });
     return text;
   }).catch(function (e) {
-    pushLog({ label: label, url: httpsUrl, ok: false, detail: "https 不通（" + (e && e.message ? e.message : String(e)) + "），回落 http", ms: 0 });
-    return request(label, apiUrl, "mobile", summarize).then(function (text) {
-      cmsSchemeCache[base] = "http";
-      return text;
-    });
+    pushLog({ label: label, url: url, ok: false, detail: (e && e.message ? e.message : String(e)), ms: Date.now() - t0 });
+    throw e;
   });
 }
 
@@ -15492,7 +15452,7 @@ function loadCmsRegistry() {
       return;
     }
     var url = urls.shift();
-    request("清单·CMS", url, "mobile", function (t) { return "解析出 " + cmsParseRegistry(t).reduce(function (n, g) { return n + g.sources.length; }, 0) + " 个源"; }).then(function (text) {
+    cmsFetchText("清单·CMS", url, function (t) { return "解析出 " + cmsParseRegistry(t).reduce(function (n, g) { return n + g.sources.length; }, 0) + " 个源"; }).then(function (text) {
       var groups = cmsParseRegistry(text);
       if (groups.length === 0) throw new Error("清单为空");
       cms.registry = groups;
@@ -15545,18 +15505,17 @@ function cmsOpenSource(src) {
   cmsLoadSource(src);
 }
 function cmsLoadSource(src) {
+  /* 与星芽 loadCategory 完全同一套：一次一个请求，先拉分类、渲染 chips，
+     再拉第 1 页列表；失败进 cms.error 渲染出来，不静默吞错。 */
   cms.loading = true; cms.error = "";
   cmsRenderSource();
   var api = src.api;
-  var catsP = cmsApiRequest("分类·" + src.name, cmsCatsUrl(api), function (t) { return "解析出 " + cmsParseList(t, api).cats.length + " 个分类"; }).then(function (text) {
-    return cmsParseList(text, api).cats.filter(function (c) { return cmsCatAllowed(c.name); });
-  }).catch(function () { return []; });
-  var listP = cmsApiRequest("列表·" + src.name, cmsListUrl(api, 1), function (t) { return "解析出 " + cmsParseList(t, api).cards.length + " 条"; }).then(function (text) {
-    return cmsParseList(text, api);
-  });
-  Promise.all([catsP, listP]).then(function (res) {
-    cms.cats = res[0];
-    var parsed = res[1];
+  cmsFetchText("分类·" + src.name, cmsCatsUrl(api), function (t) { return "解析出 " + cmsParseList(t, api).cats.length + " 个分类"; }).then(function (text) {
+    cms.cats = cmsParseList(text, api).cats.filter(function (c) { return cmsCatAllowed(c.name); });
+    cmsRenderSource();
+    return cmsFetchText("列表·" + src.name, cmsListUrl(api, 1), function (t) { return "解析出 " + cmsParseList(t, api).cards.length + " 条"; });
+  }).then(function (text) {
+    var parsed = cmsParseList(text, api);
     cms.cards = parsed.cards;
     cms.pagecount = parsed.pagecount || 0;
     cms.page = 1;
@@ -15575,7 +15534,7 @@ function loadCmsList(src, catId, page) {
   cms.loading = true; cms.error = "";
   cmsRenderSource();
   var api = src.api;
-  cmsApiRequest("列表·" + src.name, cmsListUrl(api, page, catId || undefined), function (t) { return "解析出 " + cmsParseList(t, api).cards.length + " 条"; }).then(function (text) {
+  cmsFetchText("列表·" + src.name, cmsListUrl(api, page, catId || undefined), function (t) { return "解析出 " + cmsParseList(t, api).cards.length + " 条"; }).then(function (text) {
     var parsed = cmsParseList(text, api);
     cms.cards = parsed.cards;
     if (parsed.pagecount) cms.pagecount = parsed.pagecount;
@@ -15660,11 +15619,11 @@ function cmsLoadSearch(query) {
   cmsRenderSource();
   var all = [];
   cms.registry.forEach(function (g) { g.sources.forEach(function (s) { all.push(s); }); });
-  var POOL = 5, idx = 0, done = 0;
+  var idx = 0;
   var groups = all.map(function (s) { return { source: s, cards: [], error: "" }; });
   var searchFinished = false;
-  /* 聚合搜设 60 秒总时限：个别源挂起（30 秒超时×重试×https/http 回落）时不
-     拖住整个搜索；超时未回的源记“请求超时”，其余结果照常出。 */
+  /* 聚合搜设 60 秒总时限：一次一个源顺序拉，未轮到的源记“请求超时”，
+     其余结果照常出；每回一个源就更新一次状态。 */
   var searchDeadline = setTimeout(function () {
     if (searchFinished) return;
     searchFinished = true;
@@ -15674,27 +15633,30 @@ function cmsLoadSearch(query) {
     cmsRenderSearch();
   }, 60000);
   function next() {
-    if (idx >= all.length) return;
+    if (searchFinished) return;
+    if (idx >= all.length) {
+      searchFinished = true;
+      clearTimeout(searchDeadline);
+      cms.searchGroups = groups;
+      cms.searchLoading = false;
+      cmsRenderSearch();
+      return;
+    }
     var gi = idx++;
     var g = groups[gi];
     var api = g.source.api;
-    cmsApiRequest("聚合搜·" + g.source.name, cmsSearchUrl(api, q), function (t) { return "解析出 " + cmsParseList(t, api).cards.length + " 条"; }).then(function (text) {
+    cmsFetchText("聚合搜·" + g.source.name, cmsSearchUrl(api, q), function (t) { return "解析出 " + cmsParseList(t, api).cards.length + " 条"; }).then(function (text) {
       g.cards = cmsParseList(text, api).cards;
     }).catch(function (e) {
       g.error = e instanceof Error ? e.message : String(e);
     }).then(function () {
       if (searchFinished) return;
-      done++;
-      if (done === all.length) {
-        searchFinished = true;
-        clearTimeout(searchDeadline);
-        cms.searchGroups = groups;
-        cms.searchLoading = false;
-        cmsRenderSearch();
-      } else { next(); }
+      cms.searchGroups = groups;
+      cmsRenderSearch();
+      next();
     });
   }
-  for (var w = 0; w < Math.min(POOL, all.length); w++) next();
+  next();
 }
 function cmsRenderSearch() {
   var box = $("cmsSearchResults");
@@ -15752,7 +15714,7 @@ function cmsOpenDetail(card) {
   renderDetail();
   showView("detail");
   var api = cms.source ? cms.source.api : "";
-  cmsApiRequest("详情·" + srcName, card.ref, function (t) { var pd = cmsParseDetail(t); return pd ? ("解析出 " + pd.lines.length + " 条线路") : "详情解析失败"; }).then(function (text) {
+  cmsFetchText("详情·" + srcName, card.ref, function (t) { var pd = cmsParseDetail(t); return pd ? ("解析出 " + pd.lines.length + " 条线路") : "详情解析失败"; }).then(function (text) {
     var parsed = cmsParseDetail(text);
     if (!parsed) throw new Error("详情解析失败");
     d.title = parsed.title || d.title;
