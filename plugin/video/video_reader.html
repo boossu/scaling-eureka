@@ -68,6 +68,28 @@ img{display:block}
 .pager button{border-radius:9999px;background:var(--surface);padding:6px 16px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
 .pager button:disabled{opacity:.4}
 .pager span{font-size:14px;color:var(--dim)}
+/* ---------- 来源切换 ---------- */
+.src-tabs{display:flex;gap:6px;padding-top:16px}
+.src-tab{border-radius:9999px;padding:6px 14px;font-size:14px;background:var(--surface);color:var(--dim);box-shadow:inset 0 0 0 1px var(--border)}
+.src-tab:active{transform:scale(.95)}
+.src-tab.on{background:var(--accent-dim);color:#fca5a5;font-weight:600;box-shadow:inset 0 0 0 1px var(--accent)}
+/* ---------- CMS 采集 ---------- */
+.cms-group{margin-bottom:16px}
+.cms-group h3{margin-bottom:8px;font-size:14px;font-weight:700;color:var(--dim)}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.cms-source-head{display:flex;align-items:center;gap:8px;padding-top:16px}
+.cms-source-name{font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cms-source-api{flex:1;min-width:0;font-size:12px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.line-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.line-tab{border-radius:9999px;padding:6px 14px;font-size:14px;background:var(--surface);color:var(--dim);box-shadow:inset 0 0 0 1px var(--border)}
+.line-tab:active{transform:scale(.95)}
+.line-tab.on{background:var(--accent-dim);color:#fca5a5;font-weight:600;box-shadow:inset 0 0 0 1px var(--accent)}
+.cms-summary{margin-bottom:8px;font-size:12px;color:var(--faint)}
+.cms-fuzzy{margin-bottom:12px;font-size:12px;color:var(--amber)}
+.cms-fail{border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:12px;font-size:12px;color:var(--dim)}
+.cms-fail summary{cursor:pointer}
+.cms-fail ul{margin-top:8px;padding-left:16px}
+.cms-fail li{margin-top:4px}
 /* ---------- detail ---------- */
 .back-btn{border-radius:9999px;background:var(--surface);padding:6px 16px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
 .detail-head{margin-top:12px;display:flex;gap:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:12px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
@@ -147,6 +169,11 @@ img{display:block}
         </span>
       </button>
     </div></div>
+    <div class="src-tabs" id="srcTabs" role="group" aria-label="来源">
+      <button type="button" class="src-tab on" id="tabXy">星芽短剧</button>
+      <button type="button" class="src-tab" id="tabCms">CMS采集</button>
+    </div>
+    <div id="xyBrowse">
     <p id="loginState" class="login-note" role="status"></p>
     <div class="chips" id="chips" role="group" aria-label="分类"></div>
     <form class="search-row" id="searchForm">
@@ -169,6 +196,46 @@ img{display:block}
         <button type="button" id="btnNext">下一页 ›</button>
       </div>
     </section>
+    </div>
+
+    <!-- CMS采集：清单（分组→源）→ 源主页（分类 + 列表 / 聚合搜） -->
+    <section id="cmsRegistrySec" class="hidden" aria-label="CMS 源清单">
+      <p id="cmsRegistryLoading" class="list-msg hidden">正在拉取源清单…</p>
+      <div id="cmsRegistryErr" class="err-box hidden">
+        <p class="err-text"></p>
+        <button type="button" class="retry-btn" id="btnCmsRegistryRetry">重试</button>
+      </div>
+      <div id="cmsRegistryBody" class="hidden">
+        <p id="cmsRegistryCount" class="count"></p>
+        <div id="cmsGroups"></div>
+      </div>
+    </section>
+    <section id="cmsSourceSec" class="hidden" aria-label="采集源">
+      <div class="cms-source-head">
+        <button type="button" class="back-btn" id="btnBackCmsRegistry">‹ 源清单</button>
+        <span id="cmsSourceName" class="cms-source-name"></span>
+        <span id="cmsSourceApi" class="cms-source-api"></span>
+      </div>
+      <div class="chips" id="cmsChips" role="group" aria-label="分类"></div>
+      <form class="search-row" id="cmsSearchForm">
+        <input class="search-in" id="cmsSearchInput" placeholder="输入剧名，聚合搜全部采集源" aria-label="聚合搜索 CMS 采集源">
+        <button class="search-btn" type="submit">聚合搜</button>
+      </form>
+      <div id="cmsSearchResults" class="hidden"></div>
+      <p id="cmsLoading" class="list-msg hidden">正在取剧…</p>
+      <div id="cmsErr" class="err-box hidden">
+        <p class="err-text"></p>
+        <button type="button" class="retry-btn" id="btnCmsRetry">重试</button>
+      </div>
+      <p id="cmsEmpty" class="list-msg hidden">这个源没有找到剧（可能分类为空或源暂时不可用）。</p>
+      <p id="cmsCountLine" class="count"></p>
+      <div class="v-list" id="cmsCardList"></div>
+      <div class="pager hidden" id="cmsPager">
+        <button type="button" id="btnCmsPrev">‹ 上一页</button>
+        <span id="cmsPageLabel">第 1 页</span>
+        <button type="button" id="btnCmsNext">下一页 ›</button>
+      </div>
+    </section>
   </section>
 
   <!-- 详情 -->
@@ -183,6 +250,7 @@ img{display:block}
       </div>
     </div>
     <div class="ep-sec hidden" id="epSection">
+      <div class="line-tabs hidden" id="lineTabs" role="group" aria-label="线路"></div>
       <h3>选集</h3>
       <div class="ep-grid" id="epGrid"></div>
     </div>
@@ -235,7 +303,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 4;
+var PLUGIN_VERSION = 5;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14099,6 +14167,352 @@ HevcFallbackPlayer.prototype.destroy = function () {
 };
 
 
+/* ================= 视频插件 v5 · CMS 采集（资源网采集.CMS搜，香雅情&六神） =================
+   cmsEngine.ts 的 JS 移植：苹果 CMS（MacCMS）采集协议。
+   清单运行时从网上拉（GitHub raw，失败回落 jsdelivr），不拷规则文件。
+   清单格式：`#分组名` 开一分组（裸 `#` 是分隔符），其后每行 `名字,API地址`。 */
+
+var CMS_REGISTRY_URLS = [
+  "https://raw.githubusercontent.com/xyq254245/HikerRule/main/ZYWCJ.txt",
+  "https://cdn.jsdelivr.net/gh/xyq254245/HikerRule@main/ZYWCJ.txt"
+];
+var HLS_CDN_URL = "https://cdn.jsdelivr.net/npm/hls.js@1.7.4/dist/hls.min.js";
+
+/* 分类名过滤：跳过含成人意味的分类。只列少量通用词，不照抄原规则的长黑名单。 */
+var CMS_ADULT_WORDS = ["成人", "伦理", "三级", "情色", "激情", "福利", "写真"];
+function cmsCatAllowed(name) {
+  var n = String(name || "").toLowerCase();
+  if (n.indexOf("av") >= 0) return false;
+  for (var i = 0; i < CMS_ADULT_WORDS.length; i++) {
+    if (n.indexOf(CMS_ADULT_WORDS[i]) >= 0) return false;
+  }
+  return true;
+}
+
+/* 清单格式：`#分组名` 开一分组（裸 `#` 是分隔符），其后每行
+   `名字,API地址`。名字与地址按第一个逗号分（地址里没有逗号）。 */
+function parseCmsRegistry(text) {
+  var groups = [];
+  var cur = null;
+  var lines = String(text || "").split("\n");
+  for (var li = 0; li < lines.length; li++) {
+    var line = lines[li].replace(/\r$/, "").trim();
+    if (!line) continue;
+    if (line.charAt(0) === "#") {
+      var name = line.slice(1).trim();
+      if (!name) continue; /* 裸 `#` 是分隔符 */
+      cur = { name: name, sources: [] };
+      groups.push(cur);
+      continue;
+    }
+    var comma = line.indexOf(",");
+    if (comma <= 0) continue;
+    var sname = line.slice(0, comma).trim();
+    var api = line.slice(comma + 1).trim();
+    if (!sname || !api) continue;
+    if (!cur) {
+      cur = { name: "其他", sources: [] };
+      groups.push(cur);
+    }
+    cur.sources.push({ name: sname, api: api });
+  }
+  return groups.filter(function (g) { return g.sources.length > 0; });
+}
+
+/* API 地址形状不一：有以 / 结尾的、有以 .php 结尾的、有本身
+   带 ? 的（at/xml 形）——只按 ?/& 拼查询串，不动原地址。 */
+function cmsJoinQuery(api, query) {
+  if (api.charAt(api.length - 1) === "?" || api.charAt(api.length - 1) === "&") return api + query;
+  return api + (api.indexOf("?") >= 0 ? "&" : "?") + query;
+}
+function cmsCatsUrl(api) { return cmsJoinQuery(api, "ac=list"); }
+function cmsListUrl(api, page, typeId) {
+  var q = "ac=list&pg=" + page;
+  if (typeId) q += "&t=" + encodeURIComponent(typeId);
+  return cmsJoinQuery(api, q);
+}
+function cmsSearchUrl(api, keyword) {
+  return cmsJoinQuery(api, "ac=list&wd=" + encodeURIComponent(keyword) + "&pg=1");
+}
+function cmsDetailUrl(api, id) {
+  /* 域名含 jisubt 的源详情用 ac=detail，其余 ac=videolist。 */
+  var ac = api.indexOf("jisubt") >= 0 ? "detail" : "videolist";
+  return cmsJoinQuery(api, "ac=" + ac + "&ids=" + encodeURIComponent(String(id)));
+}
+
+function cmsParseXml(text) {
+  try {
+    var doc = new DOMParser().parseFromString(text, "text/xml");
+    if (doc.getElementsByTagName("parsererror").length > 0) return null;
+    return doc;
+  } catch (e) { return null; }
+}
+function xmlChildText(el, tag) {
+  if (!el) return "";
+  var n = el.getElementsByTagName(tag)[0];
+  return n && n.textContent ? n.textContent.trim() : "";
+}
+
+function cmsCardFromJson(o, api) {
+  var id = o.vod_id;
+  if (id === undefined || id === null || id === "") return null;
+  var title = typeof o.vod_name === "string" ? o.vod_name : "";
+  if (!title) return null;
+  var remarks = typeof o.vod_remarks === "string" ? o.vod_remarks : "";
+  var typeName = typeof o.type_name === "string" ? o.type_name : "";
+  return {
+    ref: cmsDetailUrl(api, id),
+    title: title,
+    cover: typeof o.vod_pic === "string" ? o.vod_pic : "",
+    desc: remarks || typeName
+  };
+}
+function cmsCardFromXml(video, api) {
+  var id = xmlChildText(video, "id");
+  var title = xmlChildText(video, "name");
+  if (!id || !title) return null;
+  var note = xmlChildText(video, "note");
+  var typeName = xmlChildText(video, "type");
+  return {
+    ref: cmsDetailUrl(api, id),
+    title: title,
+    cover: xmlChildText(video, "pic"),
+    desc: note || typeName
+  };
+}
+function cmsJsonRows(parsed) {
+  var data = parsed || {};
+  var rows = Array.isArray(data.list) ? data.list : (Array.isArray(data.data) ? data.data : []);
+  return rows.filter(function (r) { return typeof r === "object" && r !== null; });
+}
+function cmsJsonPageCount(parsed) {
+  var n = parsed ? parsed.pagecount : undefined;
+  return typeof n === "number" ? n : 0;
+}
+
+/* 列表解析（JSON 与 XML 两路，进统一卡片；ref 拼详情地址）。
+   pageCount：服务端总页数（0 表示响应里没给，插件按“本页有内容”
+   判断是否还能往下翻）。 */
+function parseCmsList(text, api) {
+  var trimmed = String(text || "").replace(/^\s+/, "");
+  if (trimmed.charAt(0) === "<") {
+    var doc = cmsParseXml(text);
+    if (!doc) return { cards: [], pageCount: 0, total: 0 };
+    var listEl = doc.getElementsByTagName("list")[0];
+    var pageCount = listEl ? Number(listEl.getAttribute("pagecount") || 0) || 0 : 0;
+    var total = listEl ? Number(listEl.getAttribute("recordcount") || 0) || 0 : 0;
+    var cards = [];
+    var videos = doc.getElementsByTagName("video");
+    for (var i = 0; i < videos.length; i++) {
+      var card = cmsCardFromXml(videos[i], api);
+      if (card) cards.push(card);
+    }
+    return { cards: cards, pageCount: pageCount, total: total };
+  }
+  var parsed;
+  try { parsed = JSON.parse(text); } catch (e) { return { cards: [], pageCount: 0, total: 0 }; }
+  var totalNum = (parsed && typeof parsed.total === "number") ? parsed.total : 0;
+  var out = [];
+  var rows = cmsJsonRows(parsed);
+  for (var j = 0; j < rows.length; j++) {
+    var c = cmsCardFromJson(rows[j], api);
+    if (c) out.push(c);
+  }
+  return { cards: out, pageCount: cmsJsonPageCount(parsed), total: totalNum };
+}
+
+/* 分类解析（JSON 与 XML 两路；JSON 的 class 形只取顶级 type_pid===0）。 */
+function parseCmsCats(text) {
+  var trimmed = String(text || "").replace(/^\s+/, "");
+  if (trimmed.charAt(0) === "<") {
+    var doc = cmsParseXml(text);
+    if (!doc) return [];
+    var out = [];
+    var tys = doc.getElementsByTagName("ty");
+    for (var i = 0; i < tys.length; i++) {
+      var ty = tys[i];
+      var id = ty.getAttribute("id") || "";
+      var name = ty.textContent ? ty.textContent.trim() : "";
+      if (id && name && cmsCatAllowed(name)) out.push({ id: id, name: name });
+    }
+    return out;
+  }
+  var parsed;
+  try { parsed = JSON.parse(text); } catch (e) { return []; }
+  var cls = parsed ? parsed.class : undefined;
+  if (Array.isArray(cls)) {
+    var rows = cls.filter(function (r) { return typeof r === "object" && r !== null; });
+    var top = rows.filter(function (r) { return r.type_pid === 0; });
+    var use = top.length > 0 ? top : rows;
+    var out2 = [];
+    for (var k = 0; k < use.length; k++) {
+      var r = use[k];
+      var id2 = r.type_id;
+      var name2 = typeof r.type_name === "string" ? r.type_name : "";
+      if ((id2 === 0 || id2) && name2 && cmsCatAllowed(name2)) out2.push({ id: String(id2), name: name2 });
+    }
+    return out2;
+  }
+  var rows2 = cmsJsonRows(parsed);
+  var out3 = [];
+  for (var m = 0; m < rows2.length; m++) {
+    var o = rows2[m];
+    var id3 = o.list_id !== undefined ? o.list_id : o.type_id;
+    var name3 = typeof o.list_name === "string" ? o.list_name : (typeof o.type_name === "string" ? o.type_name : "");
+    if ((id3 === 0 || id3) && name3 && cmsCatAllowed(name3)) out3.push({ id: String(id3), name: name3 });
+  }
+  return out3;
+}
+
+/* vod_content 是带 HTML 的简介：去标签、解常见实体。 */
+function cmsStripHtml(s) {
+  return String(s || "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+/* 一条线路的播放串：以 # 分集，每集 “集名$URL” 或只有 URL。
+   集名里的 $ 只认第一个（URL 里极少含 $，且只认第一个分隔符）。 */
+function cmsParseLineEpisodes(playPart, pic) {
+  var out = [];
+  var parts = String(playPart || "").split("#");
+  for (var i = 0; i < parts.length; i++) {
+    var part = (parts[i] || "").trim();
+    if (!part) continue;
+    var dollar = part.indexOf("$");
+    var name = "", url = part;
+    if (dollar >= 0) {
+      name = part.slice(0, dollar).trim();
+      url = part.slice(dollar + 1).trim();
+    }
+    if (!url) continue;
+    var num = i + 1;
+    out.push({ num: num, url: url, h265Url: "", pic: pic, seconds: 0, label: name || ("第" + num + "集") });
+  }
+  return out;
+}
+
+function cmsDetailFromJson(o) {
+  var title = typeof o.vod_name === "string" ? o.vod_name : "";
+  if (!title) return null;
+  var pic = typeof o.vod_pic === "string" ? o.vod_pic : "";
+  var from = typeof o.vod_play_from === "string" ? o.vod_play_from : "";
+  var play = typeof o.vod_play_url === "string" ? o.vod_play_url : "";
+  var fromParts = from ? from.split("$$$") : [];
+  var playParts = play ? play.split("$$$") : [];
+  var lines = [];
+  var n = Math.max(fromParts.length, playParts.length);
+  for (var i = 0; i < n; i++) {
+    var episodes = cmsParseLineEpisodes(playParts[i] || "", pic);
+    if (episodes.length === 0) continue;
+    lines.push({ name: (fromParts[i] || "").trim() || ("线路" + (i + 1)), episodes: episodes });
+  }
+  return {
+    title: title, cover: pic,
+    intro: cmsStripHtml(typeof o.vod_content === "string" ? o.vod_content : ""),
+    actor: typeof o.vod_actor === "string" ? o.vod_actor : "",
+    director: typeof o.vod_director === "string" ? o.vod_director : "",
+    typeName: typeof o.type_name === "string" ? o.type_name : "",
+    remarks: typeof o.vod_remarks === "string" ? o.vod_remarks : "",
+    lines: lines
+  };
+}
+function cmsDetailFromXml(video) {
+  var title = xmlChildText(video, "name");
+  if (!title) return null;
+  var pic = xmlChildText(video, "pic");
+  var lines = [];
+  var dds = video.getElementsByTagName("dd");
+  for (var i = 0; i < dds.length; i++) {
+    var dd = dds[i];
+    var name = (dd.getAttribute("flag") || "").trim() || ("线路" + (i + 1));
+    var episodes = cmsParseLineEpisodes(dd.textContent || "", pic);
+    if (episodes.length === 0) continue;
+    lines.push({ name: name, episodes: episodes });
+  }
+  return {
+    title: title, cover: pic,
+    intro: cmsStripHtml(xmlChildText(video, "des")),
+    actor: xmlChildText(video, "actor"),
+    director: xmlChildText(video, "director"),
+    typeName: xmlChildText(video, "type"),
+    remarks: xmlChildText(video, "note"),
+    lines: lines
+  };
+}
+
+/* 详情解析（JSON 与 XML 两路，进线路分组）。 */
+function parseCmsDetail(text) {
+  var trimmed = String(text || "").replace(/^\s+/, "");
+  if (trimmed.charAt(0) === "<") {
+    var doc = cmsParseXml(text);
+    if (!doc) return null;
+    var video = doc.getElementsByTagName("video")[0];
+    if (!video) return null;
+    return cmsDetailFromXml(video);
+  }
+  var parsed;
+  try { parsed = JSON.parse(text); } catch (e) { return null; }
+  var rows = cmsJsonRows(parsed);
+  if (rows.length === 0) return null;
+  return cmsDetailFromJson(rows[0]);
+}
+
+/* 所选线路的集数进统一详情（播放器只认这一份，与星芽同款：
+   episodes 即该线路全集，自动下一集复用既有 handleEnded）。 */
+function cmsDetailToVideoDetail(d, lineIdx) {
+  var line = d.lines[lineIdx] || d.lines[0];
+  return { title: d.title, cover: d.cover, intro: d.intro, episodes: line ? line.episodes : [] };
+}
+
+/* 详情页展示用的元信息行（类型 / 更新 / 演员 / 导演，空的去掉）。 */
+function cmsDetailMeta(d) {
+  var out = [];
+  if (d.typeName) out.push("类型：" + d.typeName);
+  if (d.remarks) out.push("更新：" + d.remarks);
+  if (d.actor) out.push("演员：" + d.actor);
+  if (d.director) out.push("导演：" + d.director);
+  return out;
+}
+
+/* 只有 http(s) 的 m3u8/mp4 可进播放器；其余（share 页、磁力、
+   迅雷、ftp 等）返回原因，不假装能播。 */
+function cmsIsPlayable(url) {
+  var u = String(url || "").trim();
+  if (!/^https?:\/\//i.test(u)) {
+    return { ok: false, reason: "这集不是 http(s) 直链地址，播不了" };
+  }
+  var path = u.split(/[?#]/)[0] || "";
+  if (/\.m3u8$/i.test(path) || /\.mp4$/i.test(path)) {
+    return { ok: true, url: u };
+  }
+  return {
+    ok: false,
+    reason: "这集是分享页地址，不是 m3u8/mp4 直链，播不了（换条线路试试）"
+  };
+}
+
+/* 当前地址是不是 m3u8（播放器据此走 HLS 路径；?/# 后的参数不算）。 */
+function cmsIsHlsUrl(url) {
+  return /\.m3u8([?#]|$)/i.test(String(url || "").trim());
+}
+
+/* 原生 HLS 只认 "probably"：桌面 Chrome 对 mpegurl 返回 "maybe" 却实际
+   解不了 HLS，非空就当能播会让 m3u8 错走原生；Android 与 Safari 真能
+   原生播时返回的是 "probably"。 */
+function canPlayHlsNative() {
+  try {
+    var v = document.createElement("video");
+    return v.canPlayType("application/vnd.apple.mpegurl") === "probably";
+  } catch (e) { return false; }
+}
+
 /* ---------------- 界面与播放器（VideoPlugin.tsx + VideoPlayer.tsx 的移植） ---------------- */
 
 var SPEEDS = [1, 1.25, 1.5, 2, 0.5, 0.75];
@@ -14211,6 +14625,403 @@ function coverEl(src, alt, cls) {
   return wrap;
 }
 
+/* ---------------- CMS 采集视图状态机（VideoPlugin.tsx 的 CMS 部分移植） ---------------- */
+
+var videoSource = "xy"; /* "xy" 星芽短剧 | "cms" CMS采集；默认星芽 */
+var cmsRegistry = null, cmsRegistryLoading = false, cmsRegistryError = "";
+var cms = {
+  source: null, cats: [], catsLoading: false, catId: "", page: 1, pageCount: 0,
+  cards: [], loading: false, error: "", query: "", searchActive: false,
+  searchLoading: false, searchDone: false, searchGroups: []
+};
+var cmsDetail = null, cmsLineIdx = 0, detailIsCms = false;
+
+/* CMS 请求直连取数。XML 源若是 GBK 编码、按 UTF-8 解会乱码导致解析
+   失败：解析失败时重试一次 GBK，仍失败就用原文（解析函数会返回空，UI 如实报错）。 */
+function cmsFetchText(url) {
+  return fetchText(url).then(function (text) {
+    if (String(text).replace(/^\s+/, "").charAt(0) === "<" && !cmsParseXml(text)) {
+      return fetch(url).then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.arrayBuffer();
+      }).then(function (buf) {
+        var gbk = new TextDecoder("gbk").decode(buf);
+        if (String(gbk).replace(/^\s+/, "").charAt(0) === "<" && cmsParseXml(gbk)) return gbk;
+        return text;
+      }).catch(function () { return text; });
+    }
+    return text;
+  });
+}
+
+/* mapLimit：批量并行，上限 limit；结果保持原顺序（与控制台同款）。 */
+function mapLimit(items, limit, fn) {
+  var out = new Array(items.length);
+  var next = 0;
+  var cap = Math.max(1, Math.min(limit, items.length || 1));
+  var workers = [];
+  function worker() {
+    function step() {
+      if (next >= items.length) return Promise.resolve();
+      var i = next++;
+      return Promise.resolve().then(function () { return fn(items[i], i); }).then(function (v) {
+        out[i] = v;
+      }).then(step);
+    }
+    return step();
+  }
+  for (var w = 0; w < cap; w++) workers.push(worker());
+  return Promise.all(workers).then(function () { return out; });
+}
+
+/* 源清单：先 raw.githubusercontent，失败回落 jsdelivr；两个都
+   失败就报错，不编数据。 */
+function loadCmsRegistry() {
+  cmsRegistryLoading = true;
+  cmsRegistryError = "";
+  renderCmsRegistry();
+  var urls = CMS_REGISTRY_URLS.slice();
+  var lastErr = "";
+  function tryNext() {
+    if (urls.length === 0) {
+      cmsRegistryLoading = false;
+      cmsRegistryError = lastErr || "清单拉取失败";
+      renderCmsRegistry();
+      return;
+    }
+    var url = urls.shift();
+    fetchText(url).then(function (text) {
+      var groups = parseCmsRegistry(text);
+      if (groups.length === 0) throw new Error("清单为空");
+      cmsRegistry = groups;
+      cmsRegistryLoading = false;
+      renderCmsRegistry();
+    }).catch(function (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      tryNext();
+    });
+  }
+  tryNext();
+}
+
+function loadCmsList(src, catId, page) {
+  cms.source = src; cms.catId = catId; cms.page = page;
+  cms.loading = true; cms.error = ""; cms.searchActive = false;
+  renderCms();
+  cmsFetchText(cmsListUrl(src.api, page, catId || undefined)).then(function (text) {
+    var r = parseCmsList(text, src.api);
+    cms.source = src; cms.catId = catId; cms.page = page;
+    cms.cards = r.cards; cms.pageCount = r.pageCount;
+    cms.loading = false; cms.error = "";
+    renderCms();
+  }).catch(function (e) {
+    cms.loading = false;
+    cms.error = e instanceof Error ? e.message : String(e);
+    renderCms();
+  });
+}
+
+/* 进源主页：先拉分类（失败也不拦着，只显示“全部”），再拉第 1 页。 */
+function loadCmsSource(src) {
+  cms.source = src; cms.cats = []; cms.catsLoading = true;
+  cms.catId = ""; cms.page = 1; cms.cards = []; cms.error = ""; cms.searchActive = false;
+  renderCms();
+  cmsFetchText(cmsCatsUrl(src.api)).then(function (text) {
+    cms.cats = parseCmsCats(text); cms.catsLoading = false; renderCms();
+  }).catch(function () {
+    cms.cats = []; cms.catsLoading = false; renderCms();
+  });
+  loadCmsList(src, "", 1);
+}
+
+/* 聚合搜：并发查各源第 1 页（上限 6 在途），按源分组展示；
+   失败的源记原因，不编数据。站方是模糊 OR 搜索，结果可能不精确，UI 上注明。 */
+function runCmsSearch(query) {
+  var q = String(query || "").trim();
+  if (!q) { showToast("先输入要搜的剧名"); return; }
+  var all = (cmsRegistry || []).reduce(function (a, g) { return a.concat(g.sources); }, []);
+  if (all.length === 0) { showToast("源清单还没拉到，先回源清单重试"); return; }
+  cms.query = q; cms.searchActive = true; cms.searchLoading = true;
+  cms.searchDone = false; cms.searchGroups = [];
+  renderCms();
+  mapLimit(all, 6, function (src) {
+    return cmsFetchText(cmsSearchUrl(src.api, q)).then(function (text) {
+      var r = parseCmsList(text, src.api);
+      return { source: src, cards: r.cards, error: "" };
+    }).catch(function (e) {
+      return { source: src, cards: [], error: e instanceof Error ? e.message : String(e) };
+    });
+  }).then(function (results) {
+    cms.searchLoading = false; cms.searchDone = true; cms.searchGroups = results;
+    renderCms();
+  });
+}
+
+function openCmsVideo(card) {
+  cmsDetail = null; cmsLineIdx = 0; detailIsCms = true;
+  currentDetail = { title: card.title, cover: card.cover, intro: card.desc, episodes: [] };
+  renderDetail();
+  showView("detail");
+  cmsFetchText(card.ref).then(function (text) {
+    var d = parseCmsDetail(text);
+    if (!d || d.lines.length === 0) throw new Error("详情解析失败（没有可播线路）");
+    cmsDetail = d; cmsLineIdx = 0;
+    currentDetail = cmsDetailToVideoDetail(d, 0);
+    renderDetail();
+  }).catch(function (e) {
+    showToast("打开失败：" + (e instanceof Error ? e.message : String(e)));
+    showView("browse");
+  });
+}
+
+/* 线路切换：episodes 按所选线路出（复用既有选集机制）。 */
+function switchCmsLine(idx) {
+  if (!cmsDetail) return;
+  cmsLineIdx = idx;
+  currentDetail = cmsDetailToVideoDetail(cmsDetail, idx);
+  renderDetail();
+}
+
+/* CMS 点集：只有 m3u8/mp4 直链才进播放器，其余如实报原因。 */
+function playCmsEpisode(i) {
+  var d = currentDetail;
+  if (!d || !d.episodes[i]) return;
+  if (!detailIsCms) { playEpisode(i); return; }
+  var chk = cmsIsPlayable(d.episodes[i].url);
+  if (!chk.ok) { showToast(chk.reason); return; }
+  playEpisode(i);
+}
+
+function switchSource(s) {
+  videoSource = s;
+  $("tabXy").classList.toggle("on", s === "xy");
+  $("tabCms").classList.toggle("on", s === "cms");
+  $("xyBrowse").classList.toggle("hidden", s !== "xy");
+  if (s === "cms") {
+    renderCms();
+    if (!cmsRegistry && !cmsRegistryLoading) loadCmsRegistry();
+  } else {
+    $("cmsRegistrySec").classList.add("hidden");
+    $("cmsSourceSec").classList.add("hidden");
+    renderBrowse();
+  }
+}
+
+function renderCms() {
+  var reg = $("cmsRegistrySec"), src = $("cmsSourceSec");
+  if (!cms.source) {
+    reg.classList.remove("hidden");
+    src.classList.add("hidden");
+    renderCmsRegistry();
+    return;
+  }
+  reg.classList.add("hidden");
+  src.classList.remove("hidden");
+  renderCmsSource();
+}
+
+function renderCmsRegistry() {
+  $("cmsRegistryLoading").classList.toggle("hidden", !cmsRegistryLoading);
+  var err = $("cmsRegistryErr");
+  var showErr = !!cmsRegistryError && !cmsRegistryLoading;
+  err.classList.toggle("hidden", !showErr);
+  if (showErr) err.querySelector(".err-text").textContent = "源清单拉取失败：" + cmsRegistryError;
+  var body = $("cmsRegistryBody");
+  var showBody = !!(cmsRegistry && !cmsRegistryLoading);
+  body.classList.toggle("hidden", !showBody);
+  if (!showBody) return;
+  var total = cmsRegistry.reduce(function (n, g) { return n + g.sources.length; }, 0);
+  $("cmsRegistryCount").textContent = total + " 个采集源 · 清单运行时从网上拉取";
+  var box = $("cmsGroups");
+  box.innerHTML = "";
+  cmsRegistry.forEach(function (g) {
+    var grp = el("div", "cms-group");
+    grp.appendChild(el("h3", null, g.name));
+    var row = el("div", "chip-row");
+    g.sources.forEach(function (s) {
+      var b = el("button", "chip", s.name);
+      b.type = "button";
+      b.addEventListener("click", function () { loadCmsSource(s); });
+      row.appendChild(b);
+    });
+    grp.appendChild(row);
+    box.appendChild(grp);
+  });
+}
+
+function cmsCardButton(card, onOpen) {
+  var b = el("button", "v-card");
+  b.type = "button";
+  b.appendChild(coverEl(card.cover, card.title, "v-cover"));
+  var meta = el("span", "v-meta");
+  meta.appendChild(el("span", "v-title", card.title));
+  if (card.desc) meta.appendChild(el("span", "v-desc", card.desc));
+  b.appendChild(meta);
+  b.addEventListener("click", function () { onOpen(card); });
+  return b;
+}
+
+function renderCmsSearchResults() {
+  var box = $("cmsSearchResults");
+  box.innerHTML = "";
+  if (cms.searchLoading) {
+    box.appendChild(el("p", "list-msg", "正在聚合搜各源第 1 页…"));
+    return;
+  }
+  if (!cms.searchDone) return;
+  var withResults = cms.searchGroups.filter(function (g) { return g.cards.length > 0; });
+  var failed = cms.searchGroups.filter(function (g) { return g.error; });
+  box.appendChild(el("p", "cms-summary", "聚合搜「" + cms.query + "」· " + withResults.length + " 个源有结果，" + failed.length + " 个源失败"));
+  box.appendChild(el("p", "cms-fuzzy", "站方模糊搜索：关键词按字拆开 OR 匹配，结果可能不精确。"));
+  withResults.forEach(function (g) {
+    var grp = el("div", "cms-group");
+    grp.appendChild(el("h3", null, g.source.name + " · " + g.cards.length + " 部"));
+    var list = el("div", "v-list");
+    g.cards.forEach(function (card) {
+      list.appendChild(cmsCardButton(card, openCmsVideo));
+    });
+    grp.appendChild(list);
+    box.appendChild(grp);
+  });
+  var empty = cms.searchGroups.filter(function (g) { return g.cards.length === 0; });
+  if (empty.length > 0) {
+    var det = document.createElement("details");
+    det.className = "cms-fail";
+    var sum = document.createElement("summary");
+    sum.textContent = "没有结果 / 失败的源（" + empty.length + " 个）";
+    det.appendChild(sum);
+    var ul = document.createElement("ul");
+    empty.forEach(function (g) {
+      var li = document.createElement("li");
+      li.textContent = g.source.name + (g.error ? "：" + g.error : "：无结果");
+      ul.appendChild(li);
+    });
+    det.appendChild(ul);
+    box.appendChild(det);
+  }
+}
+
+function renderCmsSource() {
+  var src = cms.source;
+  if (!src) return;
+  $("cmsSourceName").textContent = src.name;
+  $("cmsSourceApi").textContent = src.api;
+  var chips = $("cmsChips");
+  chips.innerHTML = "";
+  if (cms.catsLoading) {
+    chips.appendChild(el("span", "count", "分类加载中…"));
+  } else {
+    var all = el("button", "chip" + (cms.catId === "" ? " on" : ""), "全部");
+    all.type = "button";
+    all.addEventListener("click", function () { loadCmsList(src, "", 1); });
+    chips.appendChild(all);
+    cms.cats.forEach(function (c) {
+      var b = el("button", "chip" + (cms.catId === c.id ? " on" : ""), c.name);
+      b.type = "button";
+      b.addEventListener("click", function () { loadCmsList(src, c.id, 1); });
+      chips.appendChild(b);
+    });
+  }
+  var si = $("cmsSearchInput");
+  if (document.activeElement !== si) si.value = cms.query || "";
+  var resBox = $("cmsSearchResults");
+  resBox.classList.toggle("hidden", !cms.searchActive);
+  if (cms.searchActive) {
+    renderCmsSearchResults();
+    $("cmsLoading").classList.add("hidden");
+    $("cmsErr").classList.add("hidden");
+    $("cmsEmpty").classList.add("hidden");
+    $("cmsCountLine").textContent = "";
+    $("cmsCardList").innerHTML = "";
+    $("cmsPager").classList.add("hidden");
+    return;
+  }
+  resBox.innerHTML = "";
+  $("cmsLoading").classList.toggle("hidden", !cms.loading);
+  var err = $("cmsErr");
+  var showErr = !!cms.error && !cms.loading;
+  err.classList.toggle("hidden", !showErr);
+  if (showErr) err.querySelector(".err-text").textContent = "取剧失败：" + cms.error;
+  $("cmsEmpty").classList.toggle("hidden", !(!cms.loading && !cms.error && cms.cards.length === 0));
+  $("cmsCountLine").textContent = (!cms.loading && !cms.error && cms.cards.length > 0) ? cms.cards.length + " 部" : "";
+  var list = $("cmsCardList");
+  list.innerHTML = "";
+  cms.cards.forEach(function (card) {
+    list.appendChild(cmsCardButton(card, openCmsVideo));
+  });
+  var pager = $("cmsPager");
+  pager.classList.toggle("hidden", cms.loading || cms.error || cms.cards.length === 0);
+  $("cmsPageLabel").textContent = "第 " + cms.page + " 页" + (cms.pageCount > 0 ? " / 共 " + cms.pageCount + " 页" : "");
+  $("btnCmsPrev").disabled = cms.page <= 1 || cms.loading;
+  $("btnCmsNext").disabled = cms.loading || (cms.pageCount > 0 ? cms.page >= cms.pageCount : cms.cards.length === 0);
+}
+
+/* ---------------- HLS（m3u8 播放，VideoPlayer.tsx 的 HLS 部分移植） ---------------- */
+
+var hlsScriptPromise = null;
+function loadHlsJs() {
+  if (window.Hls) return Promise.resolve(window.Hls);
+  if (hlsScriptPromise) return hlsScriptPromise;
+  hlsScriptPromise = new Promise(function (resolve, reject) {
+    var s = document.createElement("script");
+    s.src = HLS_CDN_URL;
+    s.onload = function () { resolve(window.Hls); };
+    s.onerror = function () { hlsScriptPromise = null; reject(new Error("hls.js 加载失败")); };
+    document.head.appendChild(s);
+  });
+  return hlsScriptPromise;
+}
+function destroyHls() {
+  if (player.hls) { try { player.hls.destroy(); } catch (e) {} player.hls = null; }
+}
+
+/* HLS 附着（mode "hls" 时）：动态加载 hls.js，只在播 m3u8 且原生播不了
+   时加载；星芽 mp4 全程不进这里。附着失败、两个源都播失败时如实报错，
+   不假装能播。沙箱出口可能被视频 CDN 挡，这里只报真实错误，不把
+   沙箱的失败写成“地址已死”。 */
+function attachHls(src, token) {
+  destroyHls();
+  player.loadState = "正在加载 HLS…";
+  renderCenter();
+  loadHlsJs().then(function (HlsCtor) {
+    if (token !== player.loadToken) return;
+    if (!HlsCtor || !HlsCtor.isSupported()) {
+      player.loadState = "";
+      player.playError = "当前浏览器既不支持原生 HLS，也加载不了 hls.js，播不了这个 m3u8。";
+      renderCenter();
+      return;
+    }
+    var v = $("nativeVideo");
+    var hls = new HlsCtor();
+    player.hls = hls;
+    hls.on(HlsCtor.Events.ERROR, function (_event, data) {
+      if (token !== player.loadToken) return;
+      if (!data.fatal) return;
+      if (player.srcIdx + 1 < player.sources.length) {
+        player.srcIdx += 1;
+        attachHls(player.sources[player.srcIdx], token);
+        return;
+      }
+      player.loadState = "";
+      player.playError = "HLS 播失败（" + (data.details || data.type) + "），地址可能已失效或被 CDN 拦截。";
+      renderCenter();
+    });
+    hls.on(HlsCtor.Events.MANIFEST_PARSED, function () {
+      if (token !== player.loadToken) return;
+      player.loadState = "";
+      var p = v.play();
+      if (p) p.catch(function () { player.needGesture = true; renderCenter(); });
+    });
+    hls.loadSource(src);
+    hls.attachMedia(v);
+  }).catch(function () {
+    if (token !== player.loadToken) return;
+    player.loadState = "";
+    player.playError = "hls.js 加载失败，播不了这个 m3u8。";
+    renderCenter();
+  });
+}
+
 function renderBrowse() {
   renderChips();
   var list = $("cardList");
@@ -14305,9 +15116,14 @@ function showView(name) {
     $(id).classList.toggle("hidden", id !== "view" + name.charAt(0).toUpperCase() + name.slice(1));
   });
   if (name !== "player") exitPlayer();
+  if (name === "browse") {
+    if (videoSource === "cms") renderCms();
+    else renderBrowse();
+  }
 }
 
 function openVideo(card) {
+  detailIsCms = false;
   currentDetail = { title: card.title, cover: card.cover, intro: card.desc, episodes: [] };
   renderDetail();
   showView("detail");
@@ -14328,19 +15144,41 @@ function renderDetail() {
   var d = currentDetail;
   if (!d) return;
   $("detailTitle").textContent = d.title || "";
-  $("detailMeta").textContent = d.episodes.length > 0 ? "共 " + d.episodes.length + " 集" : "正在取分集…";
+  var metaText = "";
+  if (detailIsCms && cmsDetail) {
+    var m = cmsDetailMeta(cmsDetail);
+    if (m.length > 0) metaText = m.join(" · ");
+  }
+  if (d.episodes.length > 0) metaText = (metaText ? metaText + " · " : "") + "共 " + d.episodes.length + " 集";
+  else if (!metaText) metaText = "正在取分集…";
+  $("detailMeta").textContent = metaText;
   $("detailIntro").textContent = d.intro || "";
   $("detailIntro").classList.toggle("hidden", !d.intro);
   var coverBox = $("detailCover");
   coverBox.innerHTML = "";
   coverBox.appendChild(coverEl(d.cover, d.title, "v-cover detail-cover"));
+  /* 线路 tabs：只在多线路时渲染（控制台同款）。 */
+  var tabs = $("lineTabs");
+  tabs.innerHTML = "";
+  if (detailIsCms && cmsDetail && cmsDetail.lines.length > 1) {
+    tabs.classList.remove("hidden");
+    cmsDetail.lines.forEach(function (line, i) {
+      var tb = el("button", "line-tab" + (i === cmsLineIdx ? " on" : ""), line.name);
+      tb.type = "button";
+      tb.addEventListener("click", function () { switchCmsLine(i); });
+      tabs.appendChild(tb);
+    });
+  } else {
+    tabs.classList.add("hidden");
+  }
   var grid = $("epGrid");
   grid.innerHTML = "";
   d.episodes.forEach(function (ep, i) {
-    var b = el("button", "ep-btn", String(ep.num));
+    var label = (detailIsCms && ep.label) ? ep.label : String(ep.num);
+    var b = el("button", "ep-btn", label);
     b.type = "button";
-    b.title = ep.seconds ? "第 " + ep.num + " 集 · " + xyFormatSeconds(ep.seconds) : "第 " + ep.num + " 集";
-    b.addEventListener("click", function () { playEpisode(i); });
+    b.title = detailIsCms ? label : (ep.seconds ? "第 " + ep.num + " 集 · " + xyFormatSeconds(ep.seconds) : "第 " + ep.num + " 集");
+    b.addEventListener("click", function () { playCmsEpisode(i); });
     grid.appendChild(b);
   });
   $("epSection").classList.toggle("hidden", d.episodes.length === 0);
@@ -14356,7 +15194,7 @@ var player = {
   rate: 1, seekPreview: null, loadToken: 0, h264Redirect: false,
   fallback: null, fbEvents: {}, hideTimer: 0, flashTimer: 0, dragging: false,
   progressTimer: 0, fakeFullscreen: false, viewportPortrait: true,
-  lastInteractAt: 0, isPortraitVideo: true, _fsIcon: false
+  lastInteractAt: 0, isPortraitVideo: true, _fsIcon: false, hls: null
 };
 
 function playerEls() {
@@ -14481,8 +15319,8 @@ function setMode(m) {
   player.mode = m;
   var E = playerEls();
   E.wrap.setAttribute("data-mode", m);
-  E.badge.textContent = m === "fallback" ? "WASM 软解" : "原生播放";
-  E.video.classList.toggle("hidden", m !== "native");
+  E.badge.textContent = m === "fallback" ? "WASM 软解" : (m === "hls" ? "HLS" : "原生播放");
+  E.video.classList.toggle("hidden", m === "fallback");
   E.canvas.classList.toggle("hidden", m !== "fallback");
 }
 function setOrientation(o) {
@@ -14552,7 +15390,7 @@ function renderCenter() {
     rb.type = "button";
     rb.addEventListener("click", function () {
       player.playError = "";
-      setMode(canPlayHevcNative() ? "native" : "fallback");
+      destroyHls();
       loadCurrentEpisode();
     });
     box.appendChild(rb);
@@ -14619,7 +15457,8 @@ function renderEpSheet() {
   var E = playerEls();
   E.sheetGrid.innerHTML = "";
   player.detail.episodes.forEach(function (ep, i) {
-    var b = el("button", "ep-sheet-btn" + (i === player.index ? " on" : ""), String(ep.num));
+    var label = (detailIsCms && ep.label) ? ep.label : String(ep.num);
+    var b = el("button", "ep-sheet-btn" + (i === player.index ? " on" : ""), label);
     b.type = "button";
     b.addEventListener("click", function () {
       E.sheet.classList.add("hidden");
@@ -14696,6 +15535,9 @@ function getFallbackPlayer() {
 }
 
 function startFallback(srcs, token) {
+  /* 双重保险：源里只要有 m3u8 就绝不启动 WASM 回落（m3u8 清单
+     不是 MP4，喂给 mp4box 只会报 Invalid box type）。 */
+  if (srcs.some(function (s) { return cmsIsHlsUrl(s); })) return Promise.resolve();
   var fb = getFallbackPlayer();
   if (!fb) return Promise.resolve();
   return fb.load(srcs).then(function (info) {
@@ -14737,8 +15579,25 @@ function loadCurrentEpisode() {
   var token = player.loadToken;
   player.nativeToken = token;
   var ep = player.detail.episodes[player.index];
-  player.sources = xyPlaySources(ep);
+  destroyHls();
+  /* CMS 集只有一个直链地址（控制台同款）；星芽沿用 https 升级 + http 回落。 */
+  player.sources = detailIsCms ? [ep.url] : xyPlaySources(ep);
   player.srcIdx = 0;
+  var firstSrc = player.sources[0] || "";
+  /* 本集是 m3u8（CMS 线路）：原生能播 HLS 就走原生 <video>，
+     播不了就走 hls.js；两者都不行时 attachHls 里如实报错。
+     不是 m3u8（星芽 mp4）走原有逻辑：原生能解 HEVC 就 native，
+     否则 WASM 回落。 */
+  if (cmsIsHlsUrl(firstSrc)) {
+    if (canPlayHlsNative()) {
+      setMode("native");
+      loadNative();
+    } else {
+      setMode("hls");
+      attachHls(firstSrc, token);
+    }
+    return Promise.resolve();
+  }
   var useFallback = !canPlayHevcNative();
   if (useFallback) {
     setMode("fallback");
@@ -14837,6 +15696,7 @@ function playEpisode(index) {
 
 function exitPlayer() {
   player.loadToken++;
+  destroyHls();
   if (player.fallback) { try { player.fallback.destroy(); } catch (e) {} player.fallback = null; }
   var v = $("nativeVideo");
   if (v) { try { v.pause(); } catch (e) {} v.removeAttribute("src"); try { v.load(); } catch (e) {} }
@@ -14847,6 +15707,17 @@ function exitPlayer() {
 }
 
 function onVideoError() {
+  /* hls 态不走这里：m3u8 的失败由 hls.js 的 ERROR 事件处理
+     （video 的 onError 在 MSE 附着下不可靠，还会与它打架）。 */
+  if (player.mode === "hls") return;
+  /* m3u8 在原生下播失败：改走 hls.js 附着，绝不进 WASM/MP4 回落
+     （回落会把 m3u8 清单当 MP4 喂给 mp4box）。 */
+  if (player.mode === "native" && cmsIsHlsUrl(player.sources[player.srcIdx] || "")) {
+    player.playError = "";
+    setMode("hls");
+    attachHls(player.sources[player.srcIdx], player.loadToken);
+    return;
+  }
   if (player.srcIdx + 1 < player.sources.length) {
     player.srcIdx += 1;
     loadNative();
@@ -15019,6 +15890,30 @@ function boot() {
   $("searchForm").addEventListener("submit", function (e) {
     e.preventDefault();
     loadSearch($("searchInput").value);
+  });
+  /* v5：来源切换 [星芽短剧 | CMS采集]，默认星芽。 */
+  $("tabXy").addEventListener("click", function () { switchSource("xy"); });
+  $("tabCms").addEventListener("click", function () { switchSource("cms"); });
+  $("btnCmsRegistryRetry").addEventListener("click", function () { loadCmsRegistry(); });
+  $("btnCmsRetry").addEventListener("click", function () {
+    if (cms.source) loadCmsList(cms.source, cms.catId, cms.page);
+  });
+  $("btnBackCmsRegistry").addEventListener("click", function () {
+    cms.source = null; cms.searchActive = false; renderCms();
+  });
+  $("cmsSearchForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    runCmsSearch($("cmsSearchInput").value);
+  });
+  $("btnCmsPrev").addEventListener("click", function () {
+    if (cms.loading || cms.page <= 1) return;
+    loadCmsList(cms.source, cms.catId, cms.page - 1);
+    window.scrollTo(0, 0);
+  });
+  $("btnCmsNext").addEventListener("click", function () {
+    if (cms.loading || (cms.pageCount > 0 && cms.page >= cms.pageCount)) return;
+    loadCmsList(cms.source, cms.catId, cms.page + 1);
+    window.scrollTo(0, 0);
   });
   $("btnRetry").addEventListener("click", function () {
     headersCache = null;
