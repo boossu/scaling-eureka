@@ -548,7 +548,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 19;
+var PLUGIN_VERSION = 20;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -16354,18 +16354,22 @@ function renderSrcTabs() {
      取数失败不致命——规则也可能自己 request()；规则若依赖 getResCode 又没取到
      数据，报错时优先报取数失败（根因），而不是 JSON 解析失败。
    - 变量：putVar/getVar 按源隔离、只存内存（st.vars），每次跑完写回本源。
-   - $()：只做 .rule()/.lazyRule() 捕获（函数源码存为延迟描述符，附在 setResult
-     值里的 [RULE:n]/[LAZY:n] 标记上），本期不执行（P2）。其他 $ 调用直接抛
-     清晰错，不静默空。
+   - $()：.rule()/.lazyRule() 捕获为延迟描述符（函数源码存进 st.captured，
+     按 kind:id 存，[RULE:n]/[LAZY:n] 标记附在 setResult 值里）。P2 起执行：
+     点卡跑 rule() 子页（genOpenRuleCard），点集跑 lazyRule() 取址（genRunLazy）。
+     其他 $ 调用直接抛清晰错，不静默空。
    - preRule：本期不跑（P3）。规则带 preRule 时列表/搜索/详情一律明报“需 preRule”，
      不进沙箱、不返回空列表。
    - 播放：集 URL 是直链才播（mp4 走原生、原生失败由 onVideoError 回落 WASM；
-     m3u8 走现有 HLS 路）。不是直链、或带 [RULE]/[LAZY] 标记，明报未实现，不静默。
+     m3u8 走现有 HLS 路）。lazyRule() 算出的地址先过直链校验，不干净时从中
+     提取第一个 http(s) 媒体直链再播（通用提取，见 genExtractMediaUrl），
+     提不到明报失败，不静默。
    - 翻页：MY_PAGE 递增，下一页追加（append），上一页重取替换。
    已知局限（P3 再处理）：Hiker 的 request() 是同步的，浏览器里是 Promise——
    规则里写 `let html = request(MY_URL)` 这种同步写法，本期拿到的会是 Promise
-   而不是文本；本期靠 getResCode() 覆盖（酷短剧与合成规则都走它）。 */
-var GEN_RULE_MARKER_RE = /\[(RULE|LAZY):\d+\]/;
+   而不是文本；本期靠 getResCode() 覆盖（酷短剧与合成规则都走它）。
+   例外（v20 P2）：lazyRule() 执行时引擎预取 MY_URL，fetch/request/post 对
+   该地址同步返回文本（__syncFetch），支持规则里 `String(fetch(input))` 这种同步写法。 */
 var genStates = {};
 var genCur = null;
 
@@ -16443,6 +16447,23 @@ function genNormEp(o, i) {
 function genIsDirectUrl(u) {
   return /\.(mp4|m3u8|mov|mkv|webm)([?#]|$)/i.test(String(u || "").trim());
 }
+/* v20 P2：[RULE:n]/[LAZY:n] 标记解析。返回 { kind: "RULE"|"LAZY", id, base }
+   （base = 去掉标记的地址），无标记返回 null。 */
+function genMarkerOf(url) {
+  var u = String(url || "");
+  var m = u.match(/\[(RULE|LAZY):(\d+)\]/);
+  if (!m) return null;
+  return { kind: m[1], id: m[2], base: u.replace(m[0], "") };
+}
+/* 捕获的描述符按 kind:id 存进 st.captured（rule 与 lazy 分开，id 跨 run
+   单调唯一——列表 run 抓的 RULE 与子页 run 抓的 LAZY 不再互相覆盖）。 */
+function genMergeCaptured(st, lc) {
+  for (var id in lc) {
+    var cap = lc[id];
+    if (!cap) continue;
+    st.captured[(cap.kind === "rule" ? "RULE" : "LAZY") + ":" + id] = cap;
+  }
+}
 /* 在沙箱里跑一段规则 js。ctx: {url, page, key}。 */
 function genRunJs(st, code, ctx) {
   var url = ctx.url || "";
@@ -16459,9 +16480,7 @@ function genRunJs(st, code, ctx) {
     var lv = HikerSandbox.lastVars();
     if (lv) st.vars = lv;
     var lc = HikerSandbox.lastCaptured();
-    if (lc) {
-      for (var id in lc) st.captured[id] = lc[id];
-    }
+    if (lc) genMergeCaptured(st, lc);
     if (value === null || value === undefined) {
       throw new Error("规则没有返回数据（没调 setResult 也没返回值）");
     }
@@ -16547,13 +16566,45 @@ function genLoadSearch(srcId, query) {
     renderGenBrowse(src);
   });
 }
+/* v20 P2：执行卡上 [RULE:n] 的 rule() 子页（取集数列表），复用详情视图。
+   上下文与 P1 一致：MY_URL = 卡的地址（去掉标记），getVar/putVar 按源隔离，
+   规则用 getResCode() 读子页数据。结果为空或执行失败都明报，不静默。 */
+function genOpenRuleCard(src, st, card, marker) {
+  var cap = (st.captured || {})[marker.kind + ":" + marker.id];
+  if (!cap || !cap.src) {
+    showToast("该卡的 rule() 取数找不到了，请重新加载列表再点");
+    return;
+  }
+  var raw = (src.def && src.def.raw) || {};
+  if (genNeedsPreRule(raw)) { showToast("该规则需要 preRule（登录），P3 再接"); return; }
+  currentDetail = { title: card.title, cover: card.cover, intro: card.desc, episodes: [], generic: true, genSrc: src.id, genRef: card.ref };
+  renderDetail();
+  showView("detail");
+  genRunJs(st, "return (" + cap.src + ")();", { url: marker.base, page: 1, key: "" }).then(function (value) {
+    var eps = [];
+    for (var j = 0; j < value.length; j++) { var ep = genNormEp(value[j], j); if (ep) eps.push(ep); }
+    if (eps.length === 0) {
+      showToast("详情没有取到集数（rule() 返回空）");
+      showView("browse");
+      return;
+    }
+    if (!currentDetail || !currentDetail.generic || currentDetail.genRef !== card.ref) return;
+    currentDetail.episodes = eps;
+    renderDetail();
+  }).catch(function (e) {
+    showToast("打开失败（" + src.title + "）：" + (e instanceof Error ? e.message : String(e)));
+    showView("browse");
+  });
+}
 function genOpenCard(srcId, card) {
   var src = findSource(srcId);
   if (!src || src.kind !== "generic") return;
   var st = genStateFor(src);
   var raw = (src.def && src.def.raw) || {};
-  if (GEN_RULE_MARKER_RE.test(card.ref || "")) {
-    showToast("该源的集数页用 rule() 子页，P2 再接");
+  var marker = genMarkerOf(card.ref || "");
+  if (marker) {
+    if (marker.kind === "RULE") { genOpenRuleCard(src, st, card, marker); return; }
+    showToast("该卡地址是 lazyRule() 取址，P2 只在集数上支持");
     return;
   }
   if (genNeedsPreRule(raw)) { showToast("该规则需要 preRule（登录），P3 再接"); return; }
@@ -16578,25 +16629,48 @@ function genOpenCard(srcId, card) {
     showView("browse");
   });
 }
-/* 通用源点集：直链才播；带 [RULE]/[LAZY] 标记或非直链，明报未实现。 */
-function genLoadCurrentEpisode(token) {
-  var ep = player.detail.episodes[player.index];
-  var url = ep ? ep.url : "";
-  if (!url) {
-    player.playError = "这集没有播址";
-    renderCenter();
-    return Promise.resolve();
-  }
-  if (GEN_RULE_MARKER_RE.test(url)) {
-    player.playError = "该集地址用 rule()/lazyRule() 现场算址，引擎未实现（P2 再接）";
-    renderCenter();
-    return Promise.resolve();
-  }
-  if (!genIsDirectUrl(url)) {
-    player.playError = "该集地址不是直链（mp4/m3u8），引擎本期只播直链";
-    renderCenter();
-    return Promise.resolve();
-  }
+/* v20 P2：lazyRule() 返回的字符串若本身不是干净直链，从中提取第一个
+   http(s) 媒体直链（mp4/m3u8 等）。规则返回的文本可能把地址和别的字段
+   粘在一起（如服务端漏换行把 format=mp4 粘进地址），这里只认 http(s)
+   开头、以媒体扩展名结尾的完整地址；提不到才报错。通用提取，不针对某个源。 */
+function genExtractMediaUrl(s) {
+  var m = String(s || "").match(/https?:\/\/[^\s"'<>\r\n]*?\.(mp4|m3u8|mov|mkv|webm)(\?[^\s"'<>\r\n]*)?/i);
+  return m ? m[0] : "";
+}
+/* v20 P2：执行集上 [LAZY:n] 的 lazyRule()，算出播址（Promise<string>）。
+   先预取 MY_URL（该集地址去掉标记）：一是供 getResCode()，二是供
+   fetch(input) 同步返回（__syncFetch）——规则里 `String(fetch(input))`
+   这种同步写法靠它。预取失败不致命，照常跑 fn，失败时优先报取数失败。 */
+function genRunLazy(st, cap, baseUrl) {
+  var fetchErr = null;
+  return sandboxFetchText(baseUrl, { timeoutMs: 25000 }).then(function (text) {
+    return { text: text };
+  }).catch(function (e) {
+    fetchErr = e;
+    return { text: "" };
+  }).then(function (pre) {
+    var syncFetch = {};
+    if (pre.text) syncFetch[baseUrl] = pre.text;
+    return HikerSandbox.run("return (" + cap.src + ")();", st.vars, 30000, {
+      MY_URL: baseUrl, MY_PAGE: 1, KEY: "", input: baseUrl, resCode: pre.text, syncFetch: syncFetch
+    }).then(function (value) {
+      var lv = HikerSandbox.lastVars();
+      if (lv) st.vars = lv;
+      var lc = HikerSandbox.lastCaptured();
+      if (lc) genMergeCaptured(st, lc);
+      if (typeof value !== "string" || !value.trim()) {
+        throw new Error("lazyRule() 没有算出播址（返回空或不是字符串）");
+      }
+      return value.trim();
+    });
+  }).catch(function (e) {
+    var msg = e instanceof Error ? e.message : String(e);
+    if (fetchErr && /Unexpected end of JSON input|Unexpected token|JSON|取数/i.test(msg)) throw fetchErr;
+    throw e;
+  });
+}
+/* 直链播址走 P1 已有的点集路由（mp4 原生、m3u8 走 HLS 路）。 */
+function genPlayDirectUrl(url, token) {
   player.sources = [url];
   player.srcIdx = 0;
   if (cmsIsHlsUrl(url)) {
@@ -16609,6 +16683,63 @@ function genLoadCurrentEpisode(token) {
   setMode("native");
   loadNative();
   return Promise.resolve();
+}
+/* 通用源点集：直链直接播；带 [LAZY:n] 标记的先跑 lazyRule() 取址再播；
+   带 [RULE:n] 或非直链的明报原因，不静默。 */
+function genLoadCurrentEpisode(token) {
+  var ep = player.detail.episodes[player.index];
+  var url = ep ? ep.url : "";
+  if (!url) {
+    player.playError = "这集没有播址";
+    renderCenter();
+    return Promise.resolve();
+  }
+  var marker = genMarkerOf(url);
+  if (marker) {
+    if (marker.kind !== "LAZY") {
+      player.playError = "该集是 rule() 子页，P2 只支持 lazyRule() 取址";
+      renderCenter();
+      return Promise.resolve();
+    }
+    var src = findSource(player.detail.genSrc);
+    if (!src || src.kind !== "generic") {
+      player.playError = "该集的源找不到了";
+      renderCenter();
+      return Promise.resolve();
+    }
+    var st = genStateFor(src);
+    var cap = (st.captured || {})["LAZY:" + marker.id];
+    if (!cap || !cap.src) {
+      player.playError = "该集的 lazyRule() 取数找不到了，请重新打开详情再点";
+      renderCenter();
+      return Promise.resolve();
+    }
+    player.loadState = "正在取播址…";
+    renderCenter();
+    return genRunLazy(st, cap, marker.base).then(function (addr) {
+      if (token !== player.loadToken) return;
+      var clean = genIsDirectUrl(addr) ? addr : genExtractMediaUrl(addr);
+      if (!clean || !genIsDirectUrl(clean)) {
+        player.loadState = "";
+        player.playError = "lazyRule() 算出的地址不是直链（mp4/m3u8），播不了：" + String(addr).slice(0, 80);
+        renderCenter();
+        return;
+      }
+      player.loadState = "";
+      return genPlayDirectUrl(clean, token);
+    }).catch(function (e) {
+      if (token !== player.loadToken) return;
+      player.loadState = "";
+      player.playError = "取播址失败：" + (e instanceof Error ? e.message : String(e));
+      renderCenter();
+    });
+  }
+  if (!genIsDirectUrl(url)) {
+    player.playError = "该集地址不是直链（mp4/m3u8），引擎本期只播直链";
+    renderCenter();
+    return Promise.resolve();
+  }
+  return genPlayDirectUrl(url, token);
 }
 function renderGenCardsInto(list, st, src) {
   list.innerHTML = "";
@@ -17347,7 +17478,8 @@ var HikerSandbox = (function () {
     "var __done = {};",
     "var __resCode = \"\";",
     "var __captured = {};",
-    "var __capSeq = 0;",
+    "var __capSeq = 0; /* v20 P2：单调递增、不随 run 重置——捕获 id 跨 run 唯一，引擎按 kind:id 存，列表 run 与子页 run 的描述符不再互相覆盖。 */",
+    "var __syncFetch = {}; /* v20 P2：lazyRule 执行时预取文本的同步返回表（见 run 里 __syncFetch 赋值与 fetchText）。 */",
     "function __callMain(msg) {",
     "  return new Promise(function (res) {",
     "    var id = ++__seq;",
@@ -17357,7 +17489,9 @@ var HikerSandbox = (function () {
     "  });",
     "}",
     "function fetchText(url, opts) {",
-    "  return __callMain({ type: \"fetch\", url: String(url), opts: opts || {} }).then(function (r) {",
+    "  var u = String(url);",
+    "  if (u in __syncFetch) return __syncFetch[u]; /* v20 P2：lazyRule 同步取址——对预取地址直接返回文本，支持规则里 String(fetch(input)) 这种同步写法。 */",
+    "  return __callMain({ type: \"fetch\", url: u, opts: opts || {} }).then(function (r) {",
     "    if (!r.ok) throw new Error(r.error || \"取数失败\");",
     "    return r.text;",
     "  });",
@@ -17412,12 +17546,12 @@ var HikerSandbox = (function () {
     "  __done[m.id] = false;",
     "  __vars = m.vars || {};",
     "  __resCode = (m.ctx && typeof m.ctx.resCode === \"string\") ? m.ctx.resCode : \"\";",
+    "  __syncFetch = (m.ctx && m.ctx.syncFetch) || {};",
     "  __captured = {};",
-    "  __capSeq = 0;",
     "  var __ctx = m.ctx || {};",
     "  try {",
-    "    var fn = new Function(\"fetchText\", \"request\", \"post\", \"fetch\", \"getVar\", \"putVar\", \"setVar\", \"setResult\", \"getResCode\", \"MY_URL\", \"MY_PAGE\", \"KEY\", \"$\", m.code);",
-    "    var r = fn(fetchText, request, post, fetch, getVar, putVar, setVar, setResult, getResCode, __ctx.MY_URL || \"\", __ctx.MY_PAGE || 1, __ctx.KEY || \"\", $);",
+    "    var fn = new Function(\"fetchText\", \"request\", \"post\", \"fetch\", \"getVar\", \"putVar\", \"setVar\", \"setResult\", \"getResCode\", \"MY_URL\", \"MY_PAGE\", \"KEY\", \"$\", \"input\", m.code);",
+    "    var r = fn(fetchText, request, post, fetch, getVar, putVar, setVar, setResult, getResCode, __ctx.MY_URL || \"\", __ctx.MY_PAGE || 1, __ctx.KEY || \"\", $, __ctx.input || \"\"); /* v20 P2：input = lazyRule 的取址对象地址（Hiker 语义）。 */",
     "    if (r && typeof r.then === \"function\") {",
     "      r.then(function (v) {",
     "        if (__done[m.id]) return;",
