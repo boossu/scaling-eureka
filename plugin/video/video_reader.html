@@ -71,6 +71,20 @@ img{display:block}
 .pager span{font-size:14px;color:var(--dim)}
 /* ---------- detail ---------- */
 .back-btn{border-radius:9999px;background:var(--surface);padding:6px 16px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
+/* ---------- v15 P0：入口页（hub）/ 导入 ---------- */
+.home-btn{flex:none;align-self:center;border-radius:9999px;background:var(--surface);padding:6px 16px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
+.import-btn{flex:1;min-width:160px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);padding:12px;font-size:14px;color:var(--dim);text-align:center}
+.import-btn:active{transform:scale(.98)}
+.hub-head{display:flex;align-items:baseline;gap:8px;padding-top:16px}
+.hub-title{font-size:18px;font-weight:700;color:#fff}
+.hub-ver{font-size:12px;color:var(--faint)}
+.hub-err{margin-top:10px;font-size:12px;color:var(--bad)}
+.hub-note{margin-top:12px;font-size:12px;color:var(--faint)}
+#hubPastePanel{margin-top:10px}
+#hubPasteJson{width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical;box-sizing:border-box}
+.paste-btns{display:flex;gap:8px;margin-top:8px}
+.paste-btns button{flex:1;border-radius:9999px;padding:8px 0;font-size:14px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--border)}
+.gen-note{margin-top:12px;font-size:13px;color:var(--dim)}
 .detail-head{margin-top:12px;display:flex;gap:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:12px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .detail-cover{width:96px;flex:none;border-radius:8px}
 .detail-cover .v-cover{border-radius:8px}
@@ -183,8 +197,22 @@ img{display:block}
 </head>
 <body>
 <div id="app">
+  <!-- v15 P0 入口页（hub）：只在点 ‹ 主页 时出现；平时直接进浏览页，不挡路 -->
+  <section id="viewHub" class="hidden">
+    <div class="hub-head"><span class="hub-title">视频插件</span><span class="hub-ver" id="hubVer"></span></div>
+    <div class="rule-row" id="hubRuleRow" style="margin-top:12px"></div>
+    <p id="hubImportErr" class="hub-err hidden" role="status"></p>
+    <div id="hubPastePanel" class="hidden">
+      <textarea id="hubPasteJson" rows="6" placeholder="粘贴视频规则 JSON（把规则文件全文粘贴到这里）…" spellcheck="false"></textarea>
+      <div class="paste-btns"><button type="button" id="hubPasteImport">导入</button><button type="button" id="hubPasteCancel">取消</button></div>
+    </div>
+    <p class="hub-note">导入的规则存在本机（IndexedDB），刷新还在；P1 接入通用引擎后可播。</p>
+    <input type="file" id="hubFileInput" accept=".json,application/json" style="display:none">
+  </section>
+
   <!-- 浏览：规则卡片 + 分类 + 搜索 + 列表（无聚合顶栏，顶栏由 APK 固定显示） -->
   <section id="viewBrowse">
+    <div style="padding-top:16px"><button type="button" class="back-btn" id="btnHomeBrowse">‹ 主页</button></div>
     <div class="src-tabs" id="srcTabs" role="group" aria-label="来源">
       <button type="button" class="src-tab on" id="tabXy">星芽短剧</button>
       <button type="button" class="src-tab" id="tabCms">CMS采集</button>
@@ -292,6 +320,19 @@ img{display:block}
     </section>
     </div>
 
+    <!-- v15 P0 导入的通用源：占位区，P1 接入通用引擎后才有列表/详情/播放 -->
+    <div id="genBrowse" class="hidden">
+      <div class="rule-row"><button type="button" class="rule-card" id="genRuleCard">
+        <span class="rule-badge">视</span>
+        <span class="rule-meta">
+          <span class="rule-title"></span>
+          <span class="rule-author"></span>
+          <span class="rule-file"></span>
+        </span>
+      </button></div>
+      <p id="genNote" class="gen-note"></p>
+    </div>
+
     <!-- CMS采集：清单（分组→源）→ 源主页（分类 + 列表 / 聚合搜） -->
     <section id="cmsRegistrySec" class="hidden" aria-label="CMS 源清单">
       <p id="cmsRegistryLoading" class="list-msg hidden">正在拉取源清单…</p>
@@ -334,7 +375,7 @@ img{display:block}
 
   <!-- 详情 -->
   <section id="viewDetail" class="hidden">
-    <div style="padding-top:16px"><button type="button" class="back-btn" id="btnBackDetail">‹ 返回列表</button></div>
+    <div style="padding-top:16px"><button type="button" class="back-btn" id="btnBackDetail">‹ 返回列表</button> <button type="button" class="back-btn" id="btnHomeDetail">‹ 主页</button></div>
     <div class="detail-head">
       <div id="detailCover"></div>
       <div class="detail-info">
@@ -354,6 +395,7 @@ img{display:block}
   <section id="viewPlayer" class="hidden">
     <div style="padding-top:16px" class="player-head">
       <button type="button" class="back-btn" id="btnBackPlayerTop">‹ 返回详情</button>
+      <button type="button" class="back-btn" id="btnHomePlayer">‹ 主页</button>
       <span class="crumb" id="playerCrumb"></span>
     </div>
     <div id="playerWrap" data-mode="native" data-orientation="portrait" data-audio="unknown" data-css-rotate="0">
@@ -403,7 +445,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 14;
+var PLUGIN_VERSION = 15;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14753,7 +14795,7 @@ function loadSearch(query) {
 }
 
 function showView(name) {
-  ["viewBrowse", "viewDetail", "viewPlayer"].forEach(function (id) {
+  ["viewHub", "viewBrowse", "viewDetail", "viewPlayer"].forEach(function (id) {
     $(id).classList.toggle("hidden", id !== "view" + name.charAt(0).toUpperCase() + name.slice(1));
   });
   if (name !== "player") exitPlayer();
@@ -15892,32 +15934,60 @@ var cms = {
 var cmsHls = null;
 var cmsHlsLoading = null;
 
-/* v8：浏览区切换的唯一入口。name 为 "xy" | "registry" | "source" | "kuwo" | "hongguo"。
-   标签高亮与内容显隐在这里原子地一起改——v7 的 bug 是 #xyBrowse 本就是
-   空 div（星芽内容全在 #rules 里），cmsShowView 藏它等于什么都没藏，
-   标签亮了 CMS、上面却还是星芽的分类。HTML 已把星芽内容真正装进
-   #xyBrowse、标签挪到 viewBrowse 下常驻；这里再保证不许只改一半。
-   v10：酷短剧是第三个源，同样走这里（#kwBrowse 整块换）。
-   v11：红果短剧是第四个源，同样走这里（#hgBrowse 整块换）。 */
+/* ---------------- v15 P0：源注册表 ----------------
+   顶层来源不再散落在 cmsShowView 的硬编码分支里，统一走 SOURCES。
+   kind: "builtin"（四手写源，行为零变化）| "generic"（导入的规则，P1 才执行）。
+   每个源：id（分流键，与旧 cmsShowView 的 name 兼容）、tab（标签元素 id）、
+   section（浏览区元素 id；CMS 用 registry/source 两个）、badge/title/author/
+   site/file（hub 卡片用）。导入的通用源由 upsertGenericSource 追加，tab
+   是动态建的（renderSrcTabs），section 共用 #genBrowse。 */
+var SOURCES = [
+  { id: "xy", kind: "builtin", title: "星芽短剧", author: "秋秋", site: "app.whjzjx.cn", file: "xingya.json", badge: "星", tab: "tabXy", section: "xyBrowse" },
+  { id: "cms", kind: "builtin", title: "CMS采集", author: "资源网采集", site: "CMS", file: "ZYWCJ.txt · 59 源", badge: "采", tab: "tabCms", sections: { registry: "cmsRegistrySec", source: "cmsSourceSec" } },
+  { id: "kuwo", kind: "builtin", title: "酷短剧", author: "Thomas喲", site: "wapi.kuwo.cn", file: "kuwo.json", badge: "酷", tab: "tabKw", section: "kwBrowse" },
+  { id: "hongguo", kind: "builtin", title: "红果短剧", author: "WorkBuddy", site: "hongguoduanju.com", file: "hongguo.json · v14 流式播放（720p/1080p）", badge: "红", tab: "tabHg", section: "hgBrowse" }
+];
+function findSource(id) {
+  for (var i = 0; i < SOURCES.length; i++) if (SOURCES[i].id === id) return SOURCES[i];
+  return null;
+}
+/* v8：浏览区切换的唯一入口。name 为 "xy" | "registry" | "source" | "kuwo" |
+   "hongguo" | 通用源 id。标签高亮与内容显隐在这里原子地一起改——v7 的
+   bug 是 #xyBrowse 本就是空 div（星芽内容全在 #rules 里），cmsShowView
+   藏它等于什么都没藏，标签亮了 CMS、上面却还是星芽的分类。HTML 已把
+   星芽内容真正装进 #xyBrowse、标签挪到 viewBrowse 下常驻；这里再保证
+   不许只改一半。v10：酷短剧是第三个源，同样走这里（#kwBrowse 整块换）。
+   v11：红果短剧是第四个源，同样走这里（#hgBrowse 整块换）。
+   v15：改走注册表——先全部熄掉再只亮当前源（多个通用源共用 #genBrowse，
+   逐个 toggle 会互相覆盖），再按当前源的 section 点亮；CMS 的 registry /
+   source 仍是同一源的两个子视图。 */
 function cmsShowView(name) {
   cms.view = name;
-  var isXy = (name === "xy");
-  $("tabXy").classList.toggle("on", isXy);
-  $("tabCms").classList.toggle("on", name === "registry" || name === "source");
-  $("tabKw").classList.toggle("on", name === "kuwo");
-  $("tabHg").classList.toggle("on", name === "hongguo");
+  var activeId = (name === "registry" || name === "source") ? "cms" : name;
+  var active = findSource(activeId);
+  if (!active) { activeId = "xy"; active = findSource("xy"); }
+  for (var i = 0; i < SOURCES.length; i++) {
+    var s = SOURCES[i];
+    var tab = s.tab && $(s.tab);
+    if (tab) tab.classList.toggle("on", s.id === activeId);
+  }
+  ["xyBrowse", "kwBrowse", "hgBrowse", "cmsRegistrySec", "cmsSourceSec", "genBrowse"].forEach(function (id) {
+    var e = $(id); if (e) e.classList.add("hidden");
+  });
   /* 用户 2026-11-28 定：CMS 界面里星芽的东西直接去掉。#rules（星芽卡片）
      与 #xyBrowse（星芽分类/搜索/列表）同时藏；#srcTabs 保留。
      #rules 现在虽已在 #xyBrowse 里面（藏 xyBrowse 即连卡片一起藏），
-     这里仍显式藏它——以后结构再动也不会让卡片漏到 CMS 上面。
-     酷短剧界面同理：星芽与 CMS 的区都藏，只留 #kwBrowse。
-     红果短剧界面同理：只留 #hgBrowse。 */
-  $("xyBrowse").classList.toggle("hidden", !isXy);
-  $("rules").classList.toggle("hidden", !isXy);
-  $("kwBrowse").classList.toggle("hidden", name !== "kuwo");
-  $("hgBrowse").classList.toggle("hidden", name !== "hongguo");
-  $("cmsRegistrySec").classList.toggle("hidden", name !== "registry");
-  $("cmsSourceSec").classList.toggle("hidden", name !== "source");
+     这里仍显式藏它——以后结构再动也不会让卡片漏到 CMS 上面。 */
+  $("rules").classList.add("hidden");
+  if (activeId === "cms") {
+    var cmsSec = $(name === "source" ? "cmsSourceSec" : "cmsRegistrySec");
+    if (cmsSec) cmsSec.classList.remove("hidden");
+  } else if (active.section) {
+    var sec = $(active.section);
+    if (sec) sec.classList.remove("hidden");
+    if (activeId === "xy") $("rules").classList.remove("hidden");
+    if (active.kind === "generic") renderGenBrowse(active);
+  }
 }
 function cmsShowXy() {
   cms.detailFrom = null;
@@ -15938,6 +16008,418 @@ function cmsShowTabCms() {
 function cmsShowTabXy() {
   cmsShowXy();
 }
+
+/* ---------------- v15 P0：导入规则存储 ----------------
+   localStorage 约 5MB，红果一条规则就 697KB，导三四个大规则就超——
+   主存 IndexedDB（异步、配额大，WebView / 浏览器都支持）；
+   IndexedDB 打不开时回落 localStorage（总量守卫 4MB，超了报清晰错）。
+   漫画插件的导入规则只放内存、刷新即丢，是个坑，这里不照抄。 */
+var ruleStore = (function () {
+  var DB_NAME = "videoPlugin", STORE_NAME = "rules";
+  var LS_PREFIX = "vp_rule_", LS_INDEX = "vp_rule_ids", LS_BUDGET = 4 * 1024 * 1024;
+  var mode = null, dbP = null;
+  function openDb() {
+    if (dbP) return dbP;
+    dbP = new Promise(function (resolve, reject) {
+      var req;
+      try { req = indexedDB.open(DB_NAME, 1); }
+      catch (e) { reject(e); return; }
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error("IndexedDB 打开失败")); };
+      req.onblocked = function () { reject(new Error("IndexedDB 被旧页占用")); };
+    });
+    return dbP;
+  }
+  function idbPut(def) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx, req;
+        try { tx = db.transaction(STORE_NAME, "readwrite"); req = tx.objectStore(STORE_NAME).put(def); }
+        catch (e) { reject(e); return; }
+        req.onsuccess = function () { resolve(def); };
+        req.onerror = function () { reject(req.error || new Error("保存失败")); };
+        tx.onerror = function () { reject(tx.error || new Error("保存失败")); };
+      });
+    });
+  }
+  function idbAll() {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx, req;
+        try { tx = db.transaction(STORE_NAME, "readonly"); req = tx.objectStore(STORE_NAME).getAll(); }
+        catch (e) { reject(e); return; }
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { reject(req.error || new Error("读取失败")); };
+      });
+    });
+  }
+  function lsIds() { try { var v = JSON.parse(localStorage.getItem(LS_INDEX) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+  function lsPut(def) {
+    var raw = JSON.stringify(def), ids = lsIds(), total = 0;
+    ids.forEach(function (id) { var s = localStorage.getItem(LS_PREFIX + id); if (s) total += s.length; });
+    var old = localStorage.getItem(LS_PREFIX + def.id);
+    if (old) total -= old.length;
+    if (total + raw.length > LS_BUDGET) throw new Error("本机存储已满（localStorage 约 5MB 上限），这条规则存不下");
+    try {
+      localStorage.setItem(LS_PREFIX + def.id, raw);
+      if (ids.indexOf(def.id) < 0) { ids.push(def.id); localStorage.setItem(LS_INDEX, JSON.stringify(ids)); }
+    } catch (e) { throw new Error("本机存储写不下这条规则（localStorage 已满）"); }
+    return def;
+  }
+  function lsAll() {
+    var out = [];
+    lsIds().forEach(function (id) {
+      try { var d = JSON.parse(localStorage.getItem(LS_PREFIX + id) || "null"); if (d) out.push(d); } catch (e) {}
+    });
+    return out;
+  }
+  function init() {
+    if (mode) return Promise.resolve(mode);
+    if (typeof indexedDB === "undefined") { mode = "ls"; return Promise.resolve(mode); }
+    return openDb().then(function () { mode = "idb"; return mode; }).catch(function () {
+      dbP = null; mode = "ls"; return mode;
+    });
+  }
+  function save(def) {
+    return init().then(function () {
+      if (mode === "idb") return idbPut(def).catch(function () { mode = "ls"; return lsPut(def); });
+      return lsPut(def);
+    });
+  }
+  function list() {
+    return init().then(function () {
+      if (mode === "idb") return idbAll().catch(function () { mode = "ls"; return lsAll(); });
+      return lsAll();
+    });
+  }
+  return { init: init, save: save, list: list, mode: function () { return mode; } };
+})();
+
+/* ---------------- v15 P0：规则形状校验 + 导入 ----------------
+   本期只做形状校验与存储，不执行规则（P1 才把导入的规则喂给沙箱）。
+   形状：顶层 JSON 对象 + 非空 title + 至少一个取数口（find_rule /
+   class_url / search_url）。非法内容报清晰错误，不静默失败。
+   去重：同一条规则（bookSourceUrl / url / title）再导一次是替换，
+   不重复加卡。 */
+function validateVideoRule(raw, fileName) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("这不是视频规则：顶层必须是 JSON 对象");
+  var title = typeof raw.title === "string" ? raw.title.trim() : "";
+  if (!title) throw new Error("这不是视频规则：缺少 title（规则名）");
+  var hasFind = typeof raw.find_rule === "string" && raw.find_rule.trim() !== "";
+  var hasClass = typeof raw.class_url === "string" && raw.class_url.trim() !== "";
+  var hasSearch = typeof raw.search_url === "string" && raw.search_url.trim() !== "";
+  if (!hasFind && !hasClass && !hasSearch) throw new Error("这不是视频规则：没有 find_rule / class_url / search_url，取不到任何列表，跑不了");
+  var author = typeof raw.author === "string" ? raw.author.trim() : "";
+  var site = "";
+  var u = (typeof raw.bookSourceUrl === "string" && raw.bookSourceUrl) || (typeof raw.url === "string" && raw.url) || "";
+  if (u) { try { site = new URL(u).hostname; } catch (e) { site = u; } }
+  if (!site && hasClass) { var first = raw.class_url.split("&")[0]; try { site = new URL(first).hostname; } catch (e) {} }
+  return { title: title, author: author, site: site, fileName: fileName || "导入的规则.json" };
+}
+function hashKey(s) { var h = 0; for (var i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; } return "g" + (h >>> 0).toString(36); }
+function importVideoRuleFromRaw(raw, fileName) {
+  var meta = validateVideoRule(raw, fileName);
+  var key = ((typeof raw.bookSourceUrl === "string" && raw.bookSourceUrl.trim())
+    || (typeof raw.url === "string" && raw.url.trim()) || meta.title).trim();
+  var def = { id: "gen_" + hashKey(key), kind: "generic", dedupKey: key,
+    title: meta.title, author: meta.author, site: meta.site, fileName: meta.fileName,
+    badge: meta.title.charAt(0), importedAt: Date.now(), raw: raw };
+  return ruleStore.save(def).then(function () { upsertGenericSource(def); return def; });
+}
+function upsertGenericSource(def) {
+  var src = findSource(def.id);
+  if (src) {
+    src.title = def.title; src.author = def.author; src.site = def.site;
+    src.file = def.fileName; src.badge = def.badge; src.def = def;
+  } else {
+    SOURCES.push({ id: def.id, kind: "generic", title: def.title, author: def.author, site: def.site,
+      file: def.fileName, badge: def.badge, tab: "tab_" + def.id, section: "genBrowse", def: def });
+  }
+  renderSrcTabs();
+  renderHub();
+}
+/* 通用源的标签只追加、不重建内置四 tab（内置 tab 的绑定在 cmsBoot 里一次绑好）。 */
+function renderSrcTabs() {
+  var bar = $("srcTabs");
+  if (!bar) return;
+  var olds = bar.querySelectorAll(".src-tab[data-gen]");
+  for (var i = olds.length - 1; i >= 0; i--) olds[i].remove();
+  for (var j = 0; j < SOURCES.length; j++) {
+    var s = SOURCES[j];
+    if (s.kind !== "generic") continue;
+    var b = el("button", "src-tab", s.title);
+    b.type = "button"; b.id = s.tab; b.setAttribute("data-gen", "1");
+    b.addEventListener("click", (function (src) { return function () { showView("browse"); cmsShowView(src.id); }; })(s));
+    bar.appendChild(b);
+  }
+}
+function renderGenBrowse(src) {
+  var card = $("genRuleCard");
+  if (card) {
+    card.querySelector(".rule-title").textContent = src.title;
+    card.querySelector(".rule-author").textContent = (src.author || "未知作者") + (src.site ? " · " + src.site : "");
+    card.querySelector(".rule-file").textContent = src.file + " · 已保存";
+    card.querySelector(".rule-badge").textContent = src.badge || "视";
+  }
+  var note = $("genNote");
+  if (note) note.textContent = "已导入“" + src.title + "”，规则存在本机（刷新还在）。列表 / 详情 / 播放走通用引擎，P1 接入后可播；现在先不执行规则。";
+}
+
+/* ---------------- v15 P0：入口页（hub） ----------------
+   照漫画插件 renderRuleRow 的结构：‹ 主页 + 源卡片 + 导入规则文件 + 粘贴 JSON。
+   平时仍直接进浏览页；入口页只在点 ‹ 主页 时出现；‹ 主页 从浏览 / 详情 /
+   播放器任何一页都回 hub（showHub）。 */
+function renderHub() {
+  var row = $("hubRuleRow");
+  if (!row) return;
+  var ver = $("hubVer");
+  if (ver) ver.textContent = "v" + PLUGIN_VERSION;
+  var html = '<button type="button" class="home-btn" id="hubHomeBtn">‹ 主页</button>';
+  for (var i = 0; i < SOURCES.length; i++) {
+    var s = SOURCES[i];
+    html += '<button type="button" class="rule-card" data-src="' + esc(s.id) + '">'
+      + '<span class="rule-badge">' + esc(s.badge || (s.title || "?").charAt(0)) + '</span>'
+      + '<span class="rule-meta"><span class="rule-title">' + esc(s.title) + '</span>'
+      + '<span class="rule-author">' + esc((s.author || "未知作者") + (s.site ? " · " + s.site : "")) + '</span>'
+      + '<span class="rule-file">' + esc(s.file + (s.kind === "generic" ? " · 待接入（P1）" : "")) + '</span></span></button>';
+  }
+  html += '<button type="button" class="import-btn" id="hubImportBtn">+ 导入规则文件</button>';
+  html += '<button type="button" class="import-btn" id="hubPasteBtn">粘贴 JSON</button>';
+  row.innerHTML = html;
+  var cards = row.querySelectorAll("[data-src]");
+  for (var j = 0; j < cards.length; j++) {
+    cards[j].addEventListener("click", function () { enterSource(this.getAttribute("data-src")); });
+  }
+  var hb = $("hubHomeBtn");
+  if (hb) hb.addEventListener("click", function () { renderHub(); });
+  /* 导入按钮是真 <button>，点它直接调文件框的 click()——
+     旧的 <label for> 指着 display:none 的输入框，手机浏览器点不开（漫画插件同款注释）。 */
+  var ib = $("hubImportBtn");
+  if (ib) ib.addEventListener("click", function () { $("hubFileInput").click(); });
+  var pb = $("hubPasteBtn");
+  if (pb) pb.addEventListener("click", function () { var p = $("hubPastePanel"); if (p) p.classList.toggle("hidden"); });
+}
+function enterSource(id) {
+  var s = findSource(id);
+  if (!s) return;
+  showView("browse");
+  if (s.kind === "generic") { cmsShowView(id); return; }
+  if (id === "xy") cmsShowTabXy();
+  else if (id === "cms") cmsShowTabCms();
+  else if (id === "kuwo") kwShowTab();
+  else if (id === "hongguo") hgShowTab();
+}
+function showHub() {
+  renderHub();
+  showView("hub");
+  window.scrollTo(0, 0);
+}
+function hubImportError(msg) {
+  var e = $("hubImportErr");
+  if (e) { e.textContent = msg; e.classList.remove("hidden"); }
+  showToast(msg);
+}
+function hubImportClear() { var e = $("hubImportErr"); if (e) { e.textContent = ""; e.classList.add("hidden"); } }
+function onImportVideoFile(file) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var raw = JSON.parse(reader.result);
+      importVideoRuleFromRaw(raw, file.name).then(function (def) {
+        hubImportClear();
+        showToast("已导入“" + def.title + "”（P1 接入后可播）");
+      }).catch(function (e2) { hubImportError("导入失败：" + (e2 && e2.message || String(e2))); });
+    } catch (e) {
+      hubImportError("导入失败：JSON 解析失败——" + (e.message || String(e)));
+    }
+  };
+  reader.onerror = function () { hubImportError("导入失败：读不到这个文件"); };
+  reader.readAsText(file);
+}
+/* 粘贴 JSON 导入：不走文件选择器（壳子 WebView 没有 onShowFileChooser，
+   点文件框永远打不开选择器），直接把规则全文粘进来走同一套校验与存储。 */
+function importHubPastedJson() {
+  var ta = $("hubPasteJson");
+  var text = ta ? ta.value : "";
+  try {
+    if (!text.trim()) throw new Error("先粘贴规则 JSON 再点导入");
+    var raw = JSON.parse(text);
+    importVideoRuleFromRaw(raw, "粘贴的规则.json").then(function (def) {
+      hubImportClear();
+      showToast("已导入“" + def.title + "”（P1 接入后可播）");
+      if (ta) ta.value = "";
+      var p = $("hubPastePanel"); if (p) p.classList.add("hidden");
+    }).catch(function (e2) { hubImportError("导入失败：" + (e2 && e2.message || String(e2))); });
+  } catch (e) {
+    hubImportError("导入失败：JSON 解析失败——" + (e.message || String(e)));
+  }
+}
+function bindHubStatic() {
+  var hb = $("btnHomeBrowse"); if (hb) hb.addEventListener("click", showHub);
+  var hd = $("btnHomeDetail"); if (hd) hd.addEventListener("click", showHub);
+  var hp = $("btnHomePlayer"); if (hp) hp.addEventListener("click", showHub);
+  var fi = $("hubFileInput");
+  if (fi) fi.addEventListener("change", function () {
+    var f = fi.files && fi.files[0];
+    fi.value = "";
+    if (f) onImportVideoFile(f);
+  });
+  var pi = $("hubPasteImport"); if (pi) pi.addEventListener("click", importHubPastedJson);
+  var pc = $("hubPasteCancel"); if (pc) pc.addEventListener("click", function () { var p = $("hubPastePanel"); if (p) p.classList.add("hidden"); });
+}
+
+/* ---------------- v15 P0：Hiker JS 沙箱骨架（Web Worker + 消息桥） ----------------
+   规则 JS 在 Worker 里跑，与页面隔离：Worker 里没有 window / document /
+   localStorage，规则里出现这些名字即 ReferenceError，可控失败，不会碰页面。
+   主线程只暴露最小桥：fetchText（走页面取数）、getVar / setVar、setResult。
+   本期只搭架子、不接规则执行（P1 才把导入的规则喂进来）。
+   执行超时可终止：超时后 Worker 直接 terminate，主线程拒掉 pending。 */
+var HikerSandbox = (function () {
+  var WORKER_SRC = [
+    "\"use strict\";",
+    "var __vars = {};",
+    "var __pending = {};",
+    "var __seq = 0;",
+    "var __runId = 0;",
+    "var __done = {};",
+    "function __callMain(msg) {",
+    "  return new Promise(function (res) {",
+    "    var id = ++__seq;",
+    "    __pending[id] = res;",
+    "    msg.__id = id;",
+    "    self.postMessage(msg);",
+    "  });",
+    "}",
+    "function fetchText(url, opts) {",
+    "  return __callMain({ type: \"fetch\", url: String(url), opts: opts || {} }).then(function (r) {",
+    "    if (!r.ok) throw new Error(r.error || \"取数失败\");",
+    "    return r.text;",
+    "  });",
+    "}",
+    "function request(url, opts) { return fetchText(url, opts); }",
+    "function getVar(k, d) { return (k in __vars) ? __vars[k] : (d === undefined ? \"\" : d); }",
+    "function setVar(k, v) { __vars[k] = v; }",
+    "function setResult(v) {",
+    "  if (__done[__runId]) return;",
+    "  __done[__runId] = true;",
+    "  self.postMessage({ type: \"result\", id: __runId, ok: true, value: (v === undefined ? null : v) });",
+    "}",
+    "self.onmessage = function (e) {",
+    "  var m = e.data || {};",
+    "  if (m.type === \"__fetchResult\") {",
+    "    var p = __pending[m.__id];",
+    "    if (p) { delete __pending[m.__id]; p(m); }",
+    "    return;",
+    "  }",
+    "  if (m.type === \"ping\") { self.postMessage({ type: \"pong\", id: m.id }); return; }",
+    "  if (m.type !== \"run\") return;",
+    "  __runId = m.id;",
+    "  __done[m.id] = false;",
+    "  __vars = m.vars || {};",
+    "  try {",
+    "    var fn = new Function(\"fetchText\", \"request\", \"getVar\", \"setVar\", \"setResult\", m.code);",
+    "    var r = fn(fetchText, request, getVar, setVar, setResult);",
+    "    if (r && typeof r.then === \"function\") {",
+    "      r.then(function (v) {",
+    "        if (__done[m.id]) return;",
+    "        __done[m.id] = true;",
+    "        self.postMessage({ type: \"result\", id: m.id, ok: true, value: (v === undefined ? null : v) });",
+    "      }, function (err) {",
+    "        if (__done[m.id]) return;",
+    "        __done[m.id] = true;",
+    "        self.postMessage({ type: \"result\", id: m.id, ok: false, error: String((err && err.message) || err) });",
+    "      });",
+    "    } else if (!__done[m.id]) {",
+    "      __done[m.id] = true;",
+    "      self.postMessage({ type: \"result\", id: m.id, ok: true, value: (r === undefined ? null : r) });",
+    "    }",
+    "  } catch (err) {",
+    "    if (__done[m.id]) return;",
+    "    __done[m.id] = true;",
+    "    self.postMessage({ type: \"result\", id: m.id, ok: false, error: String((err && err.message) || err) });",
+    "  }",
+    "};",
+    "self.postMessage({ type: \"ready\" });"
+  ].join("\n");
+  var worker = null, seq = 0, pending = {}, ready = false, readyWaiters = [];
+  function ensure() {
+    if (worker) return worker;
+    var blob = new Blob([WORKER_SRC], { type: "text/javascript" });
+    worker = new Worker(URL.createObjectURL(blob));
+    ready = false;
+    worker.onmessage = function (e) {
+      var m = e.data || {};
+      if (m.type === "ready") { ready = true; var ws = readyWaiters; readyWaiters = []; ws.forEach(function (f) { f(); }); return; }
+      if (m.type === "pong") { var pp = pending[m.id]; if (pp) { delete pending[m.id]; clearTimeout(pp.timer); pp.resolve(true); } return; }
+      if (m.type === "fetch") {
+        var fid = m.__id;
+        fetchText(m.url, m.opts || {}).then(function (text) {
+          if (worker) worker.postMessage({ type: "__fetchResult", __id: fid, ok: true, text: text });
+        }).catch(function (err) {
+          if (worker) worker.postMessage({ type: "__fetchResult", __id: fid, ok: false, error: String((err && err.message) || err) });
+        });
+        return;
+      }
+      if (m.type === "result") {
+        var pr = pending[m.id];
+        if (!pr) return;
+        delete pending[m.id];
+        clearTimeout(pr.timer);
+        if (m.ok) pr.resolve(m.value); else pr.reject(new Error(m.error || "沙箱执行失败"));
+        return;
+      }
+    };
+    worker.onerror = function (e) {
+      var msg = (e && e.message) || "Worker 出错";
+      var all = pending; pending = {};
+      Object.keys(all).forEach(function (id) { clearTimeout(all[id].timer); all[id].reject(new Error(msg)); });
+    };
+    return worker;
+  }
+  function whenReady() {
+    ensure();
+    if (ready) return Promise.resolve(true);
+    return new Promise(function (res) { readyWaiters.push(res); });
+  }
+  function ping(timeoutMs) {
+    ensure();
+    var id = ++seq;
+    return whenReady().then(function () {
+      return new Promise(function (resolve, reject) {
+        var timer = setTimeout(function () { delete pending[id]; reject(new Error("沙箱无响应")); }, timeoutMs || 5000);
+        pending[id] = { resolve: resolve, reject: reject, timer: timer };
+        worker.postMessage({ type: "ping", id: id });
+      });
+    });
+  }
+  function run(code, vars, timeoutMs) {
+    ensure();
+    var id = ++seq;
+    var ms = timeoutMs || 30000;
+    return whenReady().then(function () {
+      return new Promise(function (resolve, reject) {
+        var timer = setTimeout(function () {
+          delete pending[id];
+          terminate();
+          reject(new Error("沙箱执行超时（" + ms + "ms），已终止"));
+        }, ms);
+        pending[id] = { resolve: resolve, reject: reject, timer: timer };
+        worker.postMessage({ type: "run", id: id, code: code, vars: vars || {} });
+      });
+    });
+  }
+  function terminate() {
+    if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
+    ready = false;
+    var all = pending; pending = {};
+    Object.keys(all).forEach(function (id) { clearTimeout(all[id].timer); all[id].reject(new Error("沙箱已终止")); });
+  }
+  return { run: run, ping: ping, terminate: terminate, ensure: ensure };
+})();
 
 /* ---------------- 清单 ---------------- */
 
@@ -19211,6 +19693,17 @@ function boot() {
   $("btnBackDetail").addEventListener("click", function () { showView("browse"); });
   if (cats[0]) { browse.nav = cats[0].k; loadCategory(cats[0].k, 1); }
   cmsBoot();
+  /* v15 P0：hub / 导入 / 沙箱。导入存储异步加载，内置四源不受影响。 */
+  bindHubStatic();
+  ruleStore.init().then(function () { return ruleStore.list(); }).then(function (defs) {
+    defs.forEach(function (def) {
+      if (!def || def.kind !== "generic" || findSource(def.id)) return;
+      SOURCES.push({ id: def.id, kind: "generic", title: def.title, author: def.author, site: def.site,
+        file: def.fileName, badge: def.badge, tab: "tab_" + def.id, section: "genBrowse", def: def });
+    });
+    renderSrcTabs();
+    if (!$("viewHub").classList.contains("hidden")) renderHub();
+  }).catch(function () { /* 导入存储不可用时内置源照常用，导入时再报 */ });
 }
 
 document.addEventListener("DOMContentLoaded", boot);
