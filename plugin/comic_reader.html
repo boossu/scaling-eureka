@@ -268,7 +268,7 @@ img{display:block}
 <input type="file" id="fileInput" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
 <script>
 "use strict";
-var PLUGIN_VERSION = 10;
+var PLUGIN_VERSION = 11;
 var PLUGIN_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
 /* ---------------- 主界面 hub（入口页，v479 壳子版同款，v4 起做到 GitHub 阅读器里） ---------------- */
 /* v3 的教训：GitHub 阅读器里根本没有 hub，goHome() 只回规则卡首页；
@@ -2921,6 +2921,15 @@ function openShellDeepLink(url, title) {
 }
 /* ---------------- 启动 ---------------- */
 function boot() {
+  /* v22：视频插件“‹ 主页”回共用 hub 的标记——视频 goHome() 先置
+     localStorage mangaShowHub="1" 再载入本阅读器。boot 开头就读并立即清掉
+     （只用一次，防下次启动误进 hub）；深链优先仍在下文（有深链时直接进阅读器
+     并 return，标记已清、不会干扰），默认进浏览页仍在。 */
+  var showHubFirst = false;
+  try {
+    showHubFirst = window.localStorage && window.localStorage.getItem("mangaShowHub") === "1";
+    if (showHubFirst) window.localStorage.removeItem("mangaShowHub");
+  } catch (e) { /* 存储不可用时当作无标记 */ }
   /* 启动时把本阅读器全文存进本地存储（只在存的副本缺失或更旧时存；
      已有同版的精确字节副本时不覆盖——那份是更新通道下载的原字节）。
      供书籍 hub 的漫画入口直接载入，不再每次都去 GitHub 重拉。 */
@@ -2987,8 +2996,10 @@ function boot() {
   /* 用户 2026-11-24 15:37“点击哪个插件，就运行哪个下载的插件，进入界面”：
      启动默认直接进漫画界面（六张规则卡），不经入口页；入口页只在点
      “‹ 主页”时出现（goHome → showHub）。深链仍优先（上一步已处理）。
-     v9 的 mangaDirectEntry 标记不再需要（启动本来就直接进界面）。 */
-  enterManga();
+     v9 的 mangaDirectEntry 标记不再需要（启动本来就直接进界面）。
+     v22：视频 goHome() 置了 mangaShowHub 标记时起在 hub（上面已清掉标记），
+     否则默认进漫画界面。 */
+  if (showHubFirst) showHub(); else enterManga();
 }
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
