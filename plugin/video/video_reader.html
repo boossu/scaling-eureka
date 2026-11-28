@@ -466,7 +466,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 16;
+var PLUGIN_VERSION = 17;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -16645,7 +16645,7 @@ function renderGenBrowse(src) {
 /* ---------------- v15 P0：入口页（hub） ----------------
    照漫画插件 renderRuleRow 的结构：‹ 主页 + 源卡片 + 导入规则文件 + 粘贴 JSON。
    平时仍直接进浏览页；入口页只在点 ‹ 主页 时出现；‹ 主页 从浏览 / 详情 /
-   播放器任何一页都回 hub（showHub）。 */
+   播放器任何一页都回聚合插件 hub（v17 goHome：history.back()，无历史时回落 showHub）。 */
 function renderHub() {
   var row = $("hubRuleRow");
   if (!row) return;
@@ -16668,7 +16668,7 @@ function renderHub() {
     cards[j].addEventListener("click", function () { enterSource(this.getAttribute("data-src")); });
   }
   var hb = $("hubHomeBtn");
-  if (hb) hb.addEventListener("click", function () { renderHub(); });
+  if (hb) hb.addEventListener("click", goHome);
   /* 导入按钮是真 <button>，点它直接调文件框的 click()——
      旧的 <label for> 指着 display:none 的输入框，手机浏览器点不开（漫画插件同款注释）。 */
   var ib = $("hubImportBtn");
@@ -16690,6 +16690,23 @@ function showHub() {
   renderHub();
   showView("hub");
   window.scrollTo(0, 0);
+}
+/* ---------------- v17：‹ 主页 回聚合插件 hub ----------------
+   用户 2026-11-28 16:05 纠正：‹ 主页 要回聚合插件 hub（漫画/书籍/视频三张卡那页），
+   不是视频自己的入口页。机制用返回导航：history.back() 回打开插件前那页。
+   插件内部视图切换从不推 history 记录（无 pushState/replaceState/hash），
+   所以从浏览/详情/播放器点一次 history.back() 就直接回到打开插件前那页，
+   不会被内部视图拦截。插件是直接打开的（history.length <= 1，无上一页可回）
+   时回落到视频自己的入口页（showHub，v15 P0 的行为）。 */
+function goHome() {
+  if (window.history && window.history.length > 1) {
+    var left = false;
+    window.addEventListener("pagehide", function () { left = true; }, { once: true });
+    setTimeout(function () { if (!left && !document.hidden) showHub(); }, 800);
+    window.history.back();
+    return;
+  }
+  showHub();
 }
 function hubImportError(msg) {
   var e = $("hubImportErr");
@@ -16732,9 +16749,9 @@ function importHubPastedJson() {
   }
 }
 function bindHubStatic() {
-  var hb = $("btnHomeBrowse"); if (hb) hb.addEventListener("click", showHub);
-  var hd = $("btnHomeDetail"); if (hd) hd.addEventListener("click", showHub);
-  var hp = $("btnHomePlayer"); if (hp) hp.addEventListener("click", showHub);
+  var hb = $("btnHomeBrowse"); if (hb) hb.addEventListener("click", goHome);
+  var hd = $("btnHomeDetail"); if (hd) hd.addEventListener("click", goHome);
+  var hp = $("btnHomePlayer"); if (hp) hp.addEventListener("click", goHome);
   var fi = $("hubFileInput");
   if (fi) fi.addEventListener("change", function () {
     var f = fi.files && fi.files[0];
