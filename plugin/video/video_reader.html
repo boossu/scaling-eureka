@@ -548,7 +548,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 20;
+var PLUGIN_VERSION = 21;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -15260,7 +15260,7 @@ function renderCenter() {
   if (player.needGesture) {
     var gb = el("button", "center-gesture", "点一下播放");
     gb.type = "button";
-    gb.addEventListener("click", function (e) { e.stopPropagation(); player.needGesture = false; togglePlay(); });
+    gb.addEventListener("click", function (e) { e.stopPropagation(); player.needGesture = false; var b = getBackend(); if (b) { Promise.resolve(b.play()).catch(function () { player.needGesture = true; renderCenter(); }); setPlaying(true); flashIcon("play"); } renderCenter(); });
     c.appendChild(gb);
     return;
   }
