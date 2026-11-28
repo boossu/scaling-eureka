@@ -256,7 +256,7 @@ img{display:block}
     </section>
     </div>
 
-    <!-- 红果短剧（hongguoduanju.com，WorkBuddy）：分类 + 二级分类 + 搜索 + 详情；浏览版，播放未接 -->
+    <!-- 红果短剧（hongguoduanju.com，WorkBuddy）：分类 + 二级分类 + 搜索 + 详情 + v12 播放 -->
     <div id="hgBrowse" class="hidden">
     <div id="hgRules"><div class="rule-row">
       <button type="button" class="rule-card" id="hgRuleCard">
@@ -264,7 +264,7 @@ img{display:block}
         <span class="rule-meta">
           <span class="rule-title">红果短剧</span>
           <span class="rule-author">WorkBuddy · hongguoduanju.com</span>
-          <span class="rule-file">hongguo.json · 浏览版（播放未接）</span>
+          <span class="rule-file">hongguo.json · v12 播放已接（720p/1080p）</span>
         </span>
       </button>
     </div></div>
@@ -377,6 +377,7 @@ img{display:block}
           <button type="button" class="pill-btn" id="btnEpisodes">选集</button>
           <span class="spacer"></span>
           <button type="button" class="pill-btn" id="btnRate">1x</button>
+          <button type="button" class="pill-btn hidden" id="btnQuality">720p</button>
           <button type="button" class="round-btn" id="btnRotate" aria-label="切换横竖屏" title="切横屏"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9a8 8 0 0 1 14.9-3M20 15a8 8 0 0 1-14.9 3"/><path d="M18.5 2.5v3.5H15M5.5 21.5v-3.5H9"/></svg></button>
           <button type="button" class="round-btn" id="btnFill" aria-label="铺满" aria-pressed="false" title="铺满"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M8 9.5h8v5H8z" fill="currentColor" stroke="none"/></svg></button>
           <button type="button" class="round-btn" id="btnFullscreen" aria-label="全屏"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
@@ -402,7 +403,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 11;
+var PLUGIN_VERSION = 12;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14146,7 +14147,13 @@ HevcFallbackPlayer.prototype.startLoops = function () {
   var self = this;
   (async function () { await self.decodeLoop(); })();
   cancelAnimationFrame(this.raf);
-  this.raf = requestAnimationFrame(this.displayTick);
+  /* v12 修：displayTick 必须绑 this。原 requestAnimationFrame(this.displayTick)
+     是未绑定的方法引用，回调里 this 变成 window，第一帧后闭包调
+     self.displayTick() 即抛 "self.displayTick is not a function"，渲染循环
+     当场死亡（首帧永不出、onTime 永不回调，音频却照播完 → 自动跳下一集）。
+     此前星芽/酷短剧/CMS 全走原生，WASM 回落路从未在真浏览器跑通整集，
+     这个 latent bug 一直没暴露；红果 HEVC 是第一个真走回落的源。 */
+  this.raf = requestAnimationFrame(function () { self.displayTick(); });
 };
 
 HevcFallbackPlayer.prototype.decodeLoop = async function () {
@@ -14510,15 +14517,10 @@ function renderDetail() {
   var grid = $("epGrid");
   grid.innerHTML = "";
   d.episodes.forEach(function (ep, i) {
-    /* 红果浏览版：点集数不进播放器，只提示未接入（取址接口与解密管线未移植）。 */
     var b = el("button", "ep-btn" + (ep.free ? " free" : ""), String(ep.num));
     b.type = "button";
     b.title = ep.tip || (ep.seconds ? "第 " + ep.num + " 集 · " + xyFormatSeconds(ep.seconds) : "第 " + ep.num + " 集");
-    if (d.hongguo) {
-      b.addEventListener("click", function () { showToast("红果播放暂未接入（取址接口与解密管线未移植）"); });
-    } else {
-      b.addEventListener("click", function () { playEpisode(i); });
-    }
+    b.addEventListener("click", function () { playEpisode(i); });
     grid.appendChild(b);
   });
   $("epSection").classList.toggle("hidden", d.episodes.length === 0);
@@ -14534,7 +14536,7 @@ var player = {
   rate: 1, seekPreview: null, loadToken: 0, h264Redirect: false,
   fallback: null, fbEvents: {}, hideTimer: 0, flashTimer: 0, dragging: false,
   progressTimer: 0, fakeFullscreen: false, viewportPortrait: true,
-  lastInteractAt: 0, isPortraitVideo: true, userRotated: false, fill: false, kwRetried: false, _fsIcon: false
+  lastInteractAt: 0, isPortraitVideo: true, userRotated: false, fill: false, kwRetried: false, hgRetried: false, _fsIcon: false
 };
 
 function playerEls() {
@@ -14545,7 +14547,7 @@ function playerEls() {
     seekBar: $("seekBar"), seekFill: $("seekFill"), seekDot: $("seekDot"),
     timeLabel: $("timeLabel"), countLabel: $("countLabel"),
     playBtn: $("btnPlay"), prevBtn: $("btnPrevEp"), nextBtn: $("btnNextEp"),
-    epBtn: $("btnEpisodes"), rateBtn: $("btnRate"), rotBtn: $("btnRotate"), fillBtn: $("btnFill"),
+    epBtn: $("btnEpisodes"), rateBtn: $("btnRate"), qualityBtn: $("btnQuality"), rotBtn: $("btnRotate"), fillBtn: $("btnFill"),
     fsBtn: $("btnFullscreen"), volBtn: $("btnVol"), volRange: $("volRange"),
     orientLabel: $("orientLabel"), sheet: $("epSheet"), sheetGrid: $("epSheetGrid")
   };
@@ -14802,6 +14804,7 @@ function renderBottom() {
   E.prevBtn.disabled = player.index <= 0;
   E.nextBtn.disabled = player.index >= player.detail.episodes.length - 1;
   E.rateBtn.textContent = player.rate + "x";
+  renderQualityBtn();
   E.volBtn.textContent = player.muted ? "静音" : "音量";
   E.volRange.value = String(player.muted ? 0 : player.volume);
   E.topTitle.textContent = "第 " + player.detail.episodes[player.index].num + " 集";
@@ -14939,6 +14942,7 @@ function loadCurrentEpisode() {
   player.nativeToken = token;
   if (player.detail && player.detail.cms) { return cmsLoadCurrentEpisode(token); }
   if (player.detail && player.detail.kuwo) { return kwLoadCurrentEpisode(token); }
+  if (player.detail && player.detail.hongguo) { return hgLoadCurrentEpisode(token); }
   var ep = player.detail.episodes[player.index];
   player.sources = xyPlaySources(ep);
   player.srcIdx = 0;
@@ -14963,8 +14967,6 @@ function autoNextEpisode() {
 function playEpisode(index) {
   var detail = currentDetail;
   if (!detail || !detail.episodes[index]) return;
-  /* 红果浏览版：任何路径点集都不进播放器（集数按钮本身已绑提示，这里是纵深守卫）。 */
-  if (detail.hongguo) { showToast("红果播放暂未接入（取址接口与解密管线未移植）"); return; }
   var token = ++player.loadToken;
   /* v9：初始方向按内容定（同剧换集用上一个视频的真实宽高；新剧星芽竖屏、CMS 横屏），
      不再写死竖屏。全屏请求仍在点按手势里立即发出，不等元数据。 */
@@ -14979,6 +14981,7 @@ function playEpisode(index) {
   player.seekPreview = null;
   player.userRotated = false;
   player.kwRetried = false;
+  player.hgRetried = false;
   setAudioStatus("unknown");
   setOrientation(o);
   $("epSheet").classList.add("hidden");
@@ -15047,6 +15050,7 @@ function playEpisode(index) {
 
 function exitPlayer() {
   player.loadToken++;
+  hgRevokeBlob();
   cmsDestroyHls();
   if (player.fallback) { try { player.fallback.destroy(); } catch (e) {} player.fallback = null; }
   var v = $("nativeVideo");
@@ -15059,6 +15063,11 @@ function exitPlayer() {
 
 function onVideoError() {
   if (player.detail && player.detail.cms) { cmsOnVideoError(); return; }
+  if (player.detail && player.detail.hongguo) {
+    /* 红果只有一个 Blob 源：原生失败不进 sources 重试/二次解包，直接报重取提示。 */
+    player.playError = "红果播不了这一集（可能是地址过期）；点集数重播会重新取地址。";
+    renderCenter(); return;
+  }
   if (player.detail && player.detail.kuwo) {
     /* 酷短剧播址是带签名的 302 地址：第一次失败只当地址过期，重新现取一次；
        再失败才报错（WASM 回落只解 HEVC，mp4 走它没用，不进）。 */
@@ -15152,6 +15161,13 @@ function bindPlayer() {
   E.epBtn.addEventListener("click", function () { E.sheet.classList.toggle("hidden"); });
   $("btnEpSheetClose").addEventListener("click", function () { E.sheet.classList.add("hidden"); });
   E.rateBtn.addEventListener("click", cycleRate);
+  E.qualityBtn.addEventListener("click", function () {
+    /* 红果画质切换：720p ↔ 1080p，换集重取（默认 720p，用户定）。非红果时按钮是藏着的，点不到。 */
+    if (!player.detail || !player.detail.hongguo) return;
+    hgV5.quality = hgV5.quality === "720" ? "1080" : "720";
+    renderQualityBtn();
+    playEpisode(player.index);
+  });
   E.rotBtn.addEventListener("click", function () {
     var next = player.orientation === "portrait" ? "landscape" : "portrait";
     player.userRotated = true; /* v9：手动旋转是 override，loadedmetadata 不再纠正回来 */
@@ -16279,9 +16295,9 @@ function kwLoadCurrentEpisode(token) {
 }
 
 /* ---------------- 红果短剧（hongguoduanju.com，WorkBuddy，group 6短剧） ----------------
-   规则原文见 rules/hongguo.json。浏览版：分类 + 二级分类 + 榜单 + 搜索 + 详情；
-   播放未接（取址接口 fqnovel 回空体、视频 CENC 加密需整集下载解密，浏览器插件
-   发不出 app UA、也没有本地文件接口；每剧 SSR 里只有几集免费 vid）。
+   规则原文见 rules/hongguo.json。浏览：分类 + 二级分类 + 榜单 + 搜索 + 详情；
+   播放（v12）：v5 链路取流（ttEncrypt 注册 + medusa/helios 签名 + video_model/v1，
+   全集数字 vid，不认 web 端付费墙）+ CENC 流式解密（HG_CENC），默认 720p、可切 1080p。
    数据源是站内 SSR：页面 HTML 里嵌 _ROUTER_DATA JSON（大括号配对截取后
    JSON.parse，与规则 find_rule 同款写法）。实测（真浏览器 fetch）：
    - 分类页 loaderData.category_$.recommendList（24 条/页，pagination.totalPages
@@ -16300,7 +16316,7 @@ function kwLoadCurrentEpisode(token) {
      集数按 episode_cnt 画 1..N，前 accessible_episode_cnt 集标免费；
      点集只提示播放未接入，不进播放器。
    取数走 v4 的 fetchText（一次一个请求、失败报错显示，不静默吞）。
-   不移植：hgApiOnce、fqnovel 取址、spade_a、CENC 解密（spade_deob/cenc_clear）。 */
+   播放走 v12 的 HG_V5 + HG_CENC（见本节末尾 hgLoadCurrentEpisode）。 */
 
 var HG_SITE = "https://hongguoduanju.com";
 var HG_SEARCH_CONTEXT = HG_SITE + "/api/search/context?aid=8662";
@@ -16557,6 +16573,1859 @@ function hgParseDetail(htmlText) {
     if (v && typeof v === "object" && v.seriesDetail) return v.seriesDetail;
   }
   return null;
+}
+/* ====== HG_V5: 红果 v5 链路（v12 内联，源 ~/workspace/browser-test/hg_v5.js） ======
+   ttEncrypt 注册 + v5 medusa/helios 签名 + spade_a→DEK。挂 window.HG_V5。 */
+/* HG_V5 — 红果 v5 签名取流链路，纯浏览器 JS 移植
+ *
+ * 移植自 /home/hatch/workspace/user/files/_____27_ozxc.py（7254 行）：
+ *   注册 _v5_register_identity/_v5_build_body/_v5_build_headers/_v5_response_id/
+ *        _v5_parse_response/_v5_REGISTER_URL
+ *   取流 _v5_vm_model（video_model/v1，7.4.5.32 参数集，body 顶层 video_id）
+ *        _v5_multi_video_detail_list（multi_video_detail/v1，按 vid_index 排序）
+ *   签名 _v5_hash_f13v5/_v5_medusa_v5/_v5_helios_v5/_v5_branch_v5/
+ *        _v5_encode_v5_query/_v5_sign_playback_v5/_v5_AesV3/_v5_xmxor/_v5_key_hash/
+ *        _v5__seal/_v5__pkcs7/_v5__aes_cbc_encrypt 及全部底层原语
+ *        （SM3/MD5/标准 AES-CBC 纯 JS；AesV3 为自定义变体，不可用 WebCrypto）
+ *   选集 derive_content_key/_video_list_from_model/_definition_of/_select_quality/
+ *        _media_url/_spade_value/_key_seed_from_model/_decrypt_spade_url
+ * 未移植：preload/player 兜底形态（任务要求只做 video_model/v1 + multi_video_detail/v1）。
+ *
+ * 浏览器直接 <script> 引入即用，无 import/export，挂 window.HG_V5。
+ * 偏离 Python 之处（均已在文件内标注 DEVIATION）：
+ *  1. fetch 不能改 User-Agent（forbidden header）：代码仍把 UA 写进 headers，
+ *     浏览器会静默丢弃、发默认 UA；签名不含 UA，不影响。
+ *  2. 标准 AES-CBC（seal）与 SHA-512 用 WebCrypto（async），seal/buildBody/
+ *     registerIdentity 因此为 async；WebCrypto 不可用时 seal 回落纯 JS AES，
+ *     SHA-512 无回落会抛错。
+ *  3. _decrypt_spade_url 用 WebCrypto AES-CBC decrypt（自动去 PKCS7 填充），
+ *     因此为 async（Python 是同步）；返回前再 strip 尾部 NUL，与 Python 一致。
+ *  4. gzip 用 CompressionStream("gzip")：gzip 头字节与 Python gzip.compress(mtime=0)
+ *     未必逐字节相同，但签名是对实际发送的同一串字节算的（先 gzip 再签名再发送，
+ *     与 Python 顺序一致），服务端只做解压，不校验 gzip 头。
+ *  5. device_id/iid 超过 2^53 时 JSON.parse 会丢精度：parseResponse 先用正则从
+ *     原始文本里取 device_id_str/install_id_str（字符串，精确），再 JSON.parse。
+ *  6. 身份复用：Python 每次取流注册新身份；按任务要求改为 localStorage
+ *    （key hgV5Identity，Node/无 localStorage 时退内存）复用，取流失败时丢弃
+ *     缓存身份、重注册一次再试（只重试一次）。
+ *  7. 超时统一 20 秒（Python 注册 12 秒、取流 20 秒）。
+ */
+(function (global) {
+  "use strict";
+
+  /* ---------------- 基础工具 ---------------- */
+  var TE = new TextEncoder();
+  var TD = new TextDecoder("utf-8");
+  function utf8(s) { return TE.encode(String(s)); }
+  function concatBytes(list) {
+    var n = 0, i, j, o;
+    for (i = 0; i < list.length; i++) n += list[i].length;
+    var out = new Uint8Array(n);
+    o = 0;
+    for (i = 0; i < list.length; i++) { out.set(list[i], o); o += list[i].length; }
+    return out;
+  }
+  function hexEncode(b) {
+    var s = "";
+    for (var i = 0; i < b.length; i++) s += ("0" + b[i].toString(16)).slice(-2);
+    return s;
+  }
+  function hexDecode(s) {
+    s = String(s || "").replace(/\s+/g, "");
+    if (s.length % 2 !== 0) throw new Error("hex 长度为奇数");
+    var out = new Uint8Array(s.length / 2);
+    for (var i = 0; i < out.length; i++) {
+      var v = parseInt(s.substr(i * 2, 2), 16);
+      if (isNaN(v)) throw new Error("hex 非法");
+      out[i] = v;
+    }
+    return out;
+  }
+  function b64encode(bytes) {
+    var s = "", i, CH = 0x8000;
+    for (i = 0; i < bytes.length; i += CH) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    }
+    return btoa(s);
+  }
+  function b64encodeUrl(bytes) {
+    return b64encode(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64decode(str) {
+    var s = String(str || "").trim().replace(/-/g, "+").replace(/_/g, "/");
+    s += "=".repeat((-s.length % 4 + 4) % 4);
+    var bin = atob(s), out = new Uint8Array(bin.length), i;
+    for (i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function u32(x) { return x >>> 0; }
+  function i32(x) { return x | 0; }
+  function rotl(x, n) { var k = n & 31; return ((x << k) | (x >>> (32 - k))) >>> 0; }
+  function ror(x, n) { var k = n & 31; return ((x >>> k) | (x << (32 - k))) >>> 0; }
+  function rotl8(x) { return ((x << 4) | (x >> 4)) & 0xFF; }
+  function rotl8_3(x) { return ((x << 3) | (x >> 5)) & 0xFF; }
+  function le32(v) {
+    var x = v >>> 0;
+    return new Uint8Array([x & 0xFF, (x >>> 8) & 0xFF, (x >>> 16) & 0xFF, (x >>> 24) & 0xFF]);
+  }
+  function be32(v) {
+    var x = v >>> 0;
+    return new Uint8Array([(x >>> 24) & 0xFF, (x >>> 16) & 0xFF, (x >>> 8) & 0xFF, x & 0xFF]);
+  }
+  function readLe32(b, off) {
+    return (b[off] | (b[off + 1] << 8) | (b[off + 2] << 16) | (b[off + 3] << 24)) | 0;
+  }
+  function readBe32(b, off) {
+    return ((b[off] << 24) | (b[off + 1] << 16) | (b[off + 2] << 8) | b[off + 3]) | 0;
+  }
+  function putBe32(buf, off, v) {
+    var x = v | 0;
+    buf[off] = (x >>> 24) & 0xFF; buf[off + 1] = (x >>> 16) & 0xFF;
+    buf[off + 2] = (x >>> 8) & 0xFF; buf[off + 3] = x & 0xFF;
+  }
+  function rotr64(x, n) {
+    var k = BigInt(n) & 63n;
+    if (k === 0n) return x;
+    return ((x >> k) | (x << (64n - k))) & ((1n << 64n) - 1n);
+  }
+  function xorBytes(a, b) {
+    var bl = b.length, out = new Uint8Array(a.length), i;
+    for (i = 0; i < a.length; i++) out[i] = a[i] ^ b[i % bl];
+    return out;
+  }
+  function rndInt32() {
+    var b = new Uint8Array(4);
+    (global.crypto || {}).getRandomValues
+      ? global.crypto.getRandomValues(b)
+      : (function () { for (var i = 0; i < 4; i++) b[i] = (Math.random() * 256) | 0; })();
+    return ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) >>> 0;
+  }
+  function rndBytes(n) {
+    var b = new Uint8Array(n);
+    if (global.crypto && global.crypto.getRandomValues) global.crypto.getRandomValues(b);
+    else for (var i = 0; i < n; i++) b[i] = (Math.random() * 256) | 0;
+    return b;
+  }
+  function uuidv4() {
+    if (global.crypto && global.crypto.randomUUID) return global.crypto.randomUUID();
+    var b = rndBytes(16);
+    b[6] = (b[6] & 0x0F) | 0x40; b[8] = (b[8] & 0x3F) | 0x80;
+    var h = hexEncode(b);
+    return h.slice(0, 8) + "-" + h.slice(8, 12) + "-" + h.slice(12, 16) + "-" +
+      h.slice(16, 20) + "-" + h.slice(20);
+  }
+  function popcount(n) { var c = 0; while (n) { c += n & 1; n >>>= 1; } return c; }
+  function isPlainObj(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
+  function text(v) { if (!v) return ""; return String(v).trim(); }
+
+  /* ---------------- MD5（纯 JS） ---------------- */
+  var MD5_S = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+    5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21];
+  var MD5_K = (function () {
+    var k = [], i;
+    for (i = 0; i < 64; i++) k.push(Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0);
+    return k;
+  })();
+  function md5(data) {
+    var bitLenLow = (data.length << 3) >>> 0;
+    var bitLenHigh = Math.floor(data.length / 0x20000000) >>> 0;
+    var paddedLen = (((data.length + 9 + 63) >> 6) << 6);
+    var msg = new Uint8Array(paddedLen);
+    msg.set(data, 0); msg[data.length] = 0x80;
+    msg[paddedLen - 8] = bitLenLow & 0xFF; msg[paddedLen - 7] = (bitLenLow >>> 8) & 0xFF;
+    msg[paddedLen - 6] = (bitLenLow >>> 16) & 0xFF; msg[paddedLen - 5] = (bitLenLow >>> 24) & 0xFF;
+    msg[paddedLen - 4] = bitLenHigh & 0xFF; msg[paddedLen - 3] = (bitLenHigh >>> 8) & 0xFF;
+    msg[paddedLen - 2] = (bitLenHigh >>> 16) & 0xFF; msg[paddedLen - 1] = (bitLenHigh >>> 24) & 0xFF;
+    var a0 = 0x67452301, b0 = 0xEFCDAB89, c0 = 0x98BADCFE, d0 = 0x10325476;
+    var M = new Array(16), i, j, off;
+    for (off = 0; off < paddedLen; off += 64) {
+      for (j = 0; j < 16; j++) M[j] = readLe32(msg, off + j * 4);
+      var A = a0, B = b0, C = c0, D = d0, F, g, tmp;
+      for (i = 0; i < 64; i++) {
+        if (i < 16) { F = (B & C) | (~B & D); g = i; }
+        else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; }
+        else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; }
+        else { F = C ^ (B | ~D); g = (7 * i) % 16; }
+        F = (F + A + MD5_K[i] + M[g]) | 0;
+        tmp = D; D = C; C = B;
+        B = (B + rotl(F, MD5_S[i])) | 0;
+        A = tmp;
+      }
+      a0 = (a0 + A) | 0; b0 = (b0 + B) | 0; c0 = (c0 + C) | 0; d0 = (d0 + D) | 0;
+    }
+    return concatBytes([le32(a0), le32(b0), le32(c0), le32(d0)]);
+  }
+
+  /* ---------------- SM3（纯 JS，逐行对齐 _v5__SM3Impl） ---------------- */
+  var SM3_IV = [0x7380166F, 0x4914B2B9, 0x172442D7, 0xDA8A0600,
+    0xA96F30BC, 0x163138AA, 0xE38DEE4D, 0xB0FB0E4E];
+  function sm3Rotl(x, k) {
+    k &= 31; x >>>= 0;
+    if (k === 0) return x;
+    return ((x << k) | (x >>> (32 - k))) >>> 0;
+  }
+  function sm3(data) {
+    var h = SM3_IV.slice(), n = data.length, bitLen = n * 8;
+    var msg = Array.prototype.slice.call(data);
+    msg.push(0x80);
+    while (msg.length % 64 !== 56) msg.push(0);
+    for (var i = 7; i >= 0; i--) msg.push((Math.floor(bitLen / Math.pow(2, i * 8)) % 256));
+    var w, w1, a, b, c, d, e, f, g, hh, j, off;
+    for (off = 0; off < msg.length; off += 64) {
+      w = [];
+      for (j = 0; j < 16; j++) {
+        w.push(((msg[off + j * 4] << 24) | (msg[off + j * 4 + 1] << 16) |
+          (msg[off + j * 4 + 2] << 8) | msg[off + j * 4 + 3]) >>> 0);
+      }
+      for (j = 16; j < 68; j++) {
+        var x = (w[j - 16] ^ w[j - 9] ^ sm3Rotl(w[j - 3], 15)) >>> 0;
+        w.push((x ^ sm3Rotl(x, 15) ^ sm3Rotl(x, 23) ^ sm3Rotl(w[j - 13], 7) ^ w[j - 6]) >>> 0);
+      }
+      w1 = [];
+      for (j = 0; j < 64; j++) w1.push((w[j] ^ w[j + 4]) >>> 0);
+      a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4]; f = h[5]; g = h[6]; hh = h[7];
+      for (j = 0; j < 64; j++) {
+        var tj = j < 16 ? 0x79CC4519 : 0x7A879D8A;
+        var ss1 = sm3Rotl((sm3Rotl(a, 12) + e + sm3Rotl(tj, j)) >>> 0, 7);
+        var ss2 = (ss1 ^ sm3Rotl(a, 12)) >>> 0;
+        var ff, gg;
+        if (j < 16) { ff = (a ^ b ^ c) >>> 0; gg = (e ^ f ^ g) >>> 0; }
+        else { ff = ((a & b) | (a & c) | (b & c)) >>> 0; gg = ((e & f) | ((~e >>> 0) & g)) >>> 0; }
+        var tt1 = (ff + d + ss2 + w1[j]) >>> 0;
+        var tt2 = (gg + hh + ss1 + w[j]) >>> 0;
+        d = c; c = sm3Rotl(b, 9); b = a; a = tt1;
+        hh = g; g = sm3Rotl(f, 19); f = e;
+        e = (tt2 ^ sm3Rotl(tt2, 9) ^ sm3Rotl(tt2, 17)) >>> 0;
+      }
+      h = [((h[0] ^ a) >>> 0), ((h[1] ^ b) >>> 0), ((h[2] ^ c) >>> 0), ((h[3] ^ d) >>> 0),
+        ((h[4] ^ e) >>> 0), ((h[5] ^ f) >>> 0), ((h[6] ^ g) >>> 0), ((h[7] ^ hh) >>> 0)];
+    }
+    var out = new Uint8Array(32);
+    for (i = 0; i < 8; i++) out.set(be32(h[i]), i * 4);
+    return out;
+  }
+
+  /* ---------------- 标准 AES-128（纯 JS，供 WebCrypto 不可用时兜底） ---------------- */
+  var SBOX = [
+    99, 124, 119, 123, 242, 107, 111, 197,
+    48, 1, 103, 43, 254, 215, 171, 118,
+    202, 130, 201, 125, 250, 89, 71, 240,
+    173, 212, 162, 175, 156, 164, 114, 192,
+    183, 253, 147, 38, 54, 63, 247, 204,
+    52, 165, 229, 241, 113, 216, 49, 21,
+    4, 199, 35, 195, 24, 150, 5, 154,
+    7, 18, 128, 226, 235, 39, 178, 117,
+    9, 131, 44, 26, 27, 110, 90, 160,
+    82, 59, 214, 179, 41, 227, 47, 132,
+    83, 209, 0, 237, 32, 252, 177, 91,
+    106, 203, 190, 57, 74, 76, 88, 207,
+    208, 239, 170, 251, 67, 77, 51, 133,
+    69, 249, 2, 127, 80, 60, 159, 168,
+    81, 163, 64, 143, 146, 157, 56, 245,
+    188, 182, 218, 33, 16, 255, 243, 210,
+    205, 12, 19, 236, 95, 151, 68, 23,
+    196, 167, 126, 61, 100, 93, 25, 115,
+    96, 129, 79, 220, 34, 42, 144, 136,
+    70, 238, 184, 20, 222, 94, 11, 219,
+    224, 50, 58, 10, 73, 6, 36, 92,
+    194, 211, 172, 98, 145, 149, 228, 121,
+    231, 200, 55, 109, 141, 213, 78, 169,
+    108, 86, 244, 234, 101, 122, 174, 8,
+    186, 120, 37, 46, 28, 166, 180, 198,
+    232, 221, 116, 31, 75, 189, 139, 138,
+    112, 62, 181, 102, 72, 3, 246, 14,
+    97, 53, 87, 185, 134, 193, 29, 158,
+    225, 248, 152, 17, 105, 217, 142, 148,
+    155, 30, 135, 233, 206, 85, 40, 223,
+    140, 161, 137, 13, 191, 230, 66, 104,
+    65, 153, 45, 15, 176, 84, 187, 22
+  ];
+  var RCON = [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36];
+  var SHIFT = [0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11];
+  function xtime(a) { return (a & 0x80) ? (((a << 1) ^ 0x1B) & 0xFF) : ((a << 1) & 0xFF); }
+  function expandKey(key) {
+    var w = Array.prototype.slice.call(key), i, t0, t1, t2, t3, base;
+    for (i = 4; i < 44; i++) {
+      t0 = w[w.length - 4]; t1 = w[w.length - 3]; t2 = w[w.length - 2]; t3 = w[w.length - 1];
+      if (i % 4 === 0) {
+        var n0 = SBOX[t1], n1 = SBOX[t2], n2 = SBOX[t3], n3 = SBOX[t0];
+        t0 = n0; t1 = n1; t2 = n2; t3 = n3;
+        t0 ^= RCON[(i / 4) | 0];
+      }
+      base = (i - 4) * 4;
+      w.push(w[base] ^ t0, w[base + 1] ^ t1, w[base + 2] ^ t2, w[base + 3] ^ t3);
+    }
+    return w;
+  }
+  function encryptBlock(rk, block) {
+    var s = Array.prototype.slice.call(block), i, rnd, c, idx, a, b, cc, d, t, u, off;
+    for (i = 0; i < 16; i++) s[i] ^= rk[i];
+    for (rnd = 1; rnd < 10; rnd++) {
+      s = s.map(function (v) { return SBOX[v]; });
+      s = SHIFT.map(function (k) { return s[k]; });
+      for (c = 0; c < 4; c++) {
+        idx = c * 4;
+        a = s[idx]; b = s[idx + 1]; cc = s[idx + 2]; d = s[idx + 3];
+        t = a ^ b ^ cc ^ d; u = a;
+        var na = a ^ t ^ xtime(a ^ b);
+        var nb = b ^ t ^ xtime(b ^ cc);
+        var nc = cc ^ t ^ xtime(cc ^ d);
+        var nd = d ^ t ^ xtime(d ^ u);
+        s[idx] = na; s[idx + 1] = nb; s[idx + 2] = nc; s[idx + 3] = nd;
+      }
+      off = rnd * 16;
+      for (i = 0; i < 16; i++) s[i] ^= rk[off + i];
+    }
+    s = s.map(function (v) { return SBOX[v]; });
+    s = SHIFT.map(function (k) { return s[k]; });
+    for (i = 0; i < 16; i++) s[i] ^= rk[160 + i];
+    return new Uint8Array(s);
+  }
+  function stdAesCbcEncrypt(key, iv, data) {
+    var rk = expandKey(key), prev = iv, out = [], at, block, i;
+    for (at = 0; at < data.length; at += 16) {
+      block = new Uint8Array(16);
+      for (i = 0; i < 16; i++) block[i] = data[at + i] ^ prev[i];
+      prev = encryptBlock(rk, block);
+      out.push(prev);
+    }
+    return concatBytes(out);
+  }
+  function pkcs7(data) {
+    var n = 16 - (data.length % 16);
+    var out = new Uint8Array(data.length + n);
+    out.set(data, 0); out.fill(n, data.length);
+    return out;
+  }
+
+  /* ---------------- WebCrypto 包装（SHA-512 / AES-CBC） ---------------- */
+  function subtle() {
+    if (global.crypto && global.crypto.subtle) return global.crypto.subtle;
+    throw new Error("WebCrypto subtle 不可用");
+  }
+  function sha512(data) {
+    return subtle().digest("SHA-512", data).then(function (buf) { return new Uint8Array(buf); });
+  }
+  function aesCbcEncryptWC(key, iv, data) {
+    return subtle().importKey("raw", key, { name: "AES-CBC" }, false, ["encrypt"])
+      .then(function (k) { return subtle().encrypt({ name: "AES-CBC", iv: iv }, k, data); })
+      .then(function (buf) { return new Uint8Array(buf); });
+  }
+  function aesCbcDecryptWC(key, iv, data) {
+    return subtle().importKey("raw", key, { name: "AES-CBC" }, false, ["decrypt"])
+      .then(function (k) { return subtle().decrypt({ name: "AES-CBC", iv: iv }, k, data); })
+      .then(function (buf) { return new Uint8Array(buf); });
+  }
+  function aesCbcEncrypt(key, iv, data) {
+    // DEVIATION 注：WebCrypto AES-CBC 加密自带 PKCS7 填充，调用时不要预填充；
+    // 只有回落纯 JS（stdAesCbcEncrypt 要求输入为 16 的倍数）时才手动填充。
+    return aesCbcEncryptWC(key, iv, data).catch(function () {
+      return stdAesCbcEncrypt(key, iv, pkcs7(data));
+    });
+  }
+
+  /* ---------------- gzip（CompressionStream） ---------------- */
+  function gzipBytes(data) {
+    var cs = new CompressionStream("gzip");
+    var stream = new Blob([data]).stream().pipeThrough(cs);
+    return new Response(stream).arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
+  }
+
+  /* ---------------- protobuf 手写编码 ---------------- */
+  function varint(value) {
+    var n = Math.floor(Number(value)), out = [];
+    if (n < 0) throw new Error("varint 负数");
+    while (n > 127) { out.push((n % 128) | 128); n = Math.floor(n / 128); }
+    out.push(n);
+    return new Uint8Array(out);
+  }
+  function zigzag(value) {
+    var v = Number(value);
+    return v < 0 ? (-v * 2 - 1) : v * 2;
+  }
+  function protoField(tag, value, typ) {
+    if (value === null || value === undefined) return new Uint8Array(0);
+    if (typ === "string" && value === "") return new Uint8Array(0);
+    var body, head;
+    if (typ === "bytes" || typ === "message") {
+      body = value instanceof Uint8Array ? value : utf8(value);
+      head = concatBytes([varint((tag << 3) | 2), varint(body.length)]);
+    } else if (typ === "string") {
+      body = utf8(value);
+      head = concatBytes([varint((tag << 3) | 2), varint(body.length)]);
+    } else if (typ === "float") {
+      var dv = new DataView(new ArrayBuffer(4));
+      dv.setFloat32(0, Number(value), true);
+      body = new Uint8Array(dv.buffer);
+      head = varint((tag << 3) | 5);
+    } else {
+      var v = Number(value);
+      head = varint(tag << 3);
+      body = varint(typ === "sint" ? zigzag(v) : v);
+    }
+    return concatBytes([head, body]);
+  }
+  function proto(fields) {
+    return concatBytes(fields.map(function (f) {
+      return protoField(f[0], f[1], f.length > 2 ? String(f[2]) : "string");
+    }));
+  }
+
+  /* ---------------- hashF13 家族 ---------------- */
+  var HASH_TABLE = [
+    0xebb64faf, 0x07aadcc2, 0xcf3187bf, 0xe01138ff,
+    0x6d0bfcff, 0x5a30a3be, 0xb41ad638, 0x34180eb8,
+    0xf233eb6f, 0xb1a584cc, 0xccc30dc7, 0x47d1db51,
+    0xd55653de, 0x70a84fa1, 0x57473c12, 0xf76f0288,
+    0x2c077f0a, 0xda0dcad0, 0xfbb86f6c, 0xfdc4cf00,
+    0x688a020d, 0xe676c6a6, 0x8cd6338b, 0x1a3c8d0e,
+    0xcce8b06b, 0x6ad0ed0b, 0xa0522717, 0xdc71ac83,
+    0x2285db71, 0xd5b4dda6, 0x736f8650, 0x6560306c,
+    0x617ce2a6, 0xe423417e, 0x0a40e143, 0x544e4032,
+    0x88dffb2a, 0x716c1ae0, 0x4c467a88, 0x05b23bb3,
+    0xe1d0b866, 0xbaa3dcb8, 0xae3374d3, 0xc3381a50,
+    0x1702f75b, 0xfe6da368, 0xf0b4cf48, 0x4e0ffbb8,
+    0x72aad10d, 0x26c53a3d, 0xf2bce0f6, 0xb4557581,
+    0x4a257fdd, 0x8c3182a2, 0xab0b3b86, 0x3d5dfb14,
+    0x4f103634, 0xd37b52d7, 0x444eff16, 0xeb0a33d1,
+    0x6ca86f6e, 0x0284ba7, 0x08387cfa, 0x5fb37586
+  ];
+  function getIv(iv, data) {
+    var value = iv | 0, i, d;
+    for (i = 0; i < data.length; i++) {
+      d = data[i] & 0xFF;
+      if ((i & 1) === 0) {
+        value = (((value >>> 4) ^ (value >>> 0) ^ (value << 6) ^ d)) | 0;
+      } else {
+        value = (~((value >>> 7) ^ (value >>> 0) ^ (d | (value << 12)))) | 0;
+      }
+    }
+    return value;
+  }
+  function sumMd5(data) {
+    var check = 0x20220420 >>> 0, i, temp;
+    for (i = 0; i < 12; i++) {
+      temp = ((i & 1) === 0 ? (check >>> 3) : (check >>> 5)) ^ check;
+      temp >>>= 0;
+      if ((i & 1) === 0) {
+        check = (((data[i] & 0xFF) ^ (check << 7)) ^ temp) >>> 0;
+      } else {
+        var c = (data[i] & 0xFF) | (check << 11);
+        check = ((~c) ^ temp) >>> 0;
+      }
+    }
+    return (((check | 4) >>> 0) ^ 0x1000000) >>> 0;
+  }
+  function hashF13v5(querySm3, bodyMd5, tsBytes, khronos) {
+    var ivV1 = i32(0x9D4A97C2);
+    var countV1 = (ivV1 + khronos + 1) & 255;
+    var countV2 = i32(ivV1 + khronos);
+    var tt = HASH_TABLE.map(function (x) { return ror(x, countV1); });
+    var n0 = (countV2 + 2) & 7;
+    var seed = [0xFA, 0x45, 0x61, 0xD7];
+    var pad = new Uint8Array(seed.map(function (s) { return (((s | (s << 8)) >> n0) & 255); }));
+    var data = concatBytes([querySm3, bodyMd5, tsBytes, pad, hexDecode("00000000000001a0")]);
+    var di = new Array(((data.length / 4) | 0) + 112 + 16).fill(0);
+    var diLen = 0, i;
+    for (i = 0; i < data.length - 3; i += 4) { di[diLen] = readBe32(data, i); diLen++; }
+    var di0 = di[0];
+    for (i = 0; i < 112; i++) {
+      var di1 = di[i + 1], di14 = di[i + 14];
+      var r1 = (rotl(di1, 14) ^ rotl(di1, 25) ^ (u32(di1) >>> 3)) >>> 0;
+      var r2 = (rotl(di14, 13) ^ rotl(di14, 15) ^ (u32(di14) >>> 10)) >>> 0;
+      di[diLen] = i32(di0 + di[i + 9] + r1 + r2);
+      diLen++;
+      di0 = di1;
+    }
+    var initRaw = [0x7ABA4FC8, 0x67166507, 0x6403FA00, 0x340F512F,
+      984304912, 3005047866, 2874125293, 2152413264];
+    var init = initRaw.map(function (x) { return ror(x, countV2 & 31); });
+    var chosen = [96, 1, 3, 4, 0, 6, 5, 2, 0, 7, 7];
+    var d = init.slice();
+    for (i = 0; i < chosen[0]; i++) {
+      var base = i32(ivV1 + i);
+      var n0v = di[base & 127];
+      var n1 = (((d[chosen[3]] ^ d[chosen[4]]) & d[chosen[1]]) ^ d[chosen[3]]) | 0;
+      var n2 = (rotl(d[chosen[1]], 26) ^ rotl(d[chosen[1]], 21) ^ rotl(d[chosen[1]], 7)) >>> 0;
+      var n4 = i32(n0v + n1 + n2 + tt[base & 63] + d[chosen[5]]);
+      var n5 = (rotl(d[chosen[2]], 30) ^ rotl(d[chosen[2]], 19) ^ rotl(d[chosen[2]], 10)) >>> 0;
+      var n6 = ((d[chosen[2]] & d[chosen[6]]) | ((d[chosen[2]] | d[chosen[6]]) & d[chosen[7]])) | 0;
+      var n7 = i32(n5 + n6);
+      var old = d[chosen[9]], last = d[d.length - 1], k;
+      for (k = d.length - 1; k > 0; k--) d[k] = d[k - 1];
+      d[0] = last;
+      d[chosen[10]] = i32(n7 + n4);
+      d[chosen[8]] = i32(old + n4);
+    }
+    var ret = new Uint8Array(32);
+    for (i = 0; i < 8; i++) putBe32(ret, i * 4, i32(d[i] + init[i]));
+    for (i = 0; i < 16; i++) ret[i] ^= ret[i + 16];
+    return concatBytes([ret.slice(0, 16), le32((sumMd5(ret.slice(0, 16)) | 0x20) >>> 0)]);
+  }
+
+  /* ---------------- AesV3（自定义 S 盒 AES 变体，逐行对齐） ---------------- */
+  var V5_SBOX = hexDecode("53290fe9e51f316f90f74a7e034d367784ab49237cd0135cdc632c322fd3be0e2624a417ecd9151a7ff64f60730a87f9445ec6ada2f865d22b696c4188f24c0df37b75510b939f6bc2fe6883e68bc8c722181ba0bdb08c9871b50c9a16b46eea8eed20ba4b8a14e0fcf1468dbbef05a93e5a9d7dcf06898635c1fd99f5de287a80c594daaab19b6279fbd75070cb52eb2555c456e39e7839853874e2f0013ac0b64742d8ca10e4b79c955de8b843ce4ed464a6a72ed508091c92e7b3eedd1e1dd12afac321618fa3d65f9167c982f43d66a53c6a1997585b346dbf9672ff37cdbc073b2dae11453304df00815476b2a13fccdb30b957a8acafe127400248591238922563e36406d37a24100b7902a028044e218453c2a399199c9d13dc40c55ba67e502273850ebdc1a2e2188b8f2d9e3cb909b8c46a2a9f4a6dd93007eafa65b7b3a881aa908cc74f0ad76bbbb58617c37012ca05a469fd44e62eecf1e4272ce860c0ae5eadf99b20d8f0234174006f3f110d7657d01645d4eff8f71471cbfe1cb2f52648727bf3c9de55153e031b4d61757db63dbf7782eeafe9018a8891362fb14759ac32bab03b349aeb5a377c5156be4c8dfbe13a684bda39cf836697c894545fe0f2491acea9fc6252f4ff1e0fe72bd2df6e67a7f635e5bcc6d1a5dd951d89960887a18eb40c785cdb1f80ed42299333ab98cdd67f316cd54346585dccd759fb722789b08807cc0fda293f7e5e1819bb0353517020b31d3d00374952bea2c421e862040a9ec892a05b266b7a0d0cc316f483b81af39715657ffe32ad8de0c13077646035236ee5363e5f900e9a7cf850a81cd9960b6df73317226f99eaa6fff15cec34acb98246639b918ab2851466a7cdfc4ad1b52c2ae95a58d3734e47ddd5b7560193f644ef9c408b7dee39b4d6aabf4de761e3252d4c7ba3843187745d55e6a5db05d42b45caed43c0c5d0b64bfa9d94a4a9d8f2f0e1a108dcfd288fd2bc1fc7bd675412138169cb09249875ba3b68cfb11180afae104fc9789571c6dfce02413886796ae21e3c488cc21b9f423a066c2eabf98e2fdeeb5776e4f5d09a515ba58cbbab3e37b09fd4f6d9244df80512e84cd7956be301cf64f1429d58577cc241f3a2c655144f81aaf95a4e108da894b38970561ae9002619fbbac91fa922ed202bfc62cb08e0de2a7f3631435f8b47c8a3c563b4db4071ce74c46da6fa696a9e282d1e825d663b93bfd56c48dce1884bb10fccea063929f746443fd830a4232e53da21a1f2d1bdfebc3a02c10a1b8ad31d04fd616590d272ac737e98eb33af60528716bee78ec0ee8699031177277d9cff32542c67caf5f44591681335ae0e178f3409a7803db83892dde5b9b7f0c750e24aef077badd678a09b850b84ec1597e4963cb5e675df1c0d6fb618496ecd76c35c798325590c2fb27a5e");
+  function aesSrc(data, idx) { return idx < data.length ? (data[idx] & 0xFF) : 0; }
+  function aesPut(out, idx, value) { if (0 <= idx && idx < out.length) out[idx] = value & 0xFF; }
+  function aesXt(x) { return ((x << 1) ^ ((x & 128) ? 0x1B : 0)) & 0xFF; }
+  function aesMix(rows) {
+    for (var i = 0; i < 4; i++) {
+      var t = rows[0][i] ^ rows[1][i] ^ rows[2][i] ^ rows[3][i];
+      var u = rows[0][i];
+      rows[0][i] ^= t ^ aesXt(rows[0][i] ^ rows[1][i]);
+      rows[1][i] ^= t ^ aesXt(rows[1][i] ^ rows[2][i]);
+      rows[2][i] ^= t ^ aesXt(rows[2][i] ^ rows[3][i]);
+      rows[3][i] ^= t ^ aesXt(rows[3][i] ^ u);
+    }
+  }
+  function AesV3(key, khronos) {
+    this.wordSize = khronos & 3;
+    var ws = this.wordSize;
+    this.box = V5_SBOX.slice(ws * 256, (ws + 1) * 256);
+    this.con2 = AesV3.CON2_TABLE[ws];
+    this.order = AesV3.ORDER_TABLE[ws];
+    var init = AesV3.INIT[ws];
+    var initial = concatBytes([le32(init), le32(init), le32(init), le32(init)]);
+    var mk = xorBytes(initial, key);
+    var expanded = new Uint8Array(48);
+    expanded.set(mk, 0);
+    var rounds = 8, i, at, a, b, c, d, t;
+    for (i = 4; i < 12; i++) {
+      at = 4 * (i - 1);
+      a = expanded[at] & 0xFF; b = expanded[at + 1] & 0xFF;
+      c = expanded[at + 2] & 0xFF; d = expanded[at + 3] & 0xFF;
+      if ((i & 3) === 0) {
+        t = (((init >>> (rounds & 24)) ^ this.box[b]) & 255);
+        b = this.box[c]; c = this.box[d]; d = this.box[a]; a = t;
+      }
+      rounds += 2;
+      expanded[at + 4] = a ^ (expanded[at - 12] & 0xFF);
+      expanded[at + 5] = b ^ (expanded[at - 11] & 0xFF);
+      expanded[at + 6] = c ^ (expanded[at - 10] & 0xFF);
+      expanded[at + 7] = d ^ (expanded[at - 9] & 0xFF);
+    }
+    this.keys = [];
+    for (i = 0; i < 12; i++) {
+      this.keys.push([expanded[i * 4] & 0xFF, expanded[i * 4 + 1] & 0xFF,
+        expanded[i * 4 + 2] & 0xFF, expanded[i * 4 + 3] & 0xFF]);
+    }
+  }
+  AesV3.CON2_TABLE = [[2, 0, 3, 1], [1, 3, 2, 0], [3, 2, 1, 0], [2, 3, 1, 0]];
+  AesV3.ORDER_TABLE = [
+    [0, 9, 14, 15, 4, 13, 2, 7, 8, 1, 6, 3, 12, 5, 10, 11],
+    [0, 9, 14, 11, 4, 13, 2, 3, 8, 1, 6, 15, 12, 5, 10, 7],
+    [0, 9, 14, 3, 4, 13, 2, 15, 8, 1, 6, 11, 12, 5, 10, 7],
+    [0, 9, 14, 15, 4, 13, 2, 3, 8, 1, 6, 11, 12, 5, 10, 7]
+  ];
+  AesV3.WIRE = [6, 5, 3, 4, 2, 7, 1, 0];
+  AesV3.COMPACT = [1, 7, 3, 6, 2, 0, 4, 5];
+  AesV3.INIT = [0xBBB5DE72, 0xD4638D5B, 0x92A5F73B, 0x89F8A1C9];
+  AesV3.prototype._add = function (rows, key) {
+    for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) rows[i][j] ^= key[i][j];
+  };
+  AesV3.prototype._addCon = function (rows, ks) {
+    for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) rows[i][j] ^= ks[i][this.con2[j]];
+  };
+  AesV3.prototype._sub = function (rows) {
+    var i, j;
+    for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) rows[i][j] = this.box[rows[i][j]] & 0xFF;
+    var old = rows.map(function (r) { return r.slice(); });
+    for (i = 0; i < 4; i++) rows[i] = old[this.con2[i]];
+  };
+  AesV3.prototype._shift = function (rows) {
+    var flat = [];
+    for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) flat.push(rows[i][j] & 0xFF);
+    for (i = 0; i < 16; i++) rows[(i / 4) | 0][i % 4] = flat[this.order[i]] & 0xFF;
+  };
+  AesV3.prototype._shiftCon = function (rows) {
+    var old = rows.map(function (r) { return r.slice(); });
+    for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) rows[i][j] = old[i][this.con2[j]];
+  };
+  AesV3.prototype._subKeys = function (frm) {
+    var out = [];
+    for (var i = 0; i < 4; i++) out.push(this.keys[frm + i].slice(0, 4));
+    return out;
+  };
+  AesV3.prototype._block = function (value) {
+    var rows = [], i, j;
+    for (i = 0; i < 4; i++) {
+      rows.push([]);
+      for (j = 0; j < 4; j++) rows[i].push(value[i * 4 + j] & 0xFF);
+    }
+    this._addCon(rows, this._subKeys(0));
+    for (i = 1; i < 3; i++) {
+      this._sub(rows);
+      this._shift(rows);
+      if (i === 1) { this._shiftCon(rows); aesMix(rows); }
+      this._addCon(rows, this._subKeys(i * 4));
+    }
+    this._add(rows, this._subKeys(4));
+    var out = new Uint8Array(16), k = 0;
+    for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) out[k++] = rows[i][j] & 0xFF;
+    return out;
+  };
+  AesV3.prototype.encrypt = function (data, iv) {
+    var wire = AesV3.WIRE, compact = AesV3.COMPACT;
+    var plaintext = new Uint8Array(32), i, j, at, acc;
+    for (i = 0; i < 31; i++) {
+      at = i * 8; acc = 0;
+      for (j = 0; j < 8; j++) acc |= (((aesSrc(data, at + j) >> wire[j]) & 1) << compact[j]);
+      plaintext[i] = acc & 0xFF;
+    }
+    plaintext[31] = 1;
+    var blocks = [], previous = iv;
+    for (i = 0; i < plaintext.length; i += 16) {
+      var value = this._block(xorBytes(plaintext.slice(i, i + 16), previous));
+      blocks.push(value);
+      previous = value;
+    }
+    var key = concatBytes(blocks);
+    var out = new Uint8Array(data);
+    for (i = 0; i < 31; i++) {
+      at = i * 8;
+      var kk = key[i] & 0xFF;
+      for (j = 0; j < 8; j++) {
+        var bit = wire[j], mask = (1 << bit) & 0xFF;
+        aesPut(out, at + j,
+          (aesSrc(out, at + j) & ((~mask) & 0xFF)) | (((kk >> compact[j]) & 1) << bit));
+      }
+    }
+    return concatBytes([new Uint8Array([key[key.length - 1]]), out]);
+  };
+
+  /* ---------------- xmxor / keyHash ---------------- */
+  function xmxor(data, key) {
+    var n = data.length, encoded = new Uint8Array(n), i;
+    for (i = 0; i < n; i++) {
+      var at = (i * 4) & 28;
+      var d0 = key[at] & 0xFF, d1 = key[at + 1] & 0xFF;
+      var d2 = rotl8(data[i] & 0xFF) + d0;
+      d2 = ((~d2) ^ d1) & 0xFF;
+      d2 = rotl8_3(d2);
+      d2 = (d2 + d1) & 255;
+      d2 = (d2 ^ d0) & 255;
+      encoded[n - i - 1] = (~d2) & 255;
+    }
+    var last = (encoded[n - 1] ^ encoded[n - 2]) & 255;
+    var first = encoded[0] & 0xFF;
+    encoded[0] = ((~last) + first) & 255;
+    encoded[1] = ((encoded[0] ^ encoded[n - 1] ^ 254) + encoded[1]) & 255;
+    encoded[2] = (encoded[2] + (((last - first) ^ rotl8_3(encoded[1] & 0xFF)) ^ 2)) & 255;
+    for (i = 0; i < n - 4; i++) {
+      var temp = rotl8_3(encoded[i + 2] & 0xFF) ^ encoded[i + 1] ^ (i + 3);
+      encoded[i + 3] = ((~temp) + encoded[i + 3]) & 255;
+    }
+    encoded[n - 1] = (encoded[n - 1] ^ encoded[n - 2]) & 255;
+    var total = 0;
+    for (i = 0; i < n - 1; i++) total += encoded[i + 1] & 0xFF;
+    encoded[0] = ((encoded[0] ^ encoded[1]) + total) & 255;
+    return encoded;
+  }
+  function keyHash(signKey, random) {
+    var h = sm3(concatBytes([signKey, le32(random), signKey]));
+    var d1 = (random >>> 16) & 255;
+    var d2 = (((d1 << 11) | (random >>> 24)) ^ (d1 >> 5) ^ d1);
+    d2 = ~d2;
+    return [h, le32(d2)];
+  }
+
+  /* ---------------- medusa / helios / branch / sign ---------------- */
+  var V5_MAGIC = hexDecode("2d4b4fca49750d433fb5ae2c226dcc56");
+  var V5_LICENSE = "646637794";
+  var V5_SIGN_KEY = hexDecode("b23c2a470a20d105dc3f8c4438f8272ed46d6c89ffdcdedd5108698d26e9489d");
+  var PROCESS_NONCE = b64encodeUrl(rndBytes(18));
+  var PROCESS_STARTED = Date.now();
+  function medusaV5(url, body, khronos, who) {
+    var bodyMd5 = body ? md5(body) : new Uint8Array(16);
+    var qpos = url.indexOf("?");
+    var query = qpos >= 0 ? url.slice(qpos + 1) : "";
+    var queryBytes = utf8(query);
+    var querySm3 = sm3(queryBytes);
+    var ts = le32(khronos);
+    var f13 = hashF13v5(querySm3, bodyMd5, ts, khronos);
+    var version = who.version_name;
+    var deviceInfo = proto([
+      [1, 1, "sint"], [2, 2, "sint"], [3, "8662"], [4, who.device_id],
+      [5, PROCESS_NONCE], [6, "!noperm!"], [12, "Asia/Shanghai,8"], [13, "zh_CN"],
+      [22, who.os_version], [25, PROCESS_STARTED, "sint"],
+      [30, who.device_type], [31, "HONOR"], [32, who.device_type], [34, "HONOR"]
+    ]);
+    var env = proto([
+      [6, "v04.10.03.04-bugfix"], [8, who.channel],
+      [12, deviceInfo, "message"], [14, version]
+    ]);
+    var message = proto([
+      [1, V5_MAGIC, "bytes"], [2, 5, "sint"], [3, rndInt32(), "sint"],
+      [4, "8662"], [5, who.device_id], [6, V5_LICENSE],
+      [7, version], [8, "v04.10.03-ml-android"], [9, 0x040A0300, "sint"],
+      [10, new Uint8Array(8), "bytes"], [12, khronos, "sint"], [13, f13, "bytes"],
+      [14, querySm3.slice(0, 6), "bytes"],
+      [15, proto([[1, 1, "sint"], [2, 1, "sint"], [3, 1, "sint"], [5, 1, "sint"]]), "message"],
+      [17, khronos, "sint"], [20, "none"], [21, 312, "sint"], [23, env, "message"],
+      [24, '{"cmr":16777216,"cmr2":16777216,"un_h":11,"vpn":0,"kd":0,"dyn":"","do":1,"tk":true}']
+    ]);
+    var nonce = rndInt32();
+    var kh = keyHash(V5_SIGN_KEY, nonce);
+    var hash_ = kh[0], seed = kh[1];
+    var transformed = Array.prototype.slice.call(xmxor(message, hash_));
+    transformed = new Array(8).fill(0).concat(transformed);
+    transformed.reverse();
+    for (var i = 0; i < transformed.length; i++) {
+      transformed[i] = (transformed[i] ^ seed[(~i) & 3]) & 0xFF;
+    }
+    var check = ((((querySm3[0] & 63) << 14) | 0x18000001 | ((f13[0] & 63) << 8)) >>> 0);
+    var xmRand = rndInt32();
+    var packed = concatBytes([
+      new Uint8Array([0xCA]), le32(xmRand), le32(check),
+      new Uint8Array(transformed),
+      new Uint8Array([(nonce >>> 16) & 255, (nonce >>> 24) & 255])
+    ]);
+    var encrypted = new AesV3(md5(V5_SIGN_KEY.slice(0, 16)), khronos)
+      .encrypt(packed, md5(V5_SIGN_KEY.slice(16, 32)));
+    var prefix = Array.prototype.slice.call(concatBytes([le32(5), V5_MAGIC]));
+    var tsLe = le32(khronos);
+    for (i = 0; i < prefix.length; i++) prefix[i] ^= tsLe[i & 3];
+    return b64encode(concatBytes([
+      new Uint8Array(prefix),
+      new Uint8Array([nonce & 255, (nonce >>> 8) & 255, 0, 1]),
+      encrypted
+    ]));
+  }
+  function heliosV5(khronos) {
+    var M64 = (1n << 64n) - 1n;
+    var random = rndInt32();
+    var digest = md5(concatBytes([le32(random), utf8("8662")]));
+    var hexAscii = utf8(hexEncode(digest));
+    var words = [];
+    for (var i = 0; i < 4; i++) {
+      var w = 0n;
+      for (var k = 7; k >= 0; k--) w = (w << 8n) | BigInt(hexAscii[i * 8 + k]);
+      words.push(w);
+    }
+    var queue = [words[2], words[3]];
+    var b0 = words[0], b8 = words[1];
+    var table = new Array(35).fill(0n);
+    table[0] = words[0];
+    for (i = 0; i < 34; i++) {
+      var x8 = ((rotr64(b8, 8n) + b0) & M64) ^ BigInt(i);
+      queue.push(x8);
+      x8 = x8 ^ rotr64(b0, 61n);
+      table[i + 1] = x8;
+      b0 = x8;
+      b8 = queue.shift();
+    }
+    var textBytes = utf8(khronos + "-" + V5_LICENSE + "-8662");
+    var padLen = Math.floor((textBytes.length + 1 + 15) / 16) * 16;
+    var padByte = (16 - (textBytes.length % 16)) & 0xFF;
+    var pad = new Uint8Array(padLen).fill(padByte);
+    pad.set(textBytes, 0);
+    function le64(buf, off) {
+      var v = 0n;
+      for (var kk = 7; kk >= 0; kk--) v = (v << 8n) | BigInt(buf[off + kk]);
+      return v;
+    }
+    function le64bytes(v) {
+      var out = new Uint8Array(8);
+      for (var kk = 0; kk < 8; kk++) out[kk] = Number((v >> BigInt(kk * 8)) & 0xFFn);
+      return out;
+    }
+    var out = [];
+    for (var at = 0; at < pad.length; at += 16) {
+      var a = le64(pad, at), b = le64(pad, at + 8);
+      for (i = 0; i < 34; i++) {
+        b = table[i] ^ ((a + rotr64(b, 8n)) & M64);
+        a = b ^ rotr64(a, 61n);
+      }
+      out.push(le64bytes(a), le64bytes(b));
+    }
+    return b64encode(concatBytes([le32(random)].concat(out)));
+  }
+  function branchV5(queryStr, body, khronos) {
+    var bodyMd5 = body ? md5(body) : new Uint8Array(16);
+    var q = sm3(utf8(queryStr));
+    var iv = getIv(getIv(getIv(0x20230928, q), bodyMd5), le32(khronos));
+    return (iv & 15) === 12 ? 0 : 1;
+  }
+  function quoteV5(s) {
+    var bytes = utf8(s), out = "";
+    for (var i = 0; i < bytes.length; i++) {
+      var b = bytes[i];
+      var ch = String.fromCharCode(b);
+      if ((b >= 0x30 && b <= 0x39) || (b >= 0x41 && b <= 0x5A) ||
+        (b >= 0x61 && b <= 0x7A) || "*-._~".indexOf(ch) >= 0) out += ch;
+      else out += "%" + ("0" + b.toString(16).toUpperCase()).slice(-2);
+    }
+    return out;
+  }
+  function encodeV5Query(values) {
+    var parts = [];
+    for (var k in values) {
+      if (Object.prototype.hasOwnProperty.call(values, k)) {
+        parts.push(quoteV5(k) + "=" + quoteV5(String(values[k])));
+      }
+    }
+    return parts.join("&");
+  }
+  function signPlaybackV5(base, values, body, nowMs) {
+    var ts = Math.floor(nowMs / 1000);
+    for (var offset = 0; offset < 1024; offset++) {
+      var ticket = nowMs + offset;
+      var qv = {};
+      for (var k in values) {
+        if (Object.prototype.hasOwnProperty.call(values, k)) qv[k] = values[k];
+      }
+      qv._rticket = String(ticket);
+      var query = encodeV5Query(qv);
+      if (branchV5(query, body, ts) !== 0) continue;
+      var url = base + "?" + query;
+      var headers = {
+        "x-khronos": String(ts),
+        "x-helios": heliosV5(ts),
+        "x-medusa": medusaV5(url, body, ts, values)
+      };
+      if (body) {
+        headers["Content-Type"] = "application/json; charset=utf-8";
+        headers["x-ss-stub"] = hexEncode(md5(body)).toUpperCase();
+      }
+      return { url: url, headers: headers };
+    }
+    throw new Error("无法生成播放签名");
+  }
+
+  /* ---------------- ttEncrypt 注册 ---------------- */
+  var KDF_SALT = hexDecode("4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58");
+  var REGISTER_URL = "https://log5-applog-lf.fqnovel.com/service/2/device_register/" +
+    "?tt_data=a&cronet_version=8d40f833_2026-03-03&ttnet_version=4.2.243.31-douyin" +
+    "&use_store_region_cookie=1";
+  var REGISTER_UA = "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; " +
+    "Build/BP2A.250605.031.A3)";
+  function seal(compressed, random) {
+    return sha512(random).then(function (h1) {
+      return sha512(concatBytes([h1, KDF_SALT]));
+    }).then(function (derived) {
+      return sha512(compressed).then(function (h2) {
+        var plaintext = concatBytes([h2, compressed]);
+        return aesCbcEncrypt(derived.slice(0, 16), derived.slice(16, 32), plaintext)
+          .then(function (ct) {
+            return concatBytes([hexDecode("746305100000"), random, ct]);
+          });
+      });
+    });
+  }
+  function buildBody(now, cdid, random) {
+    var header = {
+      display_name: "红果免费短剧", update_version_code: 73932, manifest_version_code: 73932,
+      app_version_minor: "7.3.9.32", aid: 8662, channel: "update_64", package: "com.phoenix.read",
+      app_version: "7.3.9.32", version_code: 73932, sdk_version: "3.7.0-rc.34-fanqie-xiaoshuo",
+      sdk_target_version: 29, git_hash: "3a88f4e", os: "Android", os_version: "16", os_api: 36,
+      device_model: "25053RT47C", device_brand: "Redmi", device_manufacturer: "Redmi",
+      cpu_abi: "arm64-v8a", release_build: "b5e187f", density_dpi: 520, display_density: "mdpi",
+      resolution: "1280x2772", language: "zh", timezone: 8, access: "wifi", not_request_sender: 0,
+      carrier: "CHINA MOBILE", mcc_mnc: "46000", rom: "eng.root.20231116.160340",
+      rom_version: "W528JS release-keys", cdid: cdid,
+      sig_hash: "56a962410c494bbaf0b58dba20cae56f", openudid: hexEncode(rndBytes(8)),
+      clientudid: uuidv4(), ipv6_list: [], region: "CN", tz_name: "Asia/Shanghai",
+      tz_offset: 28800, sim_region: "cn", sim_serial_number: [], oaid_may_support: false,
+      req_id: uuidv4(), device_platform: "android",
+      custom: { account_region_src: "fallback", account_region: "cn", host_bit: 64, dragon_device_type: "phone" },
+      pre_installed_channel: "",
+      apk_first_install_time: now, is_system_app: 0, sdk_flavor: "china", guest_mode: 0
+    };
+    var payload = { magic_tag: "ss_app_log", header: header, _gen_time: now };
+    var json = JSON.stringify(payload);
+    return gzipBytes(utf8(json)).then(function (compressed) {
+      var rnd = random || rndBytes(32);
+      return seal(compressed, rnd);
+    });
+  }
+  function buildHeaders(body, now) {
+    return {
+      "User-Agent": REGISTER_UA,
+      "Accept": "application/json",
+      "Content-Type": "application/octet-stream;tt-data=a",
+      "log-encode-type": "gzip",
+      "x-ss-dp": "8662",
+      "x-ss-req-ticket": String(now),
+      "x-vc-bdturing-sdk-version": "4.0.3.cn",
+      "lc": "101",
+      "sdk-version": "2",
+      "passport-sdk-version": "5051452",
+      "x-neptune": "-8|50:51:59:30:40:47:49:39",
+      "x-ss-stub": hexEncode(md5(body)).toUpperCase()
+    };
+  }
+  function responseId(response, name, strFields) {
+    var value = strFields ? strFields[name + "_str"] : undefined;
+    if (value === undefined || value === null || value === "") value = response[name + "_str"];
+    if (value === undefined || value === null || value === "") value = response[name];
+    if (typeof value === "boolean") return "";
+    if (typeof value === "number") return value > 0 ? String(value) : "";
+    if (typeof value === "string") {
+      return (/^\d+$/.test(value) && /[1-9]/.test(value) && value.length <= 30) ? value : "";
+    }
+    return "";
+  }
+  function parseResponse(respBytes, status) {
+    if (status !== 200) throw new Error("HTTP " + status);
+    var rawText = TD.decode(respBytes);
+    var strFields = {};
+    var m;
+    var re = /"(device_id_str|install_id_str)"\s*:\s*"(\d+)"/g;
+    while ((m = re.exec(rawText)) !== null) strFields[m[1]] = m[2];
+    var j;
+    try { j = JSON.parse(rawText); } catch (e) { throw new Error("无效的注册响应(JSON)"); }
+    var did = responseId(j, "device_id", strFields);
+    var iid = responseId(j, "install_id", strFields);
+    var code = Number((j.code !== undefined && j.code !== null) ? j.code :
+      ((j.Code !== undefined && j.Code !== null) ? j.Code : 0)) || 0;
+    if (!did || !iid || code !== 0) throw new Error("无效的注册响应");
+    return { device_id: did, iid: iid, cdid: (typeof j.cdid === "string" ? j.cdid : "") };
+  }
+  function fetchTimeout(url, init, ms) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, ms || 20000);
+    var p = fetch(url, Object.assign({}, init, { signal: ctrl.signal }));
+    return p.then(function (r) { clearTimeout(timer); return r; },
+      function (e) { clearTimeout(timer); throw e; });
+  }
+  function registerIdentity() {
+    var now = Date.now();
+    var cdid = uuidv4();
+    return buildBody(now, cdid).then(function (body) {
+      var headers = buildHeaders(body, now);
+      return fetchTimeout(REGISTER_URL, { method: "POST", headers: headers, body: body }, 20000)
+        .then(function (res) {
+          return res.arrayBuffer().then(function (buf) {
+            return parseResponse(new Uint8Array(buf), res.status);
+          });
+        });
+    });
+  }
+
+  /* ---------------- 身份复用（localStorage，不可用时退内存） ---------------- */
+  var IDENTITY_KEY = "hgV5Identity";
+  var _memIdentity = null;
+  function loadIdentity() {
+    try {
+      var ls = global.localStorage;
+      if (ls) {
+        var s = ls.getItem(IDENTITY_KEY);
+        if (s) {
+          var o = JSON.parse(s);
+          if (o && o.device_id && o.iid) return o;
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return _memIdentity;
+  }
+  function saveIdentity(id) {
+    _memIdentity = id;
+    try {
+      var ls = global.localStorage;
+      if (ls) ls.setItem(IDENTITY_KEY, JSON.stringify(id));
+    } catch (e) { /* ignore */ }
+  }
+  function clearIdentity() {
+    _memIdentity = null;
+    try {
+      var ls = global.localStorage;
+      if (ls) ls.removeItem(IDENTITY_KEY);
+    } catch (e) { /* ignore */ }
+  }
+  function getIdentity() {
+    var id = loadIdentity();
+    if (id) return Promise.resolve(id);
+    return registerIdentity().then(function (nid) { saveIdentity(nid); return nid; });
+  }
+
+  /* ---------------- 取流 ---------------- */
+  var PRELOAD_DEVICE = {
+    aid: "8662", app_name: "novelread",
+    version_code: "74532", version_name: "7.4.5.32",
+    update_version_code: "74532", manifest_version_code: "74532",
+    os: "android", ssmix: "a", channel: "update_64",
+    device_platform: "android", device_type: "25053RT47C",
+    device_brand: "Redmi", os_version: "16", os_api: "36",
+    ac: "wifi", language: "zh", host_abi: "arm64-v8a"
+  };
+  var VM_API = "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/";
+  var VM_UA = "com.phoenix.read/74532 (Linux; U; Android 16; zh_CN_#Hans; " +
+    "25053RT47C; Build/BP2A;tt-ok/3.12.13.20)";
+  var MULTI_DETAIL_API = "https://api5-normal-sinfonlinea.fqnovel.com" +
+    "/novel/player/multi_video_detail/v1/";
+  function valuesWithIdentity(identity) {
+    var values = {};
+    for (var k in PRELOAD_DEVICE) values[k] = PRELOAD_DEVICE[k];
+    values.iid = identity.iid;
+    values.device_id = identity.device_id;
+    if (identity.cdid) values.cdid = identity.cdid;
+    return values;
+  }
+  function vmModelWith(identity, vid) {
+    var payload = {
+      biz_param: {
+        detail_page_version: 0, device_level: 1,
+        disable_digg_stat: false, disable_video_relate_book: false,
+        need_all_video_definition: true, need_mp4_align: false,
+        use_os_player: false, use_server_dns: false, video_platform: 1024
+      },
+      mixed_video_id_map: { "1004": [vid] },
+      video_id: vid,
+      dr_scene: "player"
+    };
+    return gzipBytes(utf8(JSON.stringify(payload))).then(function (body) {
+      var values = valuesWithIdentity(identity);
+      var signed = signPlaybackV5(VM_API, values, body, Date.now());
+      var headers = {
+        "User-Agent": VM_UA, "Accept": "application/json",
+        "Content-Encoding": "gzip"
+      };
+      for (var hk in signed.headers) headers[hk] = signed.headers[hk];
+      return fetchTimeout(signed.url, { method: "POST", headers: headers, body: body }, 20000)
+        .then(function (res) {
+          if (res.status !== 200) throw new Error("video_model 接口 HTTP " + res.status);
+          return res.text();
+        })
+        .then(function (txt) {
+          if (!txt.trim()) throw new Error("video_model 接口 HTTP 200 空响应");
+          var j;
+          try { j = JSON.parse(txt); } catch (e) { throw new Error("video_model 响应不是 JSON"); }
+          var code = 0;
+          if (j.Code !== undefined && j.Code !== null) code = Number(j.Code) || 0;
+          else if (j.code !== undefined && j.code !== null) code = Number(j.code) || 0;
+          else if (j.BaseResp && j.BaseResp.StatusCode !== undefined && j.BaseResp.StatusCode !== null)
+            code = Number(j.BaseResp.StatusCode) || 0;
+          if (code !== 0) throw new Error("video_model 接口错误码 " + code);
+          var data = j.data;
+          if (!data || typeof data !== "object") throw new Error("video_model 接口未返回 data");
+          var raw = data.video_model;
+          if (raw === undefined || raw === null) {
+            var entries = data["1004"];
+            if (entries && typeof entries === "object") {
+              var entry = entries[vid];
+              if (!entry) {
+                var vals = Object.keys(entries).map(function (kk) { return entries[kk]; });
+                for (var i = 0; i < vals.length; i++) {
+                  if (vals[i] && typeof vals[i] === "object" && vals[i].video_model) { entry = vals[i]; break; }
+                }
+              }
+              if (entry && typeof entry === "object") raw = entry.video_model;
+            }
+          }
+          if (typeof raw === "string") {
+            try { raw = JSON.parse(raw); } catch (e) { throw new Error("video_model JSON 无效"); }
+          }
+          if (!raw || typeof raw !== "object") throw new Error("video_model 为空");
+          return raw;
+        });
+    });
+  }
+  function vmModel(videoId) {
+    var vid = text(videoId);
+    if (!/^\d+$/.test(vid)) return Promise.reject(new Error("分集编号无效"));
+    return getIdentity().then(function (identity) {
+      return vmModelWith(identity, vid).catch(function (err) {
+        clearIdentity();
+        return registerIdentity().then(function (nid) {
+          saveIdentity(nid);
+          return vmModelWith(nid, vid);
+        });
+      });
+    });
+  }
+  function multiDetailWith(identity, sid) {
+    var payload = {
+      series_id: sid,
+      biz_param: {
+        caller_scene: "single_col",
+        detail_page_version: 0,
+        from_video_id: "",
+        need_all_video_definition: false,
+        need_mp4_align: false,
+        source: 4,
+        video_id_type: 1
+      }
+    };
+    return gzipBytes(utf8(JSON.stringify(payload))).then(function (body) {
+      var values = valuesWithIdentity(identity);
+      var signed = signPlaybackV5(MULTI_DETAIL_API, values, body, Date.now());
+      var headers = {
+        "User-Agent": VM_UA, "Accept": "application/json",
+        "Content-Encoding": "gzip"
+      };
+      for (var hk in signed.headers) headers[hk] = signed.headers[hk];
+      return fetchTimeout(signed.url, { method: "POST", headers: headers, body: body }, 20000)
+        .then(function (res) {
+          if (res.status !== 200) throw new Error("multi_video_detail HTTP " + res.status);
+          return res.text();
+        })
+        .then(function (txt) {
+          if (!txt.trim()) throw new Error("multi_video_detail 空响应");
+          var j;
+          try { j = JSON.parse(txt); } catch (e) { throw new Error("multi_video_detail 响应不是 JSON"); }
+          var data = j.data || {};
+          var series = data[sid] || {};
+          var vlist = ((series.video_data || {}).video_list) || [];
+          var rows = vlist.filter(function (e) {
+            return e && typeof e === "object" && /^\d+$/.test(String(e.vid || ""));
+          });
+          rows.sort(function (a, b) {
+            return (parseInt(a.vid_index, 10) || 0) - (parseInt(b.vid_index, 10) || 0);
+          });
+          return rows.map(function (e) { return String(e.vid); });
+        });
+    });
+  }
+  function multiVideoDetailList(seriesId) {
+    var sid = text(seriesId);
+    if (!sid) return Promise.resolve([]);
+    return getIdentity().then(function (identity) {
+      return multiDetailWith(identity, sid).catch(function () {
+        clearIdentity();
+        return registerIdentity().then(function (nid) {
+          saveIdentity(nid);
+          return multiDetailWith(nid, sid);
+        }).catch(function () { return []; });
+      });
+    }).catch(function () { return []; });
+  }
+
+  /* ---------------- 选集 / 密钥 ---------------- */
+  function first() {
+    var values = Array.prototype.slice.call(arguments), i, v, result;
+    for (i = 0; i < values.length; i++) {
+      v = values[i];
+      if (Array.isArray(v)) result = first.apply(null, v);
+      else if (isPlainObj(v)) {
+        result = first(v.url, v.uri, v.src, v.download_url, v.main_url,
+          v.backup_url, v.backup_url_1, v.play_addr, v.url_list);
+      } else result = text(v);
+      if (result) return result;
+    }
+    return "";
+  }
+  function mediaUrl(item) {
+    if (!item || typeof item !== "object") return "";
+    return first(item.main_url, item.backup_url, item.backup_url_1, item.play_addr, item.url);
+  }
+  function spadeValue(item) {
+    if (!item || typeof item !== "object") return "";
+    var ei = isPlainObj(item.encrypt_info) ? item.encrypt_info : {};
+    return first(item.spade_a, ei.spade_a);
+  }
+  function deriveContentKey(spadeB64) {
+    var raw = b64decode(spadeB64);
+    if (raw.length < 3) throw new Error("spade_a 太短");
+    var v8 = raw.length - (raw[0] ^ raw[1] ^ raw[2]) + 47;
+    if (v8 <= 0 || 1 + v8 > raw.length) v8 = raw.length - 1;
+    if (v8 < 33) throw new Error("spade_a 长度异常");
+    var value = Array.prototype.slice.call(raw.slice(1, 1 + v8));
+    var va = 85, vb = 246;
+    for (var index = 0; index < v8; index++) {
+      var previous = (index & 1) ? va : vb;
+      if (index & 1) va = value[index]; else vb = value[index];
+      value[index] = (-21 - popcount(index) + (previous ^ value[index])) & 0xFF;
+    }
+    var hexStr = "";
+    for (var i = 1; i < 33; i++) hexStr += String.fromCharCode(value[i]);
+    return hexDecode(hexStr);
+  }
+  function videoListFromModel(model) {
+    if (!isPlainObj(model)) return null;
+    var k, key;
+    for (k = 0; k < 2; k++) {
+      key = ["video_list", "dynamic_video_list"][k];
+      if (model[key] !== undefined && model[key] !== null) return model[key];
+    }
+    var dynamic = model.dynamic_video;
+    if (isPlainObj(dynamic)) {
+      var keys = ["dynamic_video_list", "video_list", "list"];
+      for (k = 0; k < keys.length; k++) {
+        if (dynamic[keys[k]] !== undefined && dynamic[keys[k]] !== null) return dynamic[keys[k]];
+      }
+    }
+    var videoInfo = model.video_info;
+    if (isPlainObj(videoInfo)) {
+      var data = videoInfo.data;
+      if (isPlainObj(data)) return videoListFromModel(data);
+    }
+    data = model.data;
+    if (isPlainObj(data)) return videoListFromModel(data);
+    return null;
+  }
+  var QUALITY_ORDER = ["2160", "1440", "1080", "720", "576", "540", "480", "360"];
+  function intOf(value) {
+    var m = /(\d+)/.exec(text(value));
+    return m ? parseInt(m[1], 10) : 0;
+  }
+  function qualityOf(value) {
+    var m = /(2160|1440|1080|720|576|540|480|360)/.exec(text(value).toLowerCase());
+    return m ? m[1] : "1080";
+  }
+  function qualityHint(value) {
+    var m = /(2160|1440|1080|720|576|540|480|360)/.exec(text(value).toLowerCase());
+    return m ? m[1] : "";
+  }
+  function definitionOf(item) {
+    if (!isPlainObj(item)) return "";
+    var meta = isPlainObj(item.video_meta) ? item.video_meta : {};
+    var values = [
+      item.definition, item.definition_code, item.video_definition,
+      item.definition_type, item.vheight, item.height, item.quality,
+      item.gear_name, item.quality_name, item.p,
+      meta.definition, meta.vheight, meta.height, meta.quality
+    ];
+    for (var i = 0; i < values.length; i++) {
+      var hint = qualityHint(values[i]);
+      if (hint) return hint;
+    }
+    return "";
+  }
+  function selectQuality(videoList, wanted) {
+    wanted = wanted === undefined || wanted === null ? "1080" : wanted;
+    function rowsFrom(value, hinted) {
+      hinted = hinted || "";
+      if (Array.isArray(value)) {
+        var r = [];
+        for (var i = 0; i < value.length; i++) r = r.concat(rowsFrom(value[i], hinted));
+        return r;
+      }
+      if (!isPlainObj(value)) return [];
+      if (["main_url", "backup_url", "backup_url_1", "play_addr", "spade_a", "encrypt_info"]
+        .some(function (k) { return k in value; })) {
+        return [[hinted, Object.assign({}, value)]];
+      }
+      var result = [];
+      var keys = Object.keys(value);
+      for (var i2 = 0; i2 < keys.length; i2++) {
+        var key = keys[i2], item = value[key];
+        if ((key === "dynamic_video" || key === "video_info" || key === "data") && isPlainObj(item)) {
+          result = result.concat(rowsFrom(item, hinted));
+          continue;
+        }
+        if (key === "video_list" || key === "dynamic_video_list" || key === "list") {
+          result = result.concat(rowsFrom(item, qualityHint(key)));
+          continue;
+        }
+        if (item && typeof item === "object") result = result.concat(rowsFrom(item, qualityHint(key)));
+      }
+      return result;
+    }
+    var candidates = rowsFrom(videoList, "");
+    var rows = new Map();
+    for (var index = 0; index < candidates.length; index++) {
+      var hintedQuality = candidates[index][0], item = candidates[index][1];
+      var definition = definitionOf(item) || qualityHint(hintedQuality) || ("idx" + index);
+      if (!rows.has(definition)) rows.set(definition, item);
+    }
+    if (rows.size === 0) throw new Error("播放模型没有清晰度");
+    var requested = qualityOf(wanted);
+    var order = [requested].concat(QUALITY_ORDER.filter(function (q) { return q !== requested; }));
+    for (var oi = 0; oi < order.length; oi++) {
+      if (rows.has(order[oi])) return [order[oi], rows.get(order[oi])];
+    }
+    var bestKey = null, bestRank = -1;
+    rows.forEach(function (it, key) {
+      var bitrate = intOf(it.bitrate || it.bit_rate || 0);
+      var size = intOf(it.size || it.duration_ms || 0);
+      var rank = bitrate * 1000000 + size;
+      if (rank > bestRank) { bestRank = rank; bestKey = key; }
+    });
+    return [bestKey, rows.get(bestKey)];
+  }
+  var SPADE_URL_CONSTANTS = hexDecode(
+    "4dd4c2e6b83162090e52b3c7a6733ba4" +
+    "1cb2462b829ab58a196b39db57177524" +
+    "f49baf7f08e8d68d26a72e37c1a95a2f" +
+    "1f05a51892aef2949732b62a38aadd58");
+  function decryptSpadeUrl(value, keySeed) {
+    var raw = b64decode(value);
+    if (raw.length < 20 || raw[0] !== 0xA8 || raw[2] !== 0x01 || raw[3] !== 0x00) {
+      return Promise.reject(new Error("spade URL 头无效"));
+    }
+    var cipherLen = raw.length - 4 - ((raw.length - 4) % 16);
+    var cipherData = raw.slice(4, 4 + cipherLen);
+    if (!cipherData.length) return Promise.reject(new Error("spade URL 密文为空"));
+    var seed = (typeof keySeed === "string") ? b64decode(keySeed) : keySeed;
+    return sha512(seed).then(function (first) {
+      return sha512(concatBytes([first, SPADE_URL_CONSTANTS]));
+    }).then(function (second) {
+      return aesCbcDecryptWC(second.slice(0, 16), second.slice(16, 32), cipherData);
+    }).then(function (plain) {
+      var s = TD.decode(plain);
+      return s.replace(/\0+$/, "");
+    });
+  }
+  function keySeedFromModel(model) {
+    if (!isPlainObj(model)) return new Uint8Array(0);
+    var value = text(model.key_seed);
+    if (value) return b64decode(value);
+    var keys = ["dynamic_video", "video_info", "data"];
+    for (var i = 0; i < keys.length; i++) {
+      var nested = model[keys[i]];
+      if (isPlainObj(nested)) {
+        var result = keySeedFromModel(nested);
+        if (result.length) return result;
+      }
+    }
+    return new Uint8Array(0);
+  }
+
+  global.HG_V5 = {
+    registerIdentity: registerIdentity,
+    vmModel: vmModel,
+    multiVideoDetailList: multiVideoDetailList,
+    videoListFromModel: videoListFromModel,
+    definitionOf: definitionOf,
+    selectQuality: selectQuality,
+    mediaUrl: mediaUrl,
+    spadeValue: spadeValue,
+    keySeedFromModel: keySeedFromModel,
+    decryptSpadeUrl: decryptSpadeUrl,
+    deriveContentKey: deriveContentKey,
+    clearIdentity: clearIdentity,
+    _internals: {
+      md5: md5, sm3: sm3, gzipBytes: gzipBytes, sha512: sha512,
+      medusaV5: medusaV5, heliosV5: heliosV5, branchV5: branchV5,
+      signPlaybackV5: signPlaybackV5, seal: seal, buildBody: buildBody,
+      PRELOAD_DEVICE: PRELOAD_DEVICE, VM_UA: VM_UA
+    }
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ====== HG_CENC: 红果 CENC 流式解密（v12 内联，源 ~/workspace/browser-test/hg_cenc.js） ======
+   moov 采样表 + Range 逐块 + WebCrypto AES-CTR。挂 window.HG_CENC。 */
+/* 红果 CENC 流式解密（浏览器 JS 移植，Python 原型见 _____27_ozxc.py）。
+   模型与 _StreamSession 同款：先拿 moov 建采样表，再按 Range 逐块拉、逐样本解密
+   （WebCrypto AES-CTR），moov 段用改写后的版本（encv/enca 还原 + sinf 清掉）。
+   不依赖本地服务器；输出为解密后的完整 MP4 字节（调用方再包成 Blob URL 喂播放器）。
+   挂 window.HG_CENC。无 import，可直接 <script> 引入。 */
+(function (g) {
+  "use strict";
+
+  var HEAD_PROBE = 1 << 16; /* 64KB：moov 在文件头，先探这一段找 moov */
+  var CHUNK = 1 << 20; /* 1MB：媒体 Range 分块 */
+
+  function u32be(b, o) {
+    return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+  }
+  function u64be(b, o) {
+    /* 64 位偏移：高 32 位 * 2^32 + 低 32 位（文件 < 2^53，可精确表示） */
+    return u32be(b, o) * 4294967296 + u32be(b, o + 4);
+  }
+  function hex(bytes) {
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += ("0" + bytes[i].toString(16)).slice(-2);
+    return s;
+  }
+  function concat(parts) {
+    var total = 0, i;
+    for (i = 0; i < parts.length; i++) total += parts[i].length;
+    var out = new Uint8Array(total), p = 0;
+    for (i = 0; i < parts.length; i++) { out.set(parts[i], p); p += parts[i].length; }
+    return out;
+  }
+
+  /* ---- 盒查找（port _find_box）：从 start 起找 fourcc，返回 {offset, size} 或 null ---- */
+  function findBox(data, fourcc, start) {
+    var f0 = fourcc.charCodeAt(0), f1 = fourcc.charCodeAt(1),
+        f2 = fourcc.charCodeAt(2), f3 = fourcc.charCodeAt(3);
+    for (var i = Math.max(4, start); i <= data.length - 4; i++) {
+      if (data[i] !== f0 || data[i + 1] !== f1 || data[i + 2] !== f2 || data[i + 3] !== f3) continue;
+      var size = u32be(data, i - 4);
+      if (size === 1 && i + 12 <= data.length) size = u64be(data, i + 4);
+      if (size >= 8 && size <= 5000000 && i - 4 + size <= data.length) {
+        return { offset: i - 4, size: size };
+      }
+    }
+    return null;
+  }
+  function boxBody(data, fourcc, start) {
+    var b = findBox(data, fourcc, start);
+    return b ? data.subarray(b.offset + 8, b.offset + b.size) : null;
+  }
+
+  /* ---- 单轨解析（port _parse_track）----
+     返回 {sizes, offsets, chunkSamples, auxSizes, auxOffset, sampleCount}，缺关键盒返回 null。 */
+  function parseTrack(moov, trackOffset) {
+    var stbl = findBox(moov, "stbl", trackOffset + 8);
+    if (!stbl) return null;
+    var stsz = boxBody(moov, "stsz", stbl.offset);
+    var stco = boxBody(moov, "stco", stbl.offset);
+    var co64 = boxBody(moov, "co64", stbl.offset);
+    var stsc = boxBody(moov, "stsc", stbl.offset);
+    var saiz = boxBody(moov, "saiz", stbl.offset);
+    var saio = boxBody(moov, "saio", stbl.offset);
+    if (!stsz || !stsc || !saiz || !saio || (!stco && !co64)) return null;
+    var defaultSize = u32be(stsz, 4);
+    var sampleCount = u32be(stsz, 8);
+    var sizes = new Array(sampleCount), i;
+    if (defaultSize) { for (i = 0; i < sampleCount; i++) sizes[i] = defaultSize; }
+    else { for (i = 0; i < sampleCount; i++) sizes[i] = u32be(stsz, 12 + i * 4); }
+    var chunkTable = stco || co64;
+    var chunkCount = u32be(chunkTable, 4);
+    var width = stco ? 4 : 8;
+    var offsets = new Array(chunkCount);
+    for (i = 0; i < chunkCount; i++) {
+      offsets[i] = width === 4 ? u32be(chunkTable, 8 + i * 4) : u64be(chunkTable, 8 + i * 8);
+    }
+    var entryCount = u32be(stsc, 4);
+    var entries = [];
+    for (i = 0; i < entryCount; i++) {
+      entries.push([u32be(stsc, 8 + i * 12), u32be(stsc, 12 + i * 12)]);
+    }
+    var chunkSamples = new Array(chunkCount).fill(0);
+    for (i = 0; i < entries.length; i++) {
+      var end = (i + 1 < entries.length) ? entries[i + 1][0] - 1 : chunkCount;
+      for (var c = entries[i][0] - 1; c < Math.min(end, chunkCount); c++) {
+        chunkSamples[c] = entries[i][1];
+      }
+    }
+    var saizFlags = (saiz[1] << 16) | (saiz[2] << 8) | saiz[3];
+    var saizCursor = (saizFlags & 1) ? 12 : 4;
+    if (saiz.length < saizCursor + 5) return null;
+    var defaultAuxSize = saiz[saizCursor];
+    var auxCount = u32be(saiz, saizCursor + 1);
+    var auxSizes = new Array(auxCount);
+    if (defaultAuxSize) { for (i = 0; i < auxCount; i++) auxSizes[i] = defaultAuxSize; }
+    else {
+      for (i = 0; i < auxCount; i++) {
+        if (saizCursor + 5 + i >= saiz.length) return null;
+        auxSizes[i] = saiz[saizCursor + 5 + i];
+      }
+    }
+    var saioFlags = (saio[1] << 16) | (saio[2] << 8) | saio[3];
+    var saioCursor = (saioFlags & 1) ? 12 : 4;
+    var offsetWidth = saio[0] === 1 ? 8 : 4;
+    if (saio.length < saioCursor + 4 + offsetWidth) return null;
+    var saioEntries = u32be(saio, saioCursor);
+    if (saioEntries < 1) return null;
+    var auxOffset = offsetWidth === 8 ? u64be(saio, saioCursor + 4) : u32be(saio, saioCursor + 4);
+    return { sizes: sizes, offsets: offsets, chunkSamples: chunkSamples,
+             auxSizes: auxSizes, auxOffset: auxOffset, sampleCount: sampleCount };
+  }
+
+  /* ---- 采样表（port _sample_table）：全轨样本按文件偏移排序。
+     每项 {offset, size, iv: Uint8Array(16)}，iv = aux 前 8 字节 + 8 个 0。 ---- */
+  function sampleTable(moov, moovStart) {
+    var samples = [], search = 0;
+    for (;;) {
+      var trak = findBox(moov, "trak", search);
+      if (!trak) break;
+      search = trak.offset + Math.max(trak.size, 8);
+      var p = parseTrack(moov, trak.offset);
+      if (!p) continue;
+      var auxLen = 0, i;
+      for (i = 0; i < p.auxSizes.length; i++) auxLen += Math.max(p.auxSizes[i], 8);
+      var auxLocal = p.auxOffset - moovStart;
+      if (auxLocal < 0 || auxLocal + auxLen > moov.length) {
+        throw new Error("CENC 辅助信息不在 moov 内，无法流式解密");
+      }
+      var aux = moov.subarray(auxLocal, auxLocal + auxLen);
+      var sampleIndex = 0, auxIndex = 0;
+      for (var ci = 0; ci < p.offsets.length; ci++) {
+        var current = p.offsets[ci];
+        for (var k = 0; k < p.chunkSamples[ci]; k++) {
+          if (sampleIndex >= p.sampleCount || sampleIndex >= p.sizes.length) break;
+          if (sampleIndex >= p.auxSizes.length) throw new Error("CENC 辅助信息数量不足");
+          var entrySize = Math.max(p.auxSizes[sampleIndex], 8);
+          var iv = new Uint8Array(16);
+          var take = Math.min(entrySize, 8);
+          iv.set(aux.subarray(auxIndex, auxIndex + take), 0);
+          samples.push({ offset: current, size: p.sizes[sampleIndex], iv: iv });
+          current += p.sizes[sampleIndex];
+          auxIndex += entrySize;
+          sampleIndex++;
+        }
+      }
+    }
+    if (!samples.length) throw new Error("moov 中没有可解密的 CENC 样本");
+    samples.sort(function (a, b) { return a.offset - b.offset; });
+    return samples;
+  }
+
+  /* ---- moov 改写（port _restore_cenc_codecs + _replace_sinf）---- */
+  function originalFormatNear(data, entryPos, deflt, kind) {
+    /* frma 优先；缺失则按配置盒（hvcC/avcC/esds…）判定；最后兜底 deflt。 */
+    var blob = data.subarray(entryPos, Math.min(data.length, entryPos + 800));
+    var idx = 0;
+    for (;;) {
+      var pos = findBytes(blob, [0x66, 0x72, 0x6d, 0x61] /* frma */, idx);
+      if (pos < 0) break;
+      if (pos + 8 <= blob.length) {
+        var fmt = String.fromCharCode(blob[pos + 4], blob[pos + 5], blob[pos + 6], blob[pos + 7]);
+        if (fmt && fmt !== "\0\0\0\0" && fmt !== "encv" && fmt !== "enca" &&
+            fmt.split("").every(function (c) { var n = c.charCodeAt(0); return n >= 32 && n < 127; })) {
+          return fmt;
+        }
+      }
+      idx = pos + 4;
+    }
+    var probes = kind === "enca"
+      ? [["esds", "mp4a"], ["opusC", "Opus"], ["ac-3", "ac-3"], ["ec-3", "ec-3"],
+         ["hvcC", "hvc1"], ["hev1C", "hev1"], ["av1C", "av01"], ["vpcC", "vp09"], ["avcC", "avc1"]]
+      : [["hvcC", "hvc1"], ["hev1C", "hev1"], ["av1C", "av01"], ["vpcC", "vp09"], ["avcC", "avc1"],
+         ["dvvC", "dvh1"], ["dvhC", "dvh1"], ["esds", "mp4a"], ["opusC", "Opus"]];
+    var best = -1, bestFmt = "";
+    for (var i = 0; i < probes.length; i++) {
+      var p = findBytes(blob, strBytes(probes[i][0]), 0);
+      if (p >= 0 && (best < 0 || p < best)) { best = p; bestFmt = probes[i][1]; }
+    }
+    return bestFmt || deflt;
+  }
+  function strBytes(s) {
+    var b = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+    return b;
+  }
+  function findBytes(hay, needle, from) {
+    outer:
+    for (var i = from || 0; i + needle.length <= hay.length; i++) {
+      for (var j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer;
+      return i;
+    }
+    return -1;
+  }
+  function rewriteMoov(moov) {
+    var out = new Uint8Array(moov); /* 复制一份再改，不动原数据 */
+    var pos = 0;
+    for (;;) {
+      var p = findBytes(out, strBytes("encv"), pos);
+      if (p < 0) break;
+      var fmt = originalFormatNear(out, p, "avc1", "encv");
+      out.set(strBytes(fmt), p);
+      pos = p + 4;
+    }
+    pos = 0;
+    for (;;) {
+      var q = findBytes(out, strBytes("enca"), pos);
+      if (q < 0) break;
+      var fmt2 = originalFormatNear(out, q, "mp4a", "enca");
+      out.set(strBytes(fmt2), q);
+      pos = q + 4;
+    }
+    /* sinf → free + 清零（只清首个子盒为 frma/schm/schi 的真 sinf 盒，防误删配置数据） */
+    var children = ["frma", "schm", "schi"];
+    pos = 0;
+    for (;;) {
+      var s = findBytes(out, strBytes("sinf"), pos);
+      if (s < 0) break;
+      if (s >= 4) {
+        var size = u32be(out, s - 4);
+        var end = s - 4 + size;
+        var child = String.fromCharCode(out[s + 8], out[s + 9], out[s + 10], out[s + 11]);
+        if (size >= 8 && size < 50000 && end <= out.length && children.indexOf(child) >= 0) {
+          out.set(strBytes("free"), s);
+          out.fill(0, s + 4, end);
+          pos = end;
+          continue;
+        }
+      }
+      pos = s + 4;
+    }
+    return out;
+  }
+
+  /* ---- 顶层盒枚举（port _toplevel_boxes）---- */
+  function toplevelBoxes(buf) {
+    var boxes = [], cursor = 0;
+    while (cursor + 8 <= buf.length) {
+      var size = u32be(buf, cursor);
+      var fourcc = String.fromCharCode(buf[cursor + 4], buf[cursor + 5], buf[cursor + 6], buf[cursor + 7]);
+      if (size === 1) {
+        if (cursor + 16 > buf.length) break;
+        size = u64be(buf, cursor + 8);
+      }
+      if (size < 8) break;
+      boxes.push({ offset: cursor, size: size, fourcc: fourcc });
+      cursor += size;
+    }
+    return boxes;
+  }
+
+  /* ---- 默认 Range 拉取（fetch + Range 头；返回 {bytes, total}）----
+     必须发 no-referrer：浏览器默认会把插件页地址当 Referer 发出去，CDN 的
+     防盗链见非白名单 Referer 直接 403（真浏览器实测：裸 Range 403、带
+     referrerPolicy no-referrer 206）。注意 fetch 的 referrer 选项改不成
+     跨域 Referer——浏览器按规范会忽略跨域 referrer 值、仍发页面自己的
+     Referer（实测 referrer novel.snssdk.com + unsafe-url 仍发页面地址，
+     照样 403），所以唯一可行的办法是不发 Referer。Node 裸请求（无 Referer）
+     206、Python 带 novel.snssdk.com Referer 也通，都印证“无 Referer 即放行”。 */
+  function defaultFetchRange(url, start, end) {
+    return fetch(url, {
+      headers: { Range: "bytes=" + start + "-" + end },
+      referrerPolicy: "no-referrer"
+    }).then(function (res) {
+      if (res.status !== 200 && res.status !== 206) {
+        throw new Error("媒体分片请求失败 " + res.status);
+      }
+      var total = 0;
+      var cr = res.headers.get("Content-Range") || "";
+      if (cr.indexOf("/") >= 0) {
+        var tail = cr.split("/").pop().trim();
+        if (/^\d+$/.test(tail)) total = parseInt(tail, 10);
+      }
+      if (!total) {
+        var len = res.headers.get("Content-Length") || "";
+        if (/^\d+$/.test(len)) total = parseInt(len, 10);
+      }
+      return res.arrayBuffer().then(function (ab) {
+        return { bytes: new Uint8Array(ab), total: total };
+      });
+    });
+  }
+
+  /* ---- 取 moov（port _fetch_moov）：先探 64KB，moov 在其中则直接取，否则按 Range 补取 ---- */
+  function fetchMoov(fetchRange, url) {
+    return fetchRange(url, 0, HEAD_PROBE - 1).then(function (r) {
+      var probe = r.bytes, total = r.total;
+      if (!total) throw new Error("媒体总长度未知");
+      var moovStart = 0, moovSize = 0;
+      var boxes = toplevelBoxes(probe);
+      for (var i = 0; i < boxes.length; i++) {
+        if (boxes[i].fourcc === "moov") { moovStart = boxes[i].offset; moovSize = boxes[i].size; break; }
+      }
+      if (!moovSize) throw new Error("未找到 moov 顶层盒");
+      if (moovStart + moovSize > total) throw new Error("moov 越界");
+      if (moovStart + moovSize <= probe.length) {
+        return { total: total, moovStart: moovStart, moov: probe.slice(moovStart, moovStart + moovSize) };
+      }
+      return fetchRange(url, moovStart, moovStart + moovSize - 1).then(function (r2) {
+        if (r2.bytes.length !== moovSize) throw new Error("moov 分片长度不符");
+        return { total: total, moovStart: moovStart, moov: r2.bytes };
+      });
+    });
+  }
+
+  /* ---- WebCrypto AES-CTR 解密一段（counter 为 16 字节大端；length=128 全 128 位递增）---- */
+  function aesCtrDecrypt(cryptoKey, counter16, data) {
+    return g.crypto.subtle.decrypt(
+      { name: "AES-CTR", counter: counter16, length: 128 }, cryptoKey, data);
+  }
+  function addCounter(iv, add) {
+    /* 128 位大端加法（port _patch 里的 counter 运算） */
+    var out = new Uint8Array(iv);
+    var carry = add, i = 15;
+    while (i >= 0 && carry > 0) {
+      var s = out[i] + (carry & 0xff);
+      out[i] = s & 0xff;
+      carry = (carry >> 8) + (s >> 8);
+      i--;
+    }
+    return out;
+  }
+
+  /* ---- 单块解密（port _StreamSession._patch，异步版）----
+     buffer：本块加密字节（Uint8Array，就地改写为明文）；base：本块在文件中的起始偏移。
+     samples：采样表；cryptoKey：已导入的 AES 密钥；moovPlain/moovStart/moovEnd：改写后 moov 的覆盖。 */
+  function patchRange(buffer, base, samples, cryptoKey, moovPlain, moovStart, moovEnd) {
+    var end = base + buffer.length - 1;
+    /* 二分找第一个 offset > base 的样本，再回退一位（与 bisect_right 同义） */
+    var lo = 0, hi = samples.length;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (samples[mid].offset <= base) lo = mid + 1; else hi = mid;
+    }
+    var index = Math.max(lo - 1, 0);
+    var jobs = [];
+    while (index < samples.length) {
+      var s = samples[index++];
+      if (s.offset > end) break;
+      if (s.offset + s.size <= base) continue;
+      var first = Math.max(s.offset, base);
+      var last = Math.min(s.offset + s.size - 1, end);
+      var skip = first - s.offset;
+      var counter = addCounter(s.iv, Math.floor(skip / 16));
+      var padding = skip % 16;
+      var data = buffer.subarray(first - base, last - base + 1);
+      /* 输入 = padding 个 0 + 本段密文（与 _patch 的 b"\0"*padding + data 同义）；
+         解出后丢掉前 padding 字节（那是补零对应的密钥流），只写回本段明文。 */
+      var cipherInput = new Uint8Array(padding + data.length);
+      cipherInput.set(data, padding);
+      jobs.push((function (first2, base2, padding2, dataLen) {
+        return aesCtrDecrypt(cryptoKey, counter, cipherInput).then(function (dec) {
+          var decBytes = new Uint8Array(dec);
+          buffer.set(decBytes.subarray(padding2, padding2 + dataLen), first2 - base2);
+        });
+      })(first, base, padding, data.length));
+    }
+    return Promise.all(jobs).then(function () {
+      if (base < moovEnd && end >= moovStart) {
+        var f = Math.max(base, moovStart), l = Math.min(end, moovEnd - 1);
+        buffer.set(moovPlain.subarray(f - moovStart, l - moovStart + 1), f - base);
+      }
+    });
+  }
+
+  /* ---- 流式取解密后整文件 ----
+     url：加密 MP4 直链；keyBytes：16 字节 DEK；
+     opts：{fetchRange, onProgress(loaded, total), chunkSize}。
+     返回 {bytes, total, moovStart, moovSize, sampleCount}。 */
+  function fetchDecrypted(url, keyBytes, opts) {
+    opts = opts || {};
+    var fetchRange = opts.fetchRange || defaultFetchRange;
+    var chunkSize = opts.chunkSize || CHUNK;
+    var onProgress = opts.onProgress || null;
+    if (!keyBytes || keyBytes.length !== 16) return Promise.reject(new Error("CENC 密钥长度错误"));
+    var cryptoKeyP = g.crypto.subtle.importKey("raw", keyBytes, { name: "AES-CTR" }, false, ["decrypt"]);
+    return fetchMoov(fetchRange, url).then(function (m) {
+      var total = m.total, moovStart = m.moovStart, moov = m.moov;
+      var samples = sampleTable(moov, moovStart);
+      var moovPlain = rewriteMoov(moov);
+      var moovEnd = moovStart + moov.length;
+      var out = new Uint8Array(total);
+      return cryptoKeyP.then(function (cryptoKey) {
+        /* 先把 moov 段写好（改写版）；媒体段按块拉、每块就地解密。 */
+        out.set(moovPlain, moovStart);
+        var loaded = moov.length;
+        if (onProgress) onProgress(loaded, total);
+        var cursor = 0;
+        function nextChunk() {
+          if (cursor >= total) return Promise.resolve();
+          /* 跳过已写好的 moov 段 */
+          if (cursor >= moovStart && cursor < moovEnd) cursor = moovEnd;
+          if (cursor >= total) return Promise.resolve();
+          var stop = Math.min(cursor + chunkSize - 1, total - 1);
+          /* 块若与 moov 段相交，只拉 moov 段之外的部分 */
+          if (cursor < moovStart && stop >= moovStart) stop = moovStart - 1;
+          var start = cursor;
+          return fetchRange(url, start, stop).then(function (r) {
+            var bytes = r.bytes;
+            if (!bytes.length) throw new Error("媒体分片为空");
+            if (r.total && r.total !== total) throw new Error("媒体总长度变化");
+            out.set(bytes, start);
+            var view = out.subarray(start, start + bytes.length);
+            return patchRange(view, start, samples, cryptoKey, moovPlain, moovStart, moovEnd);
+          }).then(function () {
+            loaded += (stop - start + 1);
+            if (onProgress) onProgress(Math.min(loaded, total), total);
+            cursor = stop + 1;
+            return nextChunk();
+          });
+        }
+        /* 文件头（ftyp 等 moov 之前的内容）也在循环里拉取；moov 段跳过不拉。 */
+        return nextChunk().then(function () {
+          return { bytes: out, total: total, moovStart: moovStart,
+                   moovSize: moov.length, sampleCount: samples.length };
+        });
+      });
+    });
+  }
+
+  /* ---- 调试用：解密后文件的 tag 检查（encv/enca/sinf/pssh/senc 应为 0）---- */
+  function countTag(bytes, tag) {
+    var needle = strBytes(tag), n = 0, pos = 0;
+    for (;;) {
+      var p = findBytes(bytes, needle, pos);
+      if (p < 0) return n;
+      n++; pos = p + 1;
+    }
+  }
+
+  g.HG_CENC = {
+    findBox: findBox, parseTrack: parseTrack, sampleTable: sampleTable,
+    rewriteMoov: rewriteMoov, toplevelBoxes: toplevelBoxes,
+    fetchMoov: fetchMoov, patchRange: patchRange,
+    fetchDecrypted: fetchDecrypted, countTag: countTag,
+    _hex: hex
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ---------------- 红果 v5 播放（v12） ----------------
+   取流：HG_V5.multiVideoDetailList(seriesId) 拿全集数字 vid（按 seriesId 缓存，
+   App 接口不认 web 端付费墙，全集都有 vid）；点集时 HG_V5.vmModel(vid) 取
+   video_model，selectQuality 选清晰度（默认 720p，可切 1080p），main_url +
+   spade_a → DEK；HG_CENC.fetchDecrypted 按 Range 流式解密 → Blob URL；
+   播放复用现有原生/WASM 两路（player.sources = [blobUrl]）。
+   播址带签名有时效（url_expire），点播时现取现用，不缓存；失败重取一次
+   （player.hgRetried，酷短剧 kwRetried 同款），重取前丢掉缓存身份。 */
+var hgV5 = { vidsBySeries: {}, quality: "720", blobUrl: "" };
+function hgRevokeBlob() {
+  if (hgV5.blobUrl) { try { URL.revokeObjectURL(hgV5.blobUrl); } catch (e) {} hgV5.blobUrl = ""; }
+}
+function hgGetVids(seriesId) {
+  if (hgV5.vidsBySeries[seriesId]) return Promise.resolve(hgV5.vidsBySeries[seriesId]);
+  return HG_V5.multiVideoDetailList(seriesId).then(function (vids) {
+    if (!vids || !vids.length) throw new Error("全集 vid 取不到");
+    hgV5.vidsBySeries[seriesId] = vids;
+    return vids;
+  });
+}
+function renderQualityBtn() {
+  var b = $("btnQuality");
+  if (!b) return;
+  var isHg = !!(player.detail && player.detail.hongguo);
+  b.classList.toggle("hidden", !isHg);
+  if (isHg) b.textContent = hgV5.quality + "p";
+}
+function hgLoadCurrentEpisode(token) {
+  var seriesId = player.detail.seriesId;
+  if (!seriesId) {
+    player.playError = "这部剧没有 series_id";
+    renderCenter();
+    return Promise.resolve();
+  }
+  player.loadState = "正在取流…";
+  renderCenter();
+  return hgGetVids(seriesId).then(function (vids) {
+    if (token !== player.loadToken) return;
+    var vid = vids[player.index];
+    if (!vid) throw new Error("这集没有 vid");
+    player.loadState = "正在取 " + hgV5.quality + "p 播址…";
+    renderCenter();
+    return HG_V5.vmModel(vid);
+  }).then(function (model) {
+    if (token !== player.loadToken) return;
+    var rows = HG_V5.videoListFromModel(model);
+    var picked = HG_V5.selectQuality(rows, hgV5.quality);
+    var def = picked[0], item = picked[1];
+    var url = HG_V5.mediaUrl(item);
+    var spade = HG_V5.spadeValue(item);
+    if (!url) throw new Error("播址为空");
+    if (!spade) throw new Error("这集没有解密材料");
+    var keySeed = HG_V5.keySeedFromModel(model);
+    /* decryptSpadeUrl 是 async（WebCrypto），key_seed 非空时须等它解完再解密；
+       本集 key_seed 为空，走 Promise.resolve 直通。 */
+    var urlP = (keySeed && keySeed.length)
+      ? HG_V5.decryptSpadeUrl(url, keySeed)
+      : Promise.resolve(url);
+    return urlP.then(function (realUrl) {
+    var key = HG_V5.deriveContentKey(spade);
+    player.loadState = "正在解密 " + def + "p…";
+    renderCenter();
+    return HG_CENC.fetchDecrypted(realUrl, key, {
+      onProgress: function (loaded, total) {
+        if (token !== player.loadToken) return;
+        if (player.fbEvents.onLoadProgress) player.fbEvents.onLoadProgress(loaded, total);
+      }
+    }).then(function (r) {
+      if (token !== player.loadToken) return;
+      hgRevokeBlob();
+      hgV5.blobUrl = URL.createObjectURL(new Blob([r.bytes], { type: "video/mp4" }));
+      player.sources = [hgV5.blobUrl];
+      player.srcIdx = 0;
+      if (!canPlayHevcNative()) {
+        setMode("fallback");
+        return startFallback(player.sources, token);
+      }
+      setMode("native");
+      loadNative();
+      return Promise.resolve();
+    });
+    });
+  }).catch(function (e) {
+    if (token !== player.loadToken) return;
+    if (!player.hgRetried) {
+      player.hgRetried = true;
+      try { localStorage.removeItem("hgV5Identity"); } catch (err) {}
+      hgLoadCurrentEpisode(token);
+      return;
+    }
+    player.playError = "红果取流失败：" + (e instanceof Error ? e.message : String(e));
+    renderCenter();
+  });
 }
 function hgOpenDetail(card) {
   currentDetail = { title: card.title, cover: card.cover, intro: card.desc, episodes: [], hongguo: true, seriesId: card.ref, freeCount: 0 };
