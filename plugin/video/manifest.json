@@ -1,6 +1,6 @@
 {
   "reader": {
-    "sha256": "9de52f1f32ac9d3f233ef6e41c80e1faa05755d820fe3c571726ef98f4519db4",
+    "sha256": "b1581f8185eac788495b9c98e6aaf53b027035190346b5d3326ab690c2ba9446",
     "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/video_reader.html"
   },
   "rules": [
@@ -24,5 +24,5 @@
     }
   ],
   "updated": "2026-11-28",
-  "version": 13
+  "version": 14
 }

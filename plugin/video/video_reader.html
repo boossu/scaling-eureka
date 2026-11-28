@@ -403,7 +403,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 13;
+var PLUGIN_VERSION = 14;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -13588,6 +13588,16 @@ function displayOrderOf(cts, timescale) {
   order.forEach(function (decIdx, rank) { displayIndexOf[decIdx] = rank; });
   return { ptsSorted: ptsSorted, displayOrder: order, displayIndexOf: displayIndexOf };
 }
+/* v14：Uint8Array -> 全新 ArrayBuffer（拷贝）。mp4box 的 appendBuffer 只认
+   ArrayBuffer（内部 new DataView(value)，传 Uint8Array 即抛
+   "First argument to DataView constructor must be an ArrayBuffer"）；
+   且 usedBytes 挂在 buffer 对象上，两路 mp4box 各须一份拷贝，绝不能共用。 */
+function hgToArrayBuffer(u8) {
+  if (u8 instanceof ArrayBuffer) return u8;
+  var ab = new ArrayBuffer(u8.byteLength);
+  new Uint8Array(ab).set(u8);
+  return ab;
+}
 function findSeekSync(ptsSorted, displayOrder, isSync, displayIndexOf, target) {
   var lo = 0, hi = ptsSorted.length - 1, ans = 0;
   while (lo <= hi) {
@@ -13829,6 +13839,15 @@ function HevcFallbackPlayer(canvas, events) {
   this.decodeRunning = false;
   this.suppressedWarned = false;
   this.loadSeq = 0;
+  /* v14 流式：以下字段只在 loadStream（边下边播）时用；整集 load() 不走它们。 */
+  this.streamSession = null;   /* HG_CENC 会话（边下边解密） */
+  this.streamComplete = true;  /* 整集已下完（load() 默认 true；loadStream 起 false） */
+  this.buffering = false;      /* 追上已下数据、等新样本 */
+  this.pendingSeek = null;     /* seek 目标超出已下数据时暂存，等前沿到了再执行 */
+  this.audioComplete = true;   /* 音频分段已全部到齐（load() 默认 true） */
+  this._mp4Video = null;       /* 流式视频 mp4box */
+  this._mp4Audio = null;       /* 流式音频 mp4box */
+  this._streamReady = false;   /* loadStream 已出首批样本、可起播 */
 }
 HevcFallbackPlayer.prototype.setState = function (s, detail) {
   this.state = s;
@@ -14006,6 +14025,7 @@ HevcFallbackPlayer.prototype.attachAudioSegments = function (init, media) {
   this.audioQueue = [init].concat(media);
   this.audioQueueIdx = 0;
   this.audioAttached = true;
+  this.audioComplete = true; /* 整集路：分段一次全到，排空即可 endOfStream */
   this.appendNextAudioSegment();
 };
 
@@ -14014,8 +14034,10 @@ HevcFallbackPlayer.prototype.appendNextAudioSegment = function () {
   if (this.audioQueueIdx >= this.audioQueue.length) {
     /* 段还没贴上来（sourceopen 时队列本来就是空的）不是播完了：
        此时绝不能 endOfStream，否则 MediaSource 直接关掉，后面再
-       appendBuffer 必抛、音频元素也报错，play() 随之拒掉。 */
-    if (!this.audioAttached) return;
+       appendBuffer 必抛、音频元素也报错，play() 随之拒掉。
+       v14：流式下队列排空也只是“还没到”，须等 audioComplete 立真
+       （会话下完 + 尾段已进队）才 endOfStream。 */
+    if (!this.audioAttached || !this.audioComplete) return;
     try { if (this.mediaSource.readyState === "open") this.mediaSource.endOfStream(); } catch (e) {}
     return;
   }
@@ -14100,6 +14122,13 @@ HevcFallbackPlayer.prototype.load = async function (sources) {
 
 HevcFallbackPlayer.prototype.resetEpisode = function () {
   try { if (this.decoder) this.decoder.flush(); } catch (e) {}
+  /* v14 流式：停掉旧 mp4box（免得旧块继续往已死实例里喂），复位流式标志。
+     load() 用默认 true（整集），loadStream 随后改成 false。 */
+  try { if (this._mp4Video) this._mp4Video.stop(); } catch (e) {}
+  try { if (this._mp4Audio) this._mp4Audio.stop(); } catch (e) {}
+  this._mp4Video = null; this._mp4Audio = null;
+  this.streamSession = null; this.streamComplete = true; this.audioComplete = true;
+  this.buffering = false; this.pendingSeek = null; this._streamReady = false;
   this.samples = []; this.ptsSorted = []; this.displayOrder = []; this.displayIndexOf = [];
   this.videoCodec = "";
   this.feedIndex = 0; this.displayCounter = 0; this.fedDisplayPts = 0;
@@ -14116,6 +14145,238 @@ HevcFallbackPlayer.prototype.resetEpisode = function () {
   this.mediaSource = null; this.audioSb = null;
   this.audioQueue = []; this.audioQueueIdx = 0;
   this.audioFailed = false; this.audioAttached = false;
+};
+
+/* v14：样本到达后重算显示序（按 CTS 排）。流式下样本是渐进到的，
+   ptsSorted 每次重算都含已到的全部样本；解码器按显示序输出，k 帧排出
+   时所有 CTS 更小的样本必已到齐（解码器必先解出它们才能输出 k 帧），
+   故 drainFrames 用 ptsSorted[displayCounter] 配对仍正确。 */
+HevcFallbackPlayer.prototype._recomputeOrder = function () {
+  var ord = displayOrderOf(this.samples.map(function (s) { return s.cts; }), this.timescale);
+  this.ptsSorted = ord.ptsSorted;
+  this.displayOrder = ord.displayOrder;
+  this.displayIndexOf = ord.displayIndexOf;
+};
+
+/* v14：流式音频分段（mp4box onSegment 回调）。init 段先到、媒体段后到；
+   媒体段比 init 先到时暂存，等 init 到了再一起贴。 */
+HevcFallbackPlayer.prototype._audioInit = function (buffer) {
+  if (this.audioFailed) return;
+  this.audioQueue = [buffer].concat(this._audioPending || []);
+  this._audioPending = [];
+  this.audioQueueIdx = 0;
+  this.audioAttached = true;
+  this.appendNextAudioSegment();
+};
+
+HevcFallbackPlayer.prototype._audioSegment = function (buffer) {
+  if (this.audioFailed) return;
+  if (!this.audioAttached) {
+    (this._audioPending = this._audioPending || []).push(buffer);
+    return;
+  }
+  this.audioQueue.push(buffer);
+  this.appendNextAudioSegment();
+};
+
+/* v14：缓冲态只发事件、不改 this.state（state 仍是 playing，decodeLoop 与
+   displayTick 才不停；setState("buffering") 会把 state 改掉、直接停播）。 */
+HevcFallbackPlayer.prototype._signalBuffering = function () {
+  if (this.buffering) return;
+  this.buffering = true;
+  if (this.events.onState) this.events.onState("buffering", "\u7f13\u51b2\u4e2d\u2026");
+};
+
+HevcFallbackPlayer.prototype._clearBuffering = function () {
+  if (!this.buffering) return;
+  this.buffering = false;
+  if (this.events.onState) this.events.onState("ready");
+};
+
+/* v14：暂存的 seek，待前沿越过目标再执行。 */
+HevcFallbackPlayer.prototype._applyPendingSeek = function () {
+  if (this.pendingSeek === null || this.destroyed) return;
+  var target = this.pendingSeek;
+  if (!this.streamComplete && this.ptsSorted.length > 0 &&
+      target > (this.ptsSorted[this.ptsSorted.length - 1] || 0) + 0.05) return;
+  this.pendingSeek = null;
+  this.seek(target);
+};
+
+/* v14：把会话解密好的一块喂给两路 mp4box（视频提样本、音频提分段）。
+   块按文件偏移递增到达；fileStart 必须对齐，否则 mp4box 不认。
+   同一份 bytes 两路共用（只读不改，各自持有引用）。 */
+HevcFallbackPlayer.prototype.feedChunk = function (start, end, bytes) {
+  if (this.destroyed || !this._mp4Video) return;
+  /* 两路各一份 ArrayBuffer 拷贝（见 hgToArrayBuffer 注释）。 */
+  var abV = hgToArrayBuffer(bytes);
+  abV.fileStart = start;
+  try { this._mp4Video.appendBuffer(abV); } catch (e) {}
+  if (this._mp4Audio) {
+    var abA = hgToArrayBuffer(bytes);
+    abA.fileStart = start;
+    try { this._mp4Audio.appendBuffer(abA); } catch (e) {}
+  }
+};
+
+/* v14：会话下完（全部块到了）——把两路 mp4box 冲干净（尾段样本/音频分段
+   在 flush 时才出来），再把完成标志立起来；音频队列排空后 endOfStream。 */
+HevcFallbackPlayer.prototype.finishStream = function () {
+  if (this.destroyed) return;
+  try { if (this._mp4Video) this._mp4Video.flush(); } catch (e) {}
+  try { if (this._mp4Audio) this._mp4Audio.flush(); } catch (e) {}
+  this.streamComplete = true;
+  this.audioComplete = true;
+  this._clearBuffering();
+  this.appendNextAudioSegment();
+};
+
+/* v14 流式：接受 HG_CENC 会话（moov+采样表先行，媒体块边下边解密边回调），
+   首批样本就绪即起播，后台继续喂。不再 fetchBytes 整集；load() 保持不动
+   （星芽/酷短剧/CMS 仍走整集）。会话出错由调用方（hgLoadCurrentEpisode）
+   的 onError 接，loadStream 另设 60s 兜底超时，永不无限挂起。 */
+HevcFallbackPlayer.prototype.loadStream = async function (session, token) {
+  if (this.destroyed) throw new Error("\u64ad\u653e\u5668\u5df2\u9500\u6bc1");
+  var seq = ++this.loadSeq;
+  var self = this;
+  this.setState("loading");
+  this.resetEpisode();
+  this.streamSession = session;
+  this.streamComplete = false;
+  this.audioComplete = false;
+  this.buffering = false;
+  this.pendingSeek = null;
+  this._streamReady = false;
+  this._audioPending = [];
+  this.prepareAudioEarly();
+  var initBytes = session.initBytes;
+  var vfile = window.__mp4boxCreateFile();
+  var afile = window.__mp4boxCreateFile();
+  this._mp4Video = vfile;
+  this._mp4Audio = afile;
+  var videoTrack = null, audioTrack = null;
+  var readyResolve = null, readyReject = null;
+  var readyP = new Promise(function (res, rej) { readyResolve = res; readyReject = rej; });
+  var settled = false;
+  function settleOk(info) { if (!settled) { settled = true; readyResolve(info); } }
+  function settleErr(e) { if (!settled) { settled = true; readyReject(e); } }
+  /* 会话 onError（hgLoadCurrentEpisode 里设）可经此拒掉 loadStream。 */
+  session._streamReject = settleErr;
+  var timeoutId = setTimeout(function () { settleErr(new Error("\u9996\u6279\u6837\u672c\u8d85\u65f6\uff0830s\uff09")); }, 60000);
+  readyP.then(function () { clearTimeout(timeoutId); }, function () { clearTimeout(timeoutId); });
+  if (session.error) { settleErr(session.error); }
+  var decoderP = getHevcDecoder();
+  function maybeReady() {
+    /* 视频轨就绪 + 参数集就绪 + 首批样本到了 + 解码器就绪 → 起播。
+       音频可后到，不阻塞起播。 */
+    if (!videoTrack || !self.paramSets || self.samples.length === 0 || !self.decoder) return;
+    settleOk({ width: self.videoW, height: self.videoH, duration: self.durationSec, codec: self.videoCodec });
+  }
+  vfile.onReady = function (info) {
+    for (var i = 0; i < info.tracks.length; i++) if (info.tracks[i].type === "video") { videoTrack = info.tracks[i]; break; }
+    if (!videoTrack) { settleErr(new Error("\u8fd9\u96c6\u91cc\u6ca1\u6709\u89c6\u9891\u8f68")); return; }
+    try {
+      /* v14：nbSamples 是每批回调的样本数（mp4box 只在 nextSample %
+         nbSamples==0 或全量时才 onSamples）。照搬 demuxVideo 的总数会等
+         全量样本到齐（即下载完成）才回调一次，首帧等到整集下完。
+         改 10（约 0.4s 一批），首批样本一到即可起播。 */
+      vfile.setExtractionOptions(videoTrack.id, null, { nbSamples: 10 });
+      vfile.start();
+    } catch (e) { settleErr(e); return; }
+    self.timescale = videoTrack.timescale;
+    self.durationSec = videoTrack.duration / videoTrack.timescale;
+    self.videoCodec = videoTrack.codec || "";
+    if (!/^(hvc1|hev1)/i.test(self.videoCodec)) { settleErr(new Error(NOT_HEVC_SENTINEL)); return; }
+    if (videoTrack.video) { self.videoW = videoTrack.video.width; self.videoH = videoTrack.video.height; }
+    var videoTrak = null;
+    for (var j = 0; j < vfile.moov.traks.length; j++) {
+      if (vfile.moov.traks[j].tkhd && vfile.moov.traks[j].tkhd.track_id === videoTrack.id) { videoTrak = vfile.moov.traks[j]; break; }
+    }
+    var entry = videoTrak && videoTrak.mdia && videoTrak.mdia.minf && videoTrak.mdia.minf.stbl &&
+      videoTrak.mdia.minf.stbl.stsd && videoTrak.mdia.minf.stbl.stsd.entries &&
+      videoTrak.mdia.minf.stbl.stsd.entries[0];
+    var naluArrays = entry && entry.hvcC && entry.hvcC.nalu_arrays;
+    if (!naluArrays || naluArrays.length === 0) { settleErr(new Error("\u89e3\u5305\u5931\u8d25\uff1a\u6ca1\u8bfb\u5230 HEVC \u53c2\u6570\u96c6\uff08hvcC\uff09")); return; }
+    self.paramSets = paramSetsAnnexB(naluArrays);
+    maybeReady();
+  };
+  vfile.onSamples = function (id, _user, s) {
+    if (!videoTrack || id !== videoTrack.id) return;
+    if (seq !== self.loadSeq || self.destroyed) return;
+    for (var i = 0; i < s.length; i++) {
+      var sm = s[i];
+      /* 复制一份样本数据，防 mp4box 内部缓冲复用。 */
+      self.samples.push({ data: new Uint8Array(sm.data), cts: sm.cts, dts: sm.dts, is_sync: sm.is_sync, size: sm.size });
+    }
+    self._recomputeOrder();
+    self._clearBuffering();
+    self._applyPendingSeek();
+    maybeReady();
+  };
+  vfile.onError = function (e) { settleErr(new Error("\u89e3\u5305\u5931\u8d25\uff1a" + (e instanceof Error ? e.message : String(e)))); };
+  afile.onReady = function (info) {
+    for (var i = 0; i < info.tracks.length; i++) if (info.tracks[i].type === "audio") { audioTrack = info.tracks[i]; break; }
+    if (!audioTrack) { self.audioFailed = true; if (self.events.onAudio) self.events.onAudio("failed", "\u65e0\u97f3\u9891\u8f68"); return; }
+    try {
+      /* v14：256 帧一段约 5.4s，流式下首段音频要 5 秒后才到。改 48 帧
+         （约 1s 一段），首段随首块媒体一起到。 */
+      afile.setSegmentOptions(audioTrack.id, null, { nbSamples: 48 });
+      var inits = afile.initializeSegmentation("per-track");
+      for (var j = 0; j < inits.length; j++) if (inits[j].id === audioTrack.id) { self._audioInit(inits[j].buffer); break; }
+      afile.onSegment = function (_id, _user, buffer) { self._audioSegment(buffer); };
+      afile.start();
+    } catch (e) {
+      self.audioFailed = true;
+      if (self.events.onAudio) self.events.onAudio("failed", "\u97f3\u9891\u5206\u6bb5\u5931\u8d25");
+    }
+  };
+  afile.onError = function () {
+    self.audioFailed = true;
+    if (self.events.onAudio) self.events.onAudio("failed", "\u97f3\u9891\u89e3\u5305\u5931\u8d25");
+  };
+  function feedInit(file) {
+    /* 每次调用一份新拷贝：vfile 与 afile 各一份（见 hgToArrayBuffer 注释）。 */
+    var buf = hgToArrayBuffer(initBytes);
+    buf.fileStart = 0;
+    file.appendBuffer(buf);
+  }
+  try {
+    feedInit(vfile);
+    feedInit(afile);
+  } catch (e) {
+    settleErr(e);
+  }
+  /* 块路由：mp4box 就绪后才接管（之前到的块在待发队列里），再排空待发队列。
+     排空是同步的，onChunk 不会插进来；此后到的块直接进 feedChunk。 */
+  player._hgFeedChunk = function (start, end, bytes) { self.feedChunk(start, end, bytes); };
+  hgDrainPending();
+  var decoderReady = decoderP.then(function (d) {
+    self.decoder = d;
+    if (seq !== self.loadSeq || self.destroyed) throw new Error("\u5df2\u5207\u96c6");
+    self.decoder.flush();
+    if (self.paramSets) self.decoder.feed(self.paramSets);
+    maybeReady();
+    return d;
+  });
+  try {
+    var info = await Promise.all([readyP, decoderReady]).then(function () {
+      return { width: self.videoW, height: self.videoH, duration: self.durationSec, codec: self.videoCodec };
+    });
+    if (seq !== this.loadSeq || this.destroyed) return null;
+    /* 会话已在建播放器期间下完（小文件/本地快）：直接收尾，免得尾段样本漏掉。 */
+    if (session.complete) this.finishStream();
+    if (!this.renderer) this.renderer = new HevcCanvasRenderer(this.canvas);
+    this._streamReady = true;
+    this.setState("ready");
+    this.startLoops();
+    return info;
+  } catch (e) {
+    if (e instanceof Error && e.message === NOT_HEVC_SENTINEL) { this.resetEpisode(); throw e; }
+    var m = e instanceof Error ? e.message : String(e);
+    this.setState("error", m);
+    if (this.events.onError) this.events.onError(m);
+    throw e;
+  }
 };
 
 HevcFallbackPlayer.prototype.feedSample = function (idx) {
@@ -14170,6 +14431,12 @@ HevcFallbackPlayer.prototype.decodeLoop = async function () {
         this.drainFrames();
       }
     }
+    /* v14 流式：已喂的样本全喂完、帧队列也空了、还没下完 → 追上已下数据，
+       短暂缓冲态（只发事件不改 state，数据到了 onSamples 会清掉）。 */
+    if (!this.destroyed && this.state === "playing" && !this.streamComplete &&
+        this.feedIndex >= this.samples.length && this.frameQueue.length === 0) {
+      this._signalBuffering();
+    }
     await hevcSleep(10);
   }
   this.decodeRunning = false;
@@ -14202,7 +14469,9 @@ HevcFallbackPlayer.prototype.displayTick = function () {
     }
   }
   if (this.events.onTime) this.events.onTime(t, this.durationSec);
-  if (this.audioFailed && this.feedIndex >= this.samples.length && this.frameQueue.length === 0 &&
+  /* v14：流式下 feedIndex 追上 samples.length 只是“已下部分播完了”；
+     须等 streamComplete（整集下完）才算播完，否则播一半就跳下一集。 */
+  if (this.audioFailed && this.streamComplete && this.feedIndex >= this.samples.length && this.frameQueue.length === 0 &&
       this.durationSec > 0 && t >= this.durationSec - 0.05) this.handleEnded();
 };
 
@@ -14222,6 +14491,13 @@ HevcFallbackPlayer.prototype.pause = function () {
 HevcFallbackPlayer.prototype.seek = function (seconds) {
   if (!this.samples.length || this.destroyed) return;
   var target = Math.max(0, Math.min(seconds, this.durationSec || 0));
+  /* v14 流式：目标超出已下数据时暂存，等前沿到了再执行；期间不改解码器状态。 */
+  if (!this.streamComplete && this.ptsSorted.length > 0 &&
+      target > (this.ptsSorted[this.ptsSorted.length - 1] || 0) + 0.05) {
+    this.pendingSeek = target;
+    return;
+  }
+  this.pendingSeek = null;
   var r = findSeekSync(this.ptsSorted, this.displayOrder,
     this.samples.map(function (s) { return s.is_sync; }), this.displayIndexOf, target);
   if (this.decoder) this.decoder.flush();
@@ -14985,6 +15261,7 @@ function playEpisode(index) {
   player.userRotated = false;
   player.kwRetried = false;
   player.hgRetried = false;
+  player._hgStarted = false; /* v14：起播标志，每集复位；首帧/起播后 onProgress 不再写加载条 */
   setAudioStatus("unknown");
   setOrientation(o);
   $("epSheet").classList.add("hidden");
@@ -15011,6 +15288,7 @@ function playEpisode(index) {
     onFirstFrame: function (info) {
       if (token !== player.loadToken) return;
       player.duration = info.duration;
+      player._hgStarted = true; /* v14 回落路：首帧即起播，onProgress 不再写加载条 */
       player.loadState = "";
       renderCenter();
     },
@@ -15053,6 +15331,7 @@ function playEpisode(index) {
 
 function exitPlayer() {
   player.loadToken++;
+  hgStopStream(); /* v14：停流式会话（不留后台下载）+ 拆 MSE */
   hgRevokeBlob();
   cmsDestroyHls();
   if (player.fallback) { try { player.fallback.destroy(); } catch (e) {} player.fallback = null; }
@@ -15113,7 +15392,44 @@ function bindPlayer() {
     renderBottom();
   };
   E.video.addEventListener("play", function () { setPlaying(true); hideCenterBtn(); });
-  E.video.addEventListener("playing", function () { setPlaying(true); setAudioStatus("ok"); hideCenterBtn(); });
+  E.video.addEventListener("playing", function () {
+    setPlaying(true); setAudioStatus("ok"); hideCenterBtn();
+    /* v14 红果 MSE 路：起播即立 _hgStarted（onProgress 不再写加载条），
+       并清掉可能残留的“缓冲中…”（只对红果 MSE 生效，不动其他源）。 */
+    if (player.detail && player.detail.hongguo && player._hgMseActive) {
+      player._hgStarted = true;
+      if (player.loadState === "\u7f13\u51b2\u4e2d\u2026") player.loadState = "";
+      renderCenter();
+    }
+  });
+  /* v14 红果 MSE 路：追上已缓冲末尾时显示短暂缓冲态（只对红果 MSE 生效，
+     不动其他源；有数据后 playing 事件会清掉它）。 */
+  E.video.addEventListener("waiting", function () {
+    if (!player.detail || !player.detail.hongguo || !player._hgMseActive) return;
+    if (player._hgStarted) { player.loadState = "\u7f13\u51b2\u4e2d\u2026"; renderCenter(); }
+  });
+  /* v14 红果 MSE 路：seek 到未缓冲处时跳取（只对红果 MSE 生效）。
+     已缓冲处不动，让浏览器直接播；未缓冲处按时间比例估算字节偏移
+     跳取（等比估算，落点由浏览器从最近同步点起播，不要求帧精确）。 */
+  E.video.addEventListener("seeking", function () {
+    if (!player.detail || !player.detail.hongguo || !player._hgMseActive || !hgMse) return;
+    var v = E.video;
+    var t = v.currentTime;
+    for (var i = 0; i < v.buffered.length; i++) {
+      if (t >= v.buffered.start(i) - 0.5 && t <= v.buffered.end(i) + 0.5) return;
+    }
+    var st = hgMse;
+    var dur = st.duration || player.duration || 0;
+    var total = st.session ? st.session.total : 0;
+    var mdatStart = st.session ? st.session.mdatStart : 0;
+    if (!dur || !total || total <= mdatStart) return;
+    var off = mdatStart + Math.floor((t / dur) * (total - mdatStart));
+    if (st.vq) st.vq.clear();
+    if (st.aq) st.aq.clear();
+    st.session.jumpTo(off);
+    player.loadState = "\u6b63\u5728\u52a0\u8f7d\u2026";
+    renderCenter();
+  });
   E.video.addEventListener("canplay", function () { var v = E.video; if (!v.paused && v.currentTime > 0) hideCenterBtn(); });
   E.video.addEventListener("timeupdate", onVidTime);
   E.video.addEventListener("loadedmetadata", function () {
@@ -17904,7 +18220,9 @@ function hgParseDetail(htmlText) {
    模型与 _StreamSession 同款：先拿 moov 建采样表，再按 Range 逐块拉、逐样本解密
    （WebCrypto AES-CTR），moov 段用改写后的版本（encv/enca 还原 + sinf 清掉）。
    不依赖本地服务器；输出为解密后的完整 MP4 字节（调用方再包成 Blob URL 喂播放器）。
-   挂 window.HG_CENC。无 import，可直接 <script> 引入。 */
+   挂 window.HG_CENC。无 import，可直接 <script> 引入。
+   v14：新增 openStream 流式会话（moov+采样表先行，媒体块边下边解密边回调，
+   不等整集）；fetchDecrypted（整集版）保留，供对照测试与旧调用。 */
 (function (g) {
   "use strict";
 
@@ -18156,11 +18474,13 @@ function hgParseDetail(htmlText) {
      Referer（实测 referrer novel.snssdk.com + unsafe-url 仍发页面地址，
      照样 403），所以唯一可行的办法是不发 Referer。Node 裸请求（无 Referer）
      206、Python 带 novel.snssdk.com Referer 也通，都印证“无 Referer 即放行”。 */
-  function defaultFetchRange(url, start, end) {
-    return fetch(url, {
+  function defaultFetchRange(url, start, end, signal) {
+    var init = {
       headers: { Range: "bytes=" + start + "-" + end },
       referrerPolicy: "no-referrer"
-    }).then(function (res) {
+    };
+    if (signal) init.signal = signal;
+    return fetch(url, init).then(function (res) {
       if (res.status !== 200 && res.status !== 206) {
         throw new Error("媒体分片请求失败 " + res.status);
       }
@@ -18175,7 +18495,7 @@ function hgParseDetail(htmlText) {
         if (/^\d+$/.test(len)) total = parseInt(len, 10);
       }
       return res.arrayBuffer().then(function (ab) {
-        return { bytes: new Uint8Array(ab), total: total };
+        return { bytes: new Uint8Array(ab), total: total, status: res.status };
       });
     });
   }
@@ -18317,6 +18637,113 @@ function hgParseDetail(htmlText) {
     });
   }
 
+  /* ---- 流式会话（v14）：moov+采样表先行，媒体块边下边解密边回调 ----
+     openStream(url, keyBytes, opts) -> Promise<session>。
+     opts：{fetchRange, onProgress(loaded,total), onChunk(start,end,bytes),
+           onComplete(), onError(e), chunkSize}。
+     session：{total, moovStart, moovSize, mdatStart, initBytes, samples, sampleCount,
+              loaded, complete, stopped, error, stop(), jumpTo(offset)}。
+     - resolve 时 init 已就绪（ftyp+改写后 moov），调用方即可起播（等首个媒体块）；
+       媒体块随后按 chunkSize 顺序在后台拉+解密，每块解密完即回调 onChunk。
+     - jumpTo(offset)：下一次取块从该偏移（对齐到块边界）开始，跳过的区间不再拉；
+       正在飞的块落完后才跳转，回调顺序始终按文件偏移递增（跳跃处除外）。
+     - stop()：停后台拉取并 abort 在途请求；complete 为真表示整集已下完。
+     注意：媒体块从 moovEnd 起拉（moov 与 mdat 之间的 free 盒字节一并当作首块
+     媒体数据拉回，解析器会忽略，不影响偏移）。 */
+  function openStream(url, keyBytes, opts) {
+    opts = opts || {};
+    var chunkSize = opts.chunkSize || CHUNK;
+    var onProgress = opts.onProgress || null;
+    var onChunk = opts.onChunk || null;
+    var onComplete = opts.onComplete || null;
+    var onError = opts.onError || null;
+    if (!keyBytes || keyBytes.length !== 16) return Promise.reject(new Error("CENC 密钥长度错误"));
+    var abort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    var signal = abort ? abort.signal : null;
+    var fetchRange = opts.fetchRange || function (u, s, e) { return defaultFetchRange(u, s, e, signal); };
+    var cryptoKeyP = g.crypto.subtle.importKey("raw", keyBytes, { name: "AES-CTR" }, false, ["decrypt"]);
+    return fetchMoov(fetchRange, url).then(function (m) {
+      var total = m.total, moovStart = m.moovStart, moov = m.moov;
+      var samples = sampleTable(moov, moovStart);
+      var moovPlain = rewriteMoov(moov);
+      var moovEnd = moovStart + moov.length;
+      var mdatStart = moovEnd;
+      return cryptoKeyP.then(function (cryptoKey) {
+        /* init 段 [0, mdatStart)：单次拉回，moov 区换成改写版。 */
+        return fetchRange(url, 0, mdatStart - 1).then(function (r) {
+          var init = r.bytes;
+          if (init.length > mdatStart) init = init.slice(0, mdatStart);
+          if (init.length !== mdatStart) throw new Error("init 段长度不符");
+          init.set(moovPlain, moovStart);
+          var session = {
+            total: total, moovStart: moovStart, moovSize: moov.length,
+            mdatStart: mdatStart, initBytes: init, samples: samples,
+            sampleCount: samples.length, loaded: mdatStart,
+            complete: false, stopped: false, error: null,
+            cursor: mdatStart,
+            stop: function () {
+              if (session.stopped) return;
+              session.stopped = true;
+              if (abort) { try { abort.abort(); } catch (e) {} }
+            },
+            jumpTo: function (offset) {
+              if (session.complete || session.stopped) return;
+              var target = Math.max(mdatStart, Math.min(offset || 0, total - 1));
+              session._jumpTarget = Math.floor(target / chunkSize) * chunkSize;
+            }
+          };
+          session._jumpTarget = -1;
+          if (onProgress) onProgress(mdatStart, total);
+          var cursor = mdatStart;
+          function pump() {
+            if (session.stopped || session.complete) return;
+            if (session._jumpTarget >= 0) {
+              cursor = Math.max(mdatStart, session._jumpTarget);
+              session._jumpTarget = -1;
+            }
+            if (cursor >= total) {
+              session.complete = true;
+              if (onComplete) { try { onComplete(); } catch (e) {} }
+              return;
+            }
+            var start = cursor;
+            var stop = Math.min(cursor + chunkSize - 1, total - 1);
+            fetchRange(url, start, stop).then(function (r) {
+              if (session.stopped) return null;
+              var bytes = r.bytes;
+              /* 服务端若无视 Range 回 200 整文件，按请求区间切出来。 */
+              if (r.status === 200 && bytes.length > stop - start + 1) {
+                bytes = bytes.subarray(start, stop + 1);
+              }
+              if (!bytes.length) throw new Error("媒体分片为空");
+              if (bytes.length !== stop - start + 1) throw new Error("媒体分片长度不符");
+              if (r.total && r.total !== total) throw new Error("媒体总长度变化");
+              return patchRange(bytes, start, samples, cryptoKey, moovPlain, moovStart, moovEnd)
+                .then(function () { return bytes; });
+            }).then(function (bytes) {
+              if (session.stopped || bytes === null) return;
+              session.loaded = Math.min(stop + 1, total);
+              session.cursor = stop + 1;
+              if (onProgress) onProgress(session.loaded, total);
+              if (onChunk) onChunk(start, stop, bytes);
+              cursor = stop + 1;
+              pump();
+            }).catch(function (e) {
+              if (session.stopped) return;
+              /* abort 属于主动停，不当错误。 */
+              if (e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")))) return;
+              session.error = e;
+              session.stopped = true;
+              if (onError) { try { onError(e); } catch (err) {} }
+            });
+          }
+          pump();
+          return session;
+        });
+      });
+    });
+  }
+
   /* ---- 调试用：解密后文件的 tag 检查（encv/enca/sinf/pssh/senc 应为 0）---- */
   function countTag(bytes, tag) {
     var needle = strBytes(tag), n = 0, pos = 0;
@@ -18331,17 +18758,18 @@ function hgParseDetail(htmlText) {
     findBox: findBox, parseTrack: parseTrack, sampleTable: sampleTable,
     rewriteMoov: rewriteMoov, toplevelBoxes: toplevelBoxes,
     fetchMoov: fetchMoov, patchRange: patchRange,
-    fetchDecrypted: fetchDecrypted, countTag: countTag,
+    fetchDecrypted: fetchDecrypted, openStream: openStream, countTag: countTag,
     _hex: hex
   };
 })(typeof window !== "undefined" ? window : globalThis);
 
-/* ---------------- 红果 v5 播放（v12） ----------------
+
+/* ---------------- 红果 v5 播放（v12 取流，v14 流式播） ----------------
    取流：HG_V5.multiVideoDetailList(seriesId) 拿全集数字 vid（按 seriesId 缓存，
    App 接口不认 web 端付费墙，全集都有 vid）；点集时 HG_V5.vmModel(vid) 取
    video_model，selectQuality 选清晰度（默认 720p，可切 1080p），main_url +
-   spade_a → DEK；HG_CENC.fetchDecrypted 按 Range 流式解密 → Blob URL；
-   播放复用现有原生/WASM 两路（player.sources = [blobUrl]）。
+   spade_a → DEK；v14：HG_CENC.openStream 边下边解密边回调（moov+首批块就起播，
+   不等整集），先试 MSE（只在 MediaSource 认 HEVC 时走），否则 WASM 回落流式喂样。
    播址带签名有时效（url_expire），点播时现取现用，不缓存；失败重取一次
    （player.hgRetried，酷短剧 kwRetried 同款），重取前丢掉缓存身份。 */
 var hgV5 = { vidsBySeries: {}, quality: "720", blobUrl: "" };
@@ -18375,20 +18803,211 @@ function renderQualityBtn() {
   /* v13：播放器里不再切分辨率（线路在详情页选），画质按钮一律隐藏。 */
   b.classList.add("hidden");
 }
+/* ---------------- 红果 v14 流式（边播边加载） ----------------
+   会话（HG_CENC.openStream）边下边解密边回调 onChunk；块路由：
+   player._hgFeedChunk 是当前消费者（MSE 或回落），未设置时块先进
+   player._hgPendingChunks 待发队列，消费者就绪后同步排空（排空期间
+   onChunk 不会插进来）。换集/退出/重取时 hgStopStream 停会话，不留后台下载。 */
+var hgMse = null; /* 当前 MSE 会话状态（或 null） */
+function hgFeedChunk(start, end, bytes) {
+  var feed = player._hgFeedChunk;
+  if (feed) { feed(start, end, bytes); return; }
+  (player._hgPendingChunks = player._hgPendingChunks || []).push({ start: start, end: end, bytes: bytes });
+}
+function hgDrainPending() {
+  var q = player._hgPendingChunks || [];
+  player._hgPendingChunks = [];
+  var feed = player._hgFeedChunk;
+  if (!feed) return;
+  for (var i = 0; i < q.length; i++) feed(q[i].start, q[i].end, q[i].bytes);
+}
+function hgStopStream() {
+  /* 停掉当前红果流式会话（换集/退出/重取时调），不留后台下载。 */
+  if (player._hgSession) {
+    try { player._hgSession.stop(); } catch (e) {}
+    player._hgSession = null;
+  }
+  player._hgFeedChunk = null;
+  player._hgPendingChunks = [];
+  if (hgMse) hgMseTeardown(hgMse, $("nativeVideo"));
+}
+/* MSE SourceBuffer 追加队列：一次只 append 一个，updateend 后再 append 下一个。 */
+function hgSbQueue(sb, onErr) {
+  var q = [];
+  var api = {
+    push: function (buf) { q.push(buf); api.pump(); },
+    clear: function () { q.length = 0; },
+    get pending() { return q.length; },
+    pump: function () {
+      if (!q.length) return;
+      try {
+        if (sb.updating) return;
+        var buf = q.shift();
+        sb.appendBuffer(buf);
+      } catch (e) { if (onErr) onErr(e); }
+    }
+  };
+  sb.addEventListener("updateend", function () { api.pump(); });
+  return api;
+}
+function hgMseTeardown(st, video) {
+  /* 按 state 对象拆（不是按全局 hgMse）：旧集的 fail/超时迟到时，
+     新集的 hgMse 已是另一个 state，不能把它拆掉。 */
+  if (!st) return;
+  st.stopped = true;
+  if (st.vq) st.vq.clear();
+  if (st.aq) st.aq.clear();
+  if (hgMse === st) {
+    hgMse = null;
+    player._hgMseActive = false;
+  }
+  if (video && st.msUrl && video.src && video.src.indexOf(st.msUrl) >= 0) {
+    try { video.removeAttribute("src"); video.load(); } catch (e) {}
+  }
+  if (st.msUrl) {
+    try { URL.revokeObjectURL(st.msUrl); } catch (e) {}
+    if (player._hgMsUrl === st.msUrl) player._hgMsUrl = "";
+  }
+}
+function hgMseFeed(st, bytes) {
+  if (st.stopped) return;
+  if (st.vq) st.vq.push(bytes);
+  if (st.aq) st.aq.push(bytes);
+}
+/* 会话下完：等两路队列排空且 SB 不在 updating 时再 endOfStream。 */
+function hgMseFinish(st) {
+  if (st.stopped || st.ended) return;
+  function tryEnd() {
+    if (st.stopped || st.ended) return;
+    var vBusy = (st.vq && st.vq.pending > 0) || (st.videoSb && st.videoSb.updating);
+    var aBusy = (st.aq && st.aq.pending > 0) || (st.audioSb && st.audioSb.updating);
+    if (vBusy || aBusy) { setTimeout(tryEnd, 100); return; }
+    try {
+      if (st.ms.readyState === "open") st.ms.endOfStream();
+      st.ended = true;
+    } catch (e) {}
+  }
+  tryEnd();
+}
+/* v14 原生 MSE 路：只在 MediaSource 认 HEVC 编解码时走；先 append 解密后的
+   init 段（ftyp+moov），再按顺序 append 媒体段，首个媒体段 append 完即播。
+   桌面 Chromium 不支持 HEVC MSE（预期）→ resolve {ok:false}，由调用方
+   走回落路，不报错。会话本身出错则 reject（没必要再试回落，会话已死）。 */
+function hgStartMse(video, session, token) {
+  return new Promise(function (resolve, reject) {
+    if (session.error) { reject(session.error); return; }
+    var settled = false;
+    function ok(r) { if (!settled) { settled = true; resolve(r); } }
+    function fail(reason) {
+      /* MSE 不走 → 回落路。已接管的块路由交还给待发队列（免得后到的块
+         被已拆的 MSE 吃掉），MediaSource 一并拆掉。 */
+      if (player._hgFeedChunk === mseFeed) player._hgFeedChunk = null;
+      if (st) hgMseTeardown(st, video);
+      ok({ ok: false, reason: reason });
+    }
+    /* 会话出错（如下载中断）直接 reject，走外层“失败重取一次 / 报错”。 */
+    session._streamReject = function (e) { if (!settled) { settled = true; reject(e); } };
+    var mseFeed = null;
+    var st = null;
+    /* 1. 用 mp4box 读 init 段拿编码串与时长。 */
+    var file = window.__mp4boxCreateFile();
+    var vCodec = null, aCodec = null, dur = 0;
+    file.onReady = function (info) {
+      for (var i = 0; i < info.tracks.length; i++) {
+        if (info.tracks[i].type === "video") { vCodec = info.tracks[i].codec; dur = info.tracks[i].duration / info.tracks[i].timescale; }
+        if (info.tracks[i].type === "audio") aCodec = info.tracks[i].codec;
+      }
+      try { file.stop(); } catch (e) {}
+      proceed();
+    };
+    file.onError = function () { fail("init 解析失败"); };
+    try {
+      var initBuf = hgToArrayBuffer(session.initBytes);
+      initBuf.fileStart = 0;
+      file.appendBuffer(initBuf);
+      file.flush();
+    } catch (e) { fail("init 解析失败"); return; }
+    function proceed() {
+      if (settled) return;
+      if (!vCodec) { fail("无视频轨"); return; }
+      var vMime = 'video/mp4; codecs="' + vCodec + '"';
+      if (!("MediaSource" in window) || !MediaSource.isTypeSupported(vMime)) {
+        fail("MSE 不支持 " + vCodec); return;
+      }
+      var aMime = aCodec ? ('audio/mp4; codecs="' + aCodec + '"') : null;
+      if (aMime && !MediaSource.isTypeSupported(aMime)) aMime = null;
+      /* 2. 建 MediaSource，接 video 元素。 */
+      var ms = new MediaSource();
+      st = { ms: ms, msUrl: "", videoSb: null, audioSb: null, vq: null, aq: null,
+        duration: dur, stopped: false, started: false, ended: false, session: session };
+      hgMse = st;
+      player._hgMseActive = true;
+      var msUrl = URL.createObjectURL(ms);
+      st.msUrl = msUrl;
+      player._hgMsUrl = msUrl;
+      video.src = msUrl;
+      /* sourceopen 超时兜底（5s 打不开就回落）。 */
+      var openTimer = setTimeout(function () { if (!st.videoSb) fail("MediaSource 打不开"); }, 5000);
+      ms.addEventListener("sourceopen", function () {
+        if (st.stopped || token !== player.loadToken) { fail("已切集"); return; }
+        clearTimeout(openTimer);
+        try {
+          st.videoSb = ms.addSourceBuffer(vMime);
+          if (aMime) { try { st.audioSb = ms.addSourceBuffer(aMime); } catch (e) { st.audioSb = null; } }
+        } catch (e) { fail("建 SourceBuffer 失败"); return; }
+        st.vq = hgSbQueue(st.videoSb, function () { fail("视频追加失败"); });
+        if (st.audioSb) st.aq = hgSbQueue(st.audioSb, function () { fail("音频追加失败"); });
+        /* 3. 先 append init 段（两路 SB 各一份），再接媒体段。 */
+        var init = session.initBytes;
+        st.vq.push(init);
+        if (st.aq) st.aq.push(init);
+        /* 4. 接管后续块并排空待发队列（init 已先入队，顺序不错）。 */
+        mseFeed = function (start, end, bytes) { hgMseFeed(st, bytes); };
+        player._hgFeedChunk = mseFeed;
+        hgDrainPending();
+        /* 5. 首个媒体段 append 完（视频 SB 第 2 次 updateend）即播。
+           只 append 了 init 还没媒体时不播（黑屏还不如留着加载条）。 */
+        var appends = 0;
+        var onAppend = function () {
+          if (st.stopped || token !== player.loadToken) return;
+          appends += 1;
+          if (appends >= 2 && !st.started) {
+            st.started = true;
+            player._hgStarted = true;
+            player.loadState = ""; renderCenter();
+            var p = video.play();
+            if (p) p.catch(function () { player.needGesture = true; renderCenter(); });
+            ok({ ok: true, duration: dur, codec: vCodec });
+          }
+        };
+        st.videoSb.addEventListener("updateend", onAppend);
+        /* 首个媒体段 30s 还没来 → 回落（会话可能还活着，回落路继续用它）。 */
+        setTimeout(function () {
+          if (!st.started && !settled) fail("首个媒体段超时（30s）");
+        }, 30000);
+        /* 会话已在建 MSE 期间下完：收尾（等队列排空再 endOfStream）。 */
+        if (session.complete) hgMseFinish(st);
+      }, { once: true });
+    }
+  });
+}
+
 function hgLoadCurrentEpisode(token) {
   var seriesId = player.detail.seriesId;
   if (!seriesId) {
-    player.playError = "这部剧没有 series_id";
+    player.playError = "\u8fd9\u90e8\u5267\u6ca1\u6709 series_id";
     renderCenter();
     return Promise.resolve();
   }
-  player.loadState = "正在取流…";
+  /* v14：先停掉上一集的流式会话（不留后台下载），再取流。 */
+  hgStopStream();
+  player.loadState = "\u6b63\u5728\u53d6\u6d41\u2026";
   renderCenter();
   return hgGetVids(seriesId).then(function (vids) {
     if (token !== player.loadToken) return;
     var vid = vids[player.index];
-    if (!vid) throw new Error("这集没有 vid");
-    player.loadState = "正在取 " + hgV5.quality + "p 播址…";
+    if (!vid) throw new Error("\u8fd9\u96c6\u6ca1\u6709 vid");
+    player.loadState = "\u6b63\u5728\u53d6 " + hgV5.quality + "p \u64ad\u5740\u2026";
     renderCenter();
     return HG_V5.vmModel(vid);
   }).then(function (model) {
@@ -18398,8 +19017,8 @@ function hgLoadCurrentEpisode(token) {
     var def = picked[0], item = picked[1];
     var url = HG_V5.mediaUrl(item);
     var spade = HG_V5.spadeValue(item);
-    if (!url) throw new Error("播址为空");
-    if (!spade) throw new Error("这集没有解密材料");
+    if (!url) throw new Error("\u64ad\u5740\u4e3a\u7a7a");
+    if (!spade) throw new Error("\u8fd9\u96c6\u6ca1\u6709\u89e3\u5bc6\u6750\u6599");
     var keySeed = HG_V5.keySeedFromModel(model);
     /* decryptSpadeUrl 是 async（WebCrypto），key_seed 非空时须等它解完再解密；
        本集 key_seed 为空，走 Promise.resolve 直通。 */
@@ -18408,30 +19027,63 @@ function hgLoadCurrentEpisode(token) {
       : Promise.resolve(url);
     return urlP.then(function (realUrl) {
     var key = HG_V5.deriveContentKey(spade);
-    player.loadState = "正在解密 " + def + "p…";
+    player.loadState = "\u6b63\u5728\u89e3\u5bc6 " + def + "p\u2026";
     renderCenter();
-    return HG_CENC.fetchDecrypted(realUrl, key, {
+    /* v14 流式：openStream 先拿 moov 建采样表，init 就绪即 resolve；
+       媒体块后台边下边解密边回调 onChunk，不等整集。 */
+    return HG_CENC.openStream(realUrl, key, {
       onProgress: function (loaded, total) {
         if (token !== player.loadToken) return;
+        /* 起播后不再写加载条（后台下载不打扰画面）；缓冲态另走 onState。 */
+        if (player._hgStarted) return;
         if (player.fbEvents.onLoadProgress) player.fbEvents.onLoadProgress(loaded, total);
+      },
+      onChunk: function (start, end, bytes) {
+        if (token !== player.loadToken) return;
+        hgFeedChunk(start, end, bytes);
+      },
+      onComplete: function () {
+        if (token !== player.loadToken) return;
+        if (player._hgMseActive && hgMse) hgMseFinish(hgMse);
+        else if (player.mode === "fallback" && player.fallback) {
+          try { player.fallback.finishStream(); } catch (e) {}
+        }
+      },
+      onError: function (e) {
+        if (token !== player.loadToken) return;
+        /* 已起播时会话出错：不断播报错，只停后台下载（播到已下末尾会缓冲）；
+           未起播时把错误递给消费者（_streamReject），由外层 catch 统一
+           走“失败重取一次 / 报错”；这里不直接写 playError，免得重试时还挂着错。 */
+        if (player._hgStarted) { console.warn("[hg] 流式会话出错（已起播，继续播已下部分）：", e); return; }
+        if (player._hgSession) { var rj = player._hgSession._streamReject; if (rj) rj(e); }
       }
-    }).then(function (r) {
-      if (token !== player.loadToken) return;
-      hgRevokeBlob();
-      hgV5.blobUrl = URL.createObjectURL(new Blob([r.bytes], { type: "video/mp4" }));
-      player.sources = [hgV5.blobUrl];
-      player.srcIdx = 0;
-      /* v13：解密完成即清 loadState——原生路没有任何事件会清它（ready/firstFrame
-         只由回落播放器发），否则最后一发解密进度（10.0/10.0 MB）会把加载条
-         钉死在画面中央。 */
-      player.loadState = ""; renderCenter();
-      if (!canPlayHevcNative()) {
+    }).then(function (session) {
+      if (token !== player.loadToken) { try { session.stop(); } catch (e) {} return; }
+      if (session.error) throw session.error;
+      player._hgSession = session;
+      player._hgPendingChunks = [];
+      /* v14：先试 MSE（只在 MediaSource 认 HEVC 时走），桌面 Chromium
+         不支持 HEVC MSE（预期）→ 优雅回落到 WASM，不报错。 */
+      var video = $("nativeVideo");
+      return hgStartMse(video, session, token).then(function (r) {
+        if (token !== player.loadToken) return;
+        if (r && r.ok) {
+          player.duration = r.duration || player.duration;
+          setMode("native");
+          return;
+        }
+        /* MSE 不走 → WASM 回落（流式喂样）。 */
         setMode("fallback");
-        return startFallback(player.sources, token);
-      }
-      setMode("native");
-      loadNative();
-      return Promise.resolve();
+        var fb = getFallbackPlayer();
+        if (!fb) throw new Error("\u56de\u843d\u64ad\u653e\u5668\u4e0d\u53ef\u7528");
+        return fb.loadStream(session, token).then(function (info) {
+          if (token !== player.loadToken || !info) return;
+          player.duration = info.duration;
+          return fb.play().then(function () {
+            if (token === player.loadToken) setPlaying(true);
+          });
+        });
+      });
     });
     });
   }).catch(function (e) {
@@ -18442,7 +19094,7 @@ function hgLoadCurrentEpisode(token) {
       hgLoadCurrentEpisode(token);
       return;
     }
-    player.playError = "红果取流失败：" + (e instanceof Error ? e.message : String(e));
+    player.playError = "\u7ea2\u679c\u53d6\u6d41\u5931\u8d25\uff1a" + (e instanceof Error ? e.message : String(e));
     renderCenter();
   });
 }
