@@ -79,6 +79,37 @@ img{display:block}
 .hub-title{font-size:18px;font-weight:700;color:#fff}
 .hub-ver{font-size:12px;color:var(--faint)}
 .hub-err{margin-top:10px;font-size:12px;color:var(--bad)}
+/* v19：聚合插件 hub 样式（照漫画/书籍插件；--fill-gs 用视频自己的 --accent） */
+.hub-list{margin-top:12px}
+.hub-row{display:flex;align-items:stretch;gap:12px}
+.hub-entry{flex:1;min-width:0;display:flex;align-items:center;gap:16px;padding:20px;border-radius:16px;border:1px solid var(--border);background:var(--surface);box-shadow:0 4px 16px rgba(0,0,0,.3);text-align:left}
+.hub-entry:active{transform:scale(.99)}
+.hub-entry-badge{flex:none;width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:16px;background:var(--accent);font-size:30px;font-weight:700;color:#fff}
+.hub-entry-badge.extra{background:var(--surface3);color:var(--text)}
+.hub-entry-text{min-width:0}
+.hub-entry-title{display:block;font-size:18px;font-weight:700;color:#fff}
+.hub-entry-sub{display:block;margin-top:2px;font-size:14px;color:var(--dim)}
+.hub-entry-arrow{margin-left:auto;flex:none;font-size:20px;color:var(--faint)}
+.hub-update{flex:none;width:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--dim);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.hub-update:disabled{opacity:.5}
+.hub-status{margin-top:8px;font-size:14px;line-height:1.5;height:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+.hub-add{width:100%;margin-top:16px;display:flex;align-items:center;justify-content:center;padding:14px;border-radius:16px;border:1px dashed var(--border);background:var(--surface);font-size:14px;color:var(--dim)}
+.hub-addpanel{margin-top:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:16px}
+.hub-add-title{font-size:15px;font-weight:700;color:#fff}
+.hub-add-hint{margin-top:4px;font-size:12px;color:var(--dim)}
+#addEntryName{width:100%;margin-top:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:10px 12px;font-size:14px;box-sizing:border-box}
+#addManifestUrl{width:100%;margin-top:8px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:10px 12px;font-size:14px;box-sizing:border-box}
+.hub-add-btns{display:flex;gap:8px;margin-top:10px}
+.hub-add-btns button{flex:1;border-radius:10px;padding:10px;font-size:14px;font-weight:600}
+#btnAddConfirm{background:var(--accent);color:#fff}
+#btnAddCancel{background:var(--surface2);color:var(--dim)}
+#btnExtraDownload{background:var(--accent);color:#fff}
+.hub-add-err{margin-top:8px;font-size:13px;color:var(--bad)}
+.hub-info{margin-top:12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);padding:16px}
+.hub-info h3{font-size:15px;font-weight:700;color:#fff}
+.hub-info p{margin-top:6px;font-size:13px;line-height:1.6;color:var(--dim)}
+.hub-info .hub-runner{color:var(--amber)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .hub-note{margin-top:12px;font-size:12px;color:var(--faint)}
 #hubPastePanel{margin-top:10px}
 #hubPasteJson{width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical;box-sizing:border-box}
@@ -198,16 +229,54 @@ img{display:block}
 <body>
 <div id="app">
   <!-- v15 P0 入口页（hub）：只在点 ‹ 主页 时出现；平时直接进浏览页，不挡路 -->
+  <!-- v19 聚合插件 hub（照漫画/书籍插件 #hub）：入口页从第一行就是插件列表；
+       顶栏由 APK 固定显示，阅读器里不再自己画顶栏。漫画/书籍/视频三个入口 +
+       各自更新按钮 + #extraList（其它插件）+ 添加其它插件。源卡片与导入/粘贴
+       已挪到浏览页，hub 里只有插件列表。 -->
   <section id="viewHub" class="hidden">
-    <div class="hub-head"><span class="hub-title">视频插件</span><span class="hub-ver" id="hubVer"></span></div>
-    <div class="rule-row" id="hubRuleRow" style="margin-top:12px"></div>
-    <p id="hubImportErr" class="hub-err hidden" role="status"></p>
-    <div id="hubPastePanel" class="hidden">
-      <textarea id="hubPasteJson" rows="6" placeholder="粘贴视频规则 JSON（把规则文件全文粘贴到这里）…" spellcheck="false"></textarea>
-      <div class="paste-btns"><button type="button" id="hubPasteImport">导入</button><button type="button" id="hubPasteCancel">取消</button></div>
-    </div>
-    <p class="hub-note">导入的规则存在本机（IndexedDB），刷新还在；P1 接入通用引擎后可播。</p>
-    <input type="file" id="hubFileInput" accept=".json,application/json" style="display:none">
+    <div style="padding-top:16px"><button type="button" class="back-btn" id="hubHomeBtn">‹ 主页</button></div>
+    <section aria-label="插件列表">
+      <div class="hub-list">
+        <div class="hub-row">
+          <button type="button" class="hub-entry" id="btnEnterManga">
+            <span class="hub-entry-badge" aria-hidden>漫</span>
+            <span class="hub-entry-text"><span class="hub-entry-title">漫画</span><span class="hub-entry-sub">点此进入漫画插件</span></span>
+            <span class="hub-entry-arrow" aria-hidden>›</span>
+          </button>
+          <button type="button" class="hub-update" id="btnUpdateManga" aria-label="更新漫画插件"><span aria-hidden>↓</span><span>更新插件</span></button>
+        </div>
+        <p class="hub-status" id="mangaUpdateStatus" role="status"></p>
+        <div class="hub-row" style="margin-top:12px">
+          <button type="button" class="hub-entry" id="btnEnterBooks">
+            <span class="hub-entry-badge" aria-hidden>书</span>
+            <span class="hub-entry-text"><span class="hub-entry-title">书籍</span><span class="hub-entry-sub">点此进入书籍插件</span></span>
+            <span class="hub-entry-arrow" aria-hidden>›</span>
+          </button>
+          <button type="button" class="hub-update" id="btnUpdateBooks" aria-label="更新书籍插件"><span aria-hidden>↓</span><span>更新插件</span></button>
+        </div>
+        <p class="hub-status" id="bookUpdateStatus" role="status"></p>
+        <div class="hub-row" style="margin-top:12px">
+          <button type="button" class="hub-entry" id="btnEnterVideo">
+            <span class="hub-entry-badge" aria-hidden>视</span>
+            <span class="hub-entry-text"><span class="hub-entry-title">视频</span><span class="hub-entry-sub">点此进入视频插件</span></span>
+            <span class="hub-entry-arrow" aria-hidden>›</span>
+          </button>
+          <button type="button" class="hub-update" id="btnUpdateVideo" aria-label="更新视频插件"><span aria-hidden>↓</span><span>更新插件</span></button>
+        </div>
+        <p class="hub-status" id="videoUpdateStatus" role="status"></p>
+        <div id="extraList"></div>
+        <button type="button" class="hub-add" id="btnAddPlugin">＋ 添加其它插件</button>
+        <div class="hub-addpanel hidden" id="addPanel">
+          <p class="hub-add-title">添加插件</p>
+          <p class="hub-add-hint">输入入口名称和插件清单地址，点下载拉取插件（阅读器 + 规则逐个验 sha256 后保存）。</p>
+          <input type="text" id="addEntryName" placeholder="入口名称（可空，默认用清单里的名字）" autocomplete="off">
+          <input type="url" id="addManifestUrl" placeholder="插件地址：https://…/manifest.json" autocomplete="off">
+          <div class="hub-add-btns"><button type="button" id="btnAddConfirm">下载</button><button type="button" id="btnAddCancel">取消</button></div>
+          <p class="hub-add-err" id="addErr" role="alert"></p>
+        </div>
+        <div class="hub-info hidden" id="extraInfo"></div>
+      </div>
+    </section>
   </section>
 
   <!-- 浏览：规则卡片 + 分类 + 搜索 + 列表（无聚合顶栏，顶栏由 APK 固定显示） -->
@@ -219,6 +288,19 @@ img{display:block}
       <button type="button" class="src-tab" id="tabKw">酷短剧</button>
       <button type="button" class="src-tab" id="tabHg">红果短剧</button>
     </div>
+    <!-- v19：导入/粘贴从 hub 挪到浏览页（照漫画插件把导入/粘贴放浏览页的做法；
+         hub 里只留插件列表）。导入的规则存在本机（IndexedDB），刷新还在。 -->
+    <div class="rule-row" style="margin-top:12px">
+      <button type="button" class="import-btn" id="hubImportBtn">+ 导入规则文件</button>
+      <button type="button" class="import-btn" id="hubPasteBtn">粘贴 JSON</button>
+    </div>
+    <p id="hubImportErr" class="hub-err hidden" role="status"></p>
+    <div id="hubPastePanel" class="hidden">
+      <textarea id="hubPasteJson" rows="6" placeholder="粘贴视频规则 JSON（把规则文件全文粘贴到这里）…" spellcheck="false"></textarea>
+      <div class="paste-btns"><button type="button" id="hubPasteImport">导入</button><button type="button" id="hubPasteCancel">取消</button></div>
+    </div>
+    <p class="hub-note">导入的规则存在本机（IndexedDB），刷新还在；通用引擎已接，可播。</p>
+    <input type="file" id="hubFileInput" accept=".json,application/json" style="display:none">
     <div id="xyBrowse">
     <div id="rules"><div class="rule-row">
       <button type="button" class="rule-card" id="ruleCard">
@@ -466,7 +548,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 18;
+var PLUGIN_VERSION = 19;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -16652,72 +16734,527 @@ function renderGenBrowse(src) {
   }
 }
 
-/* ---------------- v15 P0：入口页（hub） ----------------
-   照漫画插件 renderRuleRow 的结构：‹ 主页 + 源卡片 + 导入规则文件 + 粘贴 JSON。
-   平时仍直接进浏览页；入口页只在点 ‹ 主页 时出现；‹ 主页 从浏览 / 详情 /
-   播放器任何一页都回聚合插件 hub（v17 goHome：history.back()，无历史时回落 showHub）。 */
-function renderHub() {
-  var row = $("hubRuleRow");
-  if (!row) return;
-  var ver = $("hubVer");
-  if (ver) ver.textContent = "v" + PLUGIN_VERSION;
-  var html = '<button type="button" class="home-btn" id="hubHomeBtn">‹ 主页</button>';
-  for (var i = 0; i < SOURCES.length; i++) {
-    var s = SOURCES[i];
-    html += '<button type="button" class="rule-card" data-src="' + esc(s.id) + '">'
-      + '<span class="rule-badge">' + esc(s.badge || (s.title || "?").charAt(0)) + '</span>'
-      + '<span class="rule-meta"><span class="rule-title">' + esc(s.title) + '</span>'
-      + '<span class="rule-author">' + esc((s.author || "未知作者") + (s.site ? " · " + s.site : "")) + '</span>'
-      + '<span class="rule-file">' + esc(s.file + (s.kind === "generic" ? " · 通用引擎" : "")) + '</span></span></button>';
+/* ---------------- v19：聚合插件 hub（照漫画/书籍插件） ----------------
+   用户 2026-11-28 16:20 纠正：v17 的 history.back() 是错的。漫画插件
+   （comic_reader.html 2421 行）把“‹ 主页”绑到 goHome() → showHub()，
+   只做内部显隐（#hub 显示、#app 隐藏），不导航、不碰 history。
+   视频插件照搬：goHome() 只调 showHub()，hub 就是插件里的聚合插件列表
+   （漫画/书籍/视频三个入口 + 各自更新按钮 + #extraList + 添加其它插件）。
+   漫画/书籍入口的跳转机制照书籍插件：优先读本地存的副本（漫画读
+   mangaReaderCache，书籍读 extraList 里已下载的条目），没有才按清单
+   拉取（清单 → 验 sha256 → 阅读器 → 验 sha256 → 存进 extraList → 载入）。
+   载入对方阅读器用 loadReaderText：document.open/write（WebView 里最稳），
+   失败退到 blob 链接。 */
+var VIDEO_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/manifest.json";
+var MANGA_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/manifest.json";
+var BOOK_MANIFEST_URL = "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/book/manifest.json";
+var HUB_EXTRA_KEY = "hubExtraPlugins";
+var MANGA_READER_CACHE_KEY = "mangaReaderCache";
+var hubUpdating = false;
+var mangaBusy = false;
+var bookBusy = false;
+
+function sha256Hex(str) {
+  var K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+  function rr(v, a) { return (v >>> a) | (v << (32 - a)); }
+  var bytes = [];
+  for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    if (c < 0x80) bytes.push(c);
+    else if (c < 0x800) { bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f)); }
+    else if (c >= 0xd800 && c < 0xdc00) {
+      var c2 = str.charCodeAt(++i);
+      var cp = 0x10000 + (((c & 0x3ff) << 10) | (c2 & 0x3ff));
+      bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+    } else bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
   }
-  html += '<button type="button" class="import-btn" id="hubImportBtn">+ 导入规则文件</button>';
-  html += '<button type="button" class="import-btn" id="hubPasteBtn">粘贴 JSON</button>';
-  row.innerHTML = html;
-  var cards = row.querySelectorAll("[data-src]");
-  for (var j = 0; j < cards.length; j++) {
-    cards[j].addEventListener("click", function () { enterSource(this.getAttribute("data-src")); });
+  var bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  bytes.push(0, 0, 0, 0, (bitLen >>> 24) & 0xff, (bitLen >>> 16) & 0xff, (bitLen >>> 8) & 0xff, bitLen & 0xff);
+  var h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a, h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+  var w = new Array(64);
+  for (var b = 0; b < bytes.length; b += 64) {
+    for (var t = 0; t < 16; t++) w[t] = ((bytes[b + t * 4] << 24) | (bytes[b + t * 4 + 1] << 16) | (bytes[b + t * 4 + 2] << 8) | bytes[b + t * 4 + 3]) | 0;
+    for (var t2 = 16; t2 < 64; t2++) {
+      var s0 = rr(w[t2 - 15], 7) ^ rr(w[t2 - 15], 18) ^ (w[t2 - 15] >>> 3);
+      var s1 = rr(w[t2 - 2], 17) ^ rr(w[t2 - 2], 19) ^ (w[t2 - 2] >>> 10);
+      w[t2] = (w[t2 - 16] + s0 + w[t2 - 7] + s1) | 0;
+    }
+    var a = h0, bb = h1, cc = h2, d = h3, e = h4, f = h5, g = h6, hh = h7;
+    for (var t3 = 0; t3 < 64; t3++) {
+      var S1 = rr(e, 6) ^ rr(e, 11) ^ rr(e, 25);
+      var ch = (e & f) ^ (~e & g);
+      var tmp1 = (hh + S1 + ch + K[t3] + w[t3]) | 0;
+      var S0 = rr(a, 2) ^ rr(a, 13) ^ rr(a, 22);
+      var mj = (a & bb) ^ (a & cc) ^ (bb & cc);
+      var tmp2 = (S0 + mj) | 0;
+      hh = g; g = f; f = e; e = (d + tmp1) | 0; d = cc; cc = bb; bb = a; a = (tmp1 + tmp2) | 0;
+    }
+    h0 = (h0 + a) | 0; h1 = (h1 + bb) | 0; h2 = (h2 + cc) | 0; h3 = (h3 + d) | 0; h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + hh) | 0;
   }
-  var hb = $("hubHomeBtn");
-  if (hb) hb.addEventListener("click", goHome);
-  /* 导入按钮是真 <button>，点它直接调文件框的 click()——
-     旧的 <label for> 指着 display:none 的输入框，手机浏览器点不开（漫画插件同款注释）。 */
-  var ib = $("hubImportBtn");
-  if (ib) ib.addEventListener("click", function () { $("hubFileInput").click(); });
-  var pb = $("hubPasteBtn");
-  if (pb) pb.addEventListener("click", function () { var p = $("hubPastePanel"); if (p) p.classList.toggle("hidden"); });
+  function hx(v) { var s = ""; for (var i = 28; i >= 0; i -= 4) s += "0123456789abcdef"[(v >>> i) & 0xf]; return s; }
+  return hx(h0) + hx(h1) + hx(h2) + hx(h3) + hx(h4) + hx(h5) + hx(h6) + hx(h7);
 }
-function enterSource(id) {
-  var s = findSource(id);
-  if (!s) return;
+
+function fetchTextTimeout(url, ms) {
+  return fetch(url, { signal: AbortSignal.timeout(ms || 30000) }).then(function (res) {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.text();
+  });
+}
+
+function manifestUrlFresh(url) {
+  return url + (url.indexOf("?") === -1 ? "?" : "&") + "t=" + Date.now();
+}
+
+function validatePluginManifest(m) {
+  if (!m || typeof m !== "object") return "清单不是有效的 JSON 对象";
+  if (typeof m.version !== "number") return "清单缺少 version（数字）";
+  if (!m.reader || typeof m.reader.url !== "string" || !m.reader.url) return "清单缺少 reader.url";
+  if (typeof m.reader.sha256 !== "string" || !m.reader.sha256) return "清单缺少 reader.sha256";
+  if (!Array.isArray(m.rules)) return "清单缺少 rules（数组）";
+  return "";
+}
+
+function pullPluginFromManifest(manifestUrl, customName) {
+  var m;
+  return fetchTextTimeout(manifestUrlFresh(manifestUrl)).then(function (text) {
+    try { m = JSON.parse(text); } catch (e) { throw new Error("清单 JSON 解析失败"); }
+    var bad = validatePluginManifest(m);
+    if (bad) throw new Error(bad);
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url));
+  }).then(function (readerText) {
+    if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上，拒绝保存");
+    var entry = { name: "", url: manifestUrl, version: m.version, rules: m.rules.length, updated: m.updated || "", readerText: readerText, readerSha256: String(m.reader.sha256).toLowerCase(), ruleTexts: {} };
+    var chain = Promise.resolve();
+    m.rules.forEach(function (r) {
+      chain = chain.then(function () { return fetchTextTimeout(r.url); }).then(function (rt) {
+        if (sha256Hex(rt) !== String(r.sha256).toLowerCase()) throw new Error("规则 " + (r.file || r.name || "") + " sha256 对不上，拒绝保存");
+        entry.ruleTexts[r.file || r.name || ("rule" + Object.keys(entry.ruleTexts).length)] = rt;
+      });
+    });
+    return chain.then(function () { return { entry: entry, manifest: m }; });
+  }).then(function (res) {
+    var m2 = res.manifest, entry = res.entry;
+    var name = (customName && String(customName).trim()) ? String(customName).trim()
+      : ((typeof m2.name === "string" && m2.name) ? m2.name
+      : ((typeof m2.title === "string" && m2.title) ? m2.title
+      : (m2.rules && m2.rules[0] && m2.rules[0].name) ? m2.rules[0].name : "未命名插件"));
+    entry.name = name;
+    return entry;
+  });
+}
+
+function hubExtraPlugins() {
+  try {
+    var raw = (window.localStorage) ? window.localStorage.getItem(HUB_EXTRA_KEY) : null;
+    var arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function hubSaveExtraPlugins(list) {
+  try { if (window.localStorage) window.localStorage.setItem(HUB_EXTRA_KEY, JSON.stringify(list)); } catch (e) { /* no storage */ }
+}
+
+function hubSetBridgeVisible(v) {
+  try { if (window.ComicBridge && typeof window.ComicBridge.setHubVisible === "function") window.ComicBridge.setHubVisible(v); } catch (e) { /* no bridge */ }
+}
+
+function saveMangaReaderCache(version, readerText) {
+  try { if (window.localStorage) window.localStorage.setItem(MANGA_READER_CACHE_KEY, JSON.stringify({ version: version, readerText: readerText })); } catch (e) { /* 存储不可用时忽略 */ }
+}
+
+function loadMangaReaderCache() {
+  try {
+    var raw = window.localStorage ? window.localStorage.getItem(MANGA_READER_CACHE_KEY) : null;
+    var c = raw ? JSON.parse(raw) : null;
+    if (c && typeof c.readerText === "string" && c.readerText.indexOf("PLUGIN_VERSION") !== -1) return c;
+    return null;
+  } catch (e) { return null; }
+}
+
+function loadReaderText(text) {
+  try {
+    document.open();
+    document.write(text);
+    document.close();
+  } catch (e) {
+    try {
+      var blob = new Blob([text], { type: "text/html" });
+      window.location.href = URL.createObjectURL(blob);
+    } catch (e2) { showToast("打不开这个插件的阅读器"); }
+  }
+}
+
+function showExtraInfo(idx) {
+  var list = hubExtraPlugins();
+  var p = list[idx]; if (!p) return;
+  var box = $("extraInfo"); if (!box) return;
+  var html = '<h3>' + esc(p.name) + '</h3>'
+    + '<p>版本：插件 v' + esc(String(p.version)) + ' · 规则 ' + esc(String(p.rules)) + ' 条</p>'
+    + '<p class="mono">清单：' + esc(p.url) + '</p>';
+  if (p.readerText) {
+    html += '<p>已下载到本地，点条目即可打开。</p>';
+  } else {
+    /* 旧版只记清单时加的条目：没有下载内容，点下载拉取后才能打开。 */
+    html += '<p class="hub-runner">这个条目是旧版只记清单时加的，还没下载阅读器和规则，点下面按钮下载后才能打开。</p>'
+      + '<div class="hub-add-btns"><button type="button" id="btnExtraDownload">下载</button></div>';
+  }
+  box.innerHTML = html;
+  box.classList.remove("hidden");
+  var bd = $("btnExtraDownload");
+  if (bd) bd.addEventListener("click", function () {
+    bd.disabled = true;
+    pullPluginFromManifest(p.url, p.name).then(function (entry) {
+      var l2 = hubExtraPlugins();
+      for (var i = 0; i < l2.length; i++) if (l2[i].url === p.url) {
+        l2[i].version = entry.version; l2[i].rules = entry.rules; l2[i].updated = entry.updated;
+        l2[i].readerText = entry.readerText; l2[i].readerSha256 = entry.readerSha256; l2[i].ruleTexts = entry.ruleTexts;
+      }
+      hubSaveExtraPlugins(l2);
+      renderExtraList();
+      box.classList.add("hidden");
+      showToast("已下载 " + p.name);
+    }).catch(function (e) {
+      showToast("下载失败：" + (e && e.message ? e.message : String(e)));
+    }).then(function () { bd.disabled = false; });
+  });
+}
+
+function openAddedPlugin(idx) {
+  var list = hubExtraPlugins();
+  var p = list[idx]; if (!p) return;
+  if (!p.readerText) { showExtraInfo(idx); return; }
+  loadReaderText(p.readerText);
+}
+
+function updateAddedPlugin(idx) {
+  var list = hubExtraPlugins();
+  var p = list[idx]; if (!p) return;
+  var st = $("extraStatus-" + idx);
+  if (st) st.textContent = "正在检查更新…";
+  pullPluginFromManifest(p.url, p.name).then(function (entry) {
+    if (entry.version <= (p.version || 0)) {
+      if (st) st.textContent = "已是最新 v" + (p.version || 0);
+      return;
+    }
+    var l2 = hubExtraPlugins();
+    var target = null;
+    for (var i = 0; i < l2.length; i++) if (l2[i].url === p.url) target = l2[i];
+    if (!target) throw new Error("该插件已不在列表中");
+    /* 保留自定义入口名称，只换内容与版本 */
+    target.version = entry.version;
+    target.rules = entry.rules;
+    target.updated = entry.updated;
+    target.readerText = entry.readerText;
+    target.readerSha256 = entry.readerSha256;
+    target.ruleTexts = entry.ruleTexts;
+    hubSaveExtraPlugins(l2);
+    renderExtraList();
+    var st2 = $("extraStatus-" + idx);
+    if (st2) st2.textContent = "已更新到 v" + entry.version;
+  }).catch(function (e) {
+    if (st) st.textContent = "检查失败，请稍后重试";
+  });
+}
+
+function addPluginFromUrl(url, customName) {
+  var errEl = $("addErr");
+  function fail(msg) { if (errEl) errEl.textContent = msg; }
+  if (errEl) errEl.textContent = "";
+  var u = String(url || "").trim();
+  if (!u) { fail("请输入插件地址"); return; }
+  var list = hubExtraPlugins();
+  for (var i = 0; i < list.length; i++) if (list[i].url === u) { fail("该插件已添加"); return; }
+  var btn = $("btnAddConfirm"); if (btn) btn.disabled = true;
+  if (errEl) errEl.textContent = "正在下载插件…";
+  pullPluginFromManifest(u, customName).then(function (entry) {
+    var l2 = hubExtraPlugins();
+    for (var j = 0; j < l2.length; j++) if (l2[j].url === u) throw new Error("该插件已添加");
+    l2.push(entry);
+    hubSaveExtraPlugins(l2);
+    var check = hubExtraPlugins();
+    var ok = false;
+    for (var k = 0; k < check.length; k++) if (check[k].url === u) ok = true;
+    if (!ok) throw new Error("保存失败（存储不可用或空间不足）");
+    renderExtraList();
+    var inp = $("addManifestUrl"); if (inp) inp.value = "";
+    var nm = $("addEntryName"); if (nm) nm.value = "";
+    var panel = $("addPanel"); if (panel) panel.classList.add("hidden");
+    if (errEl) errEl.textContent = "";
+    showToast("已下载 " + entry.name);
+  }).catch(function (e) {
+    fail("下载失败：" + (e && e.message ? e.message : String(e)));
+  }).then(function () { if (btn) btn.disabled = false; });
+}
+
+function renderExtraList() {
+  var box = $("extraList"); if (!box) return;
+  var list = hubExtraPlugins();
+  var html = "";
+  for (var i = 0; i < list.length; i++) {
+    var p = list[i];
+    /* v4：跳过与本插件同一清单的条目——书籍插件自己就是内置入口，
+       再列一次就是用户截图里的两个“书籍”。下标 i 保持原列表下标，
+       data-extra / extraStatus 仍对得上 openAddedPlugin / updateAddedPlugin。
+       条目只在显示时跳过，不从 localStorage 删：checkBookUpdate 还要靠
+       那份存着的条目同步 APK hub 里的书籍副本。 */
+    /* v19：跳过与三个内置入口同一清单的条目（漫画/书籍/视频都已是内置入口，
+       再列一次就是重复。下标 i 保持原列表下标，data-extra 仍对得上
+       openAddedPlugin / updateAddedPlugin。条目只在显示时跳过，不从
+       localStorage 删：更新按钮还要靠那份存着的条目同步副本。 */
+    if (p.url === VIDEO_MANIFEST_URL || p.url === MANGA_MANIFEST_URL || p.url === BOOK_MANIFEST_URL) continue;
+    html += '<div class="hub-row" style="margin-top:12px">'
+      + '<button type="button" class="hub-entry" data-extra="' + i + '">'
+      + '<span class="hub-entry-badge extra" aria-hidden>' + esc(String(p.name || "插").charAt(0)) + '</span>'
+      + '<span class="hub-entry-text"><span class="hub-entry-title">' + esc(p.name) + '</span>'
+      + '<span class="hub-entry-sub">插件 v' + esc(String(p.version)) + ' · ' + esc(String(p.rules)) + ' 条规则</span></span>'
+      + '<span class="hub-entry-arrow" aria-hidden>›</span></button>'
+      + '<button type="button" class="hub-update" data-extra-update="' + i + '" aria-label="更新"><span aria-hidden>↓</span><span>更新</span></button>'
+      + '</div>'
+      + '<p class="hub-status" id="extraStatus-' + i + '" role="status"></p>';
+  }
+  box.innerHTML = html;
+  var btns = box.querySelectorAll("[data-extra]");
+  for (var j = 0; j < btns.length; j++) btns[j].addEventListener("click", function () {
+    openAddedPlugin(parseInt(this.getAttribute("data-extra"), 10));
+  });
+  var ubtns = box.querySelectorAll("[data-extra-update]");
+  for (var k = 0; k < ubtns.length; k++) ubtns[k].addEventListener("click", function () {
+    updateAddedPlugin(parseInt(this.getAttribute("data-extra-update"), 10));
+  });
+}
+
+/* 漫画入口的更新按钮：查漫画清单。本地存着漫画条目且已是最新 → “已是最新 vX”；
+   有新版（或本地没存漫画）→ 下载验 sha256 后当场载入新漫画阅读器。
+   不调 ComicBridge.checkForUpdate()——那是漫画插件自己的更新通道，书籍 hub 里没有漫画插件可调。 */
+function checkMangaUpdate() {
+  if (mangaBusy) return;
+  mangaBusy = true;
+  var btn = $("btnUpdateManga"), st = $("mangaUpdateStatus");
+  if (btn) btn.disabled = true;
+  if (st) st.textContent = "正在检查更新…";
+  function done() { mangaBusy = false; if (btn) btn.disabled = false; }
+  fetchTextTimeout(manifestUrlFresh(MANGA_MANIFEST_URL)).then(function (text) {
+    var m;
+    try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
+    var bad = validatePluginManifest(m);
+    if (bad) throw new Error(bad);
+    var stored = null;
+    try {
+      var list = hubExtraPlugins();
+      for (var i = 0; i < list.length; i++) if (list[i].url === MANGA_MANIFEST_URL) stored = list[i];
+    } catch (e) { /* 存储不可用时当作本地没存 */ }
+    if (stored && m.version <= (stored.version || 0)) {
+      if (st) st.textContent = "已是最新 v" + (stored.version || 0);
+      done();
+      return;
+    }
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
+      if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
+      saveMangaReaderCache(m.version, readerText); /* 新版原字节同步进本地存的副本（覆盖旧版） */
+      try {
+        var l2 = hubExtraPlugins();
+        for (var j = 0; j < l2.length; j++) {
+          if (l2[j].url === MANGA_MANIFEST_URL) {
+            l2[j].version = m.version;
+            l2[j].rules = Array.isArray(m.rules) ? m.rules.length : l2[j].rules;
+            l2[j].updated = m.updated || l2[j].updated;
+            l2[j].readerText = readerText;
+            l2[j].readerSha256 = String(m.reader.sha256).toLowerCase();
+          }
+        }
+        hubSaveExtraPlugins(l2);
+      } catch (e) { /* 存储不可用时忽略，当场载入照常 */ }
+      if (st) st.textContent = "已更新到 v" + m.version;
+      done();
+      loadReaderText(readerText);
+    });
+  }).catch(function (e) {
+    if (st) st.textContent = "检查失败，请稍后重试";
+    done();
+  });
+}
+
+/* 视频插件自己的更新按钮：查视频清单。有新版 → 下载新阅读器、验 sha256、
+   顺手更新本地已存的同清单条目（其它插件 hub 的 localStorage 里那份），再当场载入新阅读器。
+   （照书籍插件 checkBookUpdate 的结构。） */
+function checkVideoUpdate() {
+  if (hubUpdating) return;
+  var btn = $("btnUpdateVideo"), st = $("videoUpdateStatus");
+  hubUpdating = true;
+  if (btn) btn.disabled = true;
+  if (st) st.textContent = "正在检查更新…";
+  function done() { hubUpdating = false; if (btn) btn.disabled = false; }
+  fetchTextTimeout(manifestUrlFresh(VIDEO_MANIFEST_URL)).then(function (text) {
+    var m;
+    try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
+    var bad = validatePluginManifest(m);
+    if (bad) throw new Error(bad);
+    if (m.version <= (window.PLUGIN_VERSION || 1)) {
+      if (st) st.textContent = "已是最新 v" + (window.PLUGIN_VERSION || 1);
+      done();
+      return;
+    }
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
+      if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
+      try {
+        var list = hubExtraPlugins();
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].url === VIDEO_MANIFEST_URL) {
+            list[i].version = m.version;
+            list[i].rules = Array.isArray(m.rules) ? m.rules.length : list[i].rules;
+            list[i].updated = m.updated || list[i].updated;
+            list[i].readerText = readerText;
+            list[i].readerSha256 = String(m.reader.sha256).toLowerCase();
+          }
+        }
+        hubSaveExtraPlugins(list);
+      } catch (e) { /* 存储不可用时忽略，当场载入照常 */ }
+      if (st) st.textContent = "已更新到 v" + m.version;
+      done();
+      loadReaderText(readerText);
+    });
+  }).catch(function (e) {
+    if (st) st.textContent = "检查失败，请稍后重试";
+    done();
+  });
+}
+
+function renderHub() {
+  renderExtraList();
+}
+/* 点 hub 的“视频”入口进本插件浏览页：启动时已直接进浏览页，这里只恢复视图。 */
+function enterVideo() {
   showView("browse");
-  if (s.kind === "generic") { cmsShowView(id); return; }
-  if (id === "xy") cmsShowTabXy();
-  else if (id === "cms") cmsShowTabCms();
-  else if (id === "kuwo") kwShowTab();
-  else if (id === "hongguo") hgShowTab();
+  hubSetBridgeVisible(false);
+  window.scrollTo(0, 0);
+}
+/* v19：点漫画先走本地副本——漫画插件已经下载在本机（漫画阅读器启动时把
+   全文存进 localStorage "mangaReaderCache"，更新时也同步刷新），入口直接
+   载入本地副本，不再每次都去 GitHub 重新拉清单+阅读器。没有本地副本时才
+   联网拉取，并顺手存一份供下次直接进。更新仍走“更新插件”按钮
+   （checkMangaUpdate），入口本身不查新版。（照书籍插件 enterManga；
+   mangaDirectEntry 标记在漫画 v10 已退役，漫画启动本来就直接进界面，不用写。） */
+function enterManga() {
+  var cached = loadMangaReaderCache();
+  if (cached) { loadReaderText(cached.readerText); return; }
+  if (mangaBusy) return;
+  mangaBusy = true;
+  var st = $("mangaUpdateStatus");
+  if (st) st.textContent = "正在拉取漫画插件…";
+  fetchTextTimeout(manifestUrlFresh(MANGA_MANIFEST_URL)).then(function (text) {
+    var m;
+    try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
+    var bad = validatePluginManifest(m);
+    if (bad) throw new Error(bad);
+    return fetchTextTimeout(manifestUrlFresh(m.reader.url)).then(function (readerText) {
+      if (sha256Hex(readerText) !== String(m.reader.sha256).toLowerCase()) throw new Error("阅读器 sha256 对不上");
+      saveMangaReaderCache(m.version, readerText);
+      mangaBusy = false;
+      loadReaderText(readerText);
+    });
+  }).catch(function (e) {
+    mangaBusy = false;
+    if (st) st.textContent = "";
+    showToast("漫画插件拉取失败，请稍后重试");
+  });
+}
+/* 点书籍：先读 extraList 里已下载的条目（上次拉过就直接进）；没有才按清单
+   拉整包（清单 → 阅读器 + 规则逐个验 sha256），存进 extraList 供下次直接进，
+   再载入。书籍阅读器启动时不存自己的 reader cache（与书籍插件一致），所以
+   这里不用 bookReaderCache，只走 extraList + 拉取。 */
+function enterBooks() {
+  var list = hubExtraPlugins();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].url === BOOK_MANIFEST_URL && list[i].readerText) { loadReaderText(list[i].readerText); return; }
+  }
+  if (bookBusy) return;
+  bookBusy = true;
+  var st = $("bookUpdateStatus");
+  if (st) st.textContent = "正在拉取书籍插件…";
+  pullPluginFromManifest(BOOK_MANIFEST_URL).then(function (entry) {
+    try {
+      var l2 = hubExtraPlugins();
+      var target = null;
+      for (var j = 0; j < l2.length; j++) if (l2[j].url === BOOK_MANIFEST_URL) target = l2[j];
+      if (target) {
+        target.version = entry.version; target.rules = entry.rules; target.updated = entry.updated;
+        target.readerText = entry.readerText; target.readerSha256 = entry.readerSha256; target.ruleTexts = entry.ruleTexts;
+      } else {
+        l2.push(entry);
+      }
+      hubSaveExtraPlugins(l2);
+    } catch (e) { /* 存储不可用时忽略，当场载入照常 */ }
+    bookBusy = false;
+    if (st) st.textContent = "";
+    loadReaderText(entry.readerText);
+  }).catch(function (e) {
+    bookBusy = false;
+    if (st) st.textContent = "";
+    showToast("书籍插件拉取失败，请稍后重试");
+  });
+}
+/* 书籍入口的更新按钮：查书籍清单。本地存着书籍条目且已是最新 → “已是最新 vX”；
+   有新版（或本地没存书籍）→ 拉整包验 sha256 后存进 extraList、当场载入新书籍阅读器。
+   （照书籍插件 checkMangaUpdate 的结构。） */
+function checkBookUpdate() {
+  if (bookBusy) return;
+  bookBusy = true;
+  var btn = $("btnUpdateBooks"), st = $("bookUpdateStatus");
+  if (btn) btn.disabled = true;
+  if (st) st.textContent = "正在检查更新…";
+  function done() { bookBusy = false; if (btn) btn.disabled = false; }
+  var stored = null;
+  try {
+    var list = hubExtraPlugins();
+    for (var i = 0; i < list.length; i++) if (list[i].url === BOOK_MANIFEST_URL) stored = list[i];
+  } catch (e) { /* 存储不可用时当作本地没存 */ }
+  fetchTextTimeout(manifestUrlFresh(BOOK_MANIFEST_URL)).then(function (text) {
+    var m;
+    try { m = JSON.parse(text); } catch (e) { throw new Error("插件清单格式不对"); }
+    var bad = validatePluginManifest(m);
+    if (bad) throw new Error(bad);
+    if (stored && m.version <= (stored.version || 0)) {
+      if (st) st.textContent = "已是最新 v" + (stored.version || 0);
+      done();
+      return;
+    }
+    return pullPluginFromManifest(BOOK_MANIFEST_URL).then(function (entry) {
+      try {
+        var l2 = hubExtraPlugins();
+        var target = null;
+        for (var j = 0; j < l2.length; j++) if (l2[j].url === BOOK_MANIFEST_URL) target = l2[j];
+        if (target) {
+          target.version = entry.version; target.rules = entry.rules; target.updated = entry.updated;
+          target.readerText = entry.readerText; target.readerSha256 = entry.readerSha256; target.ruleTexts = entry.ruleTexts;
+        } else {
+          l2.push(entry);
+        }
+        hubSaveExtraPlugins(l2);
+      } catch (e) { /* 存储不可用时忽略，当场载入照常 */ }
+      if (st) st.textContent = "已更新到 v" + entry.version;
+      done();
+      loadReaderText(entry.readerText);
+    });
+  }).catch(function (e) {
+    if (st) st.textContent = "检查失败，请稍后重试";
+    done();
+  });
 }
 function showHub() {
   renderHub();
   showView("hub");
+  hubSetBridgeVisible(true);
   window.scrollTo(0, 0);
 }
-/* ---------------- v17：‹ 主页 回聚合插件 hub ----------------
-   用户 2026-11-28 16:05 纠正：‹ 主页 要回聚合插件 hub（漫画/书籍/视频三张卡那页），
-   不是视频自己的入口页。机制用返回导航：history.back() 回打开插件前那页。
-   插件内部视图切换从不推 history 记录（无 pushState/replaceState/hash），
-   所以从浏览/详情/播放器点一次 history.back() 就直接回到打开插件前那页，
-   不会被内部视图拦截。插件是直接打开的（history.length <= 1，无上一页可回）
-   时回落到视频自己的入口页（showHub，v15 P0 的行为）。 */
-function goHome() {
-  if (window.history && window.history.length > 1) {
-    var left = false;
-    window.addEventListener("pagehide", function () { left = true; }, { once: true });
-    setTimeout(function () { if (!left && !document.hidden) showHub(); }, 800);
-    window.history.back();
-    return;
-  }
-  showHub();
-}
+/* 「‹ 主页」按钮与壳子返回键都走这里：回本地入口页（hub），不依赖父页面。
+   v17 的 history.back() 是错的（用户 2026-11-28 16:20 纠正）：漫画插件
+   goHome() 只调 showHub()，不导航、不碰 history；这里照搬。 */
+function goHome() { showHub(); }
+
 function hubImportError(msg) {
   var e = $("hubImportErr");
   if (e) { e.textContent = msg; e.classList.remove("hidden"); }
@@ -16762,6 +17299,28 @@ function bindHubStatic() {
   var hb = $("btnHomeBrowse"); if (hb) hb.addEventListener("click", goHome);
   var hd = $("btnHomeDetail"); if (hd) hd.addEventListener("click", goHome);
   var hp = $("btnHomePlayer"); if (hp) hp.addEventListener("click", goHome);
+  var hh = $("hubHomeBtn"); if (hh) hh.addEventListener("click", goHome);
+  var em = $("btnEnterManga"); if (em) em.addEventListener("click", function () { enterManga(); });
+  var um = $("btnUpdateManga"); if (um) um.addEventListener("click", function () { checkMangaUpdate(); });
+  var eb = $("btnEnterBooks"); if (eb) eb.addEventListener("click", function () { enterBooks(); });
+  var ub = $("btnUpdateBooks"); if (ub) ub.addEventListener("click", function () { checkBookUpdate(); });
+  var ev = $("btnEnterVideo"); if (ev) ev.addEventListener("click", function () { enterVideo(); });
+  var uv = $("btnUpdateVideo"); if (uv) uv.addEventListener("click", function () { checkVideoUpdate(); });
+  var ba = $("btnAddPlugin"); if (ba) ba.addEventListener("click", function () {
+    var p = $("addPanel"); if (p) p.classList.toggle("hidden");
+    var e = $("addErr"); if (e) e.textContent = "";
+  });
+  var bc = $("btnAddConfirm"); if (bc) bc.addEventListener("click", function () {
+    var inp = $("addManifestUrl"), nm = $("addEntryName");
+    addPluginFromUrl(inp ? inp.value : "", nm ? nm.value : "");
+  });
+  var bx = $("btnAddCancel"); if (bx) bx.addEventListener("click", function () {
+    var p = $("addPanel"); if (p) p.classList.add("hidden");
+  });
+  /* 导入按钮是真 <button>，点它直接调文件框的 click()——
+     旧的 <label for> 指着 display:none 的输入框，手机浏览器点不开（漫画插件同款注释）。 */
+  var ib = $("hubImportBtn"); if (ib) ib.addEventListener("click", function () { $("hubFileInput").click(); });
+  var pb = $("hubPasteBtn"); if (pb) pb.addEventListener("click", function () { var p = $("hubPastePanel"); if (p) p.classList.toggle("hidden"); });
   var fi = $("hubFileInput");
   if (fi) fi.addEventListener("change", function () {
     var f = fi.files && fi.files[0];
