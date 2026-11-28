@@ -1,6 +1,6 @@
 {
   "reader": {
-    "sha256": "60f658722f2620dbaff6d65277cd11078857a0a225db684f1a68104135a340b5",
+    "sha256": "1980dd5d721c0388a307fdd574223115283fad09d17fc6e9f2054056148ca771",
     "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/video_reader.html"
   },
   "rules": [
@@ -15,8 +15,14 @@
       "name": "酷短剧",
       "sha256": "42475b99e03b542914f4beb49b046670110782dc2228bceaea993b362d7efe69",
       "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/kuwo.json"
+    },
+    {
+      "file": "hongguo.json",
+      "name": "红果短剧",
+      "sha256": "1cfcb8e47b94f0bdcfcc0862581d30754c57e29cd64fffcc568e178e6415da8f",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/hongguo.json"
     }
   ],
   "updated": "2026-11-28",
-  "version": 10
+  "version": 11
 }

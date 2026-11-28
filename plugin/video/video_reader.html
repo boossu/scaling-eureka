@@ -34,6 +34,7 @@ img{display:block}
 .login-note.bad{color:var(--bad)}
 /* ---------- chips ---------- */
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding-top:16px}
+.chips.sub{padding-top:8px}
 .chip{border-radius:9999px;padding:6px 14px;font-size:14px;background:var(--surface);color:var(--dim);box-shadow:inset 0 0 0 1px var(--border)}
 .chip:active{transform:scale(.95)}
 .chip.on{background:var(--accent-dim);color:#fca5a5;font-weight:600;box-shadow:inset 0 0 0 1px var(--accent)}
@@ -83,6 +84,8 @@ img{display:block}
 @media(min-width:640px){.ep-grid{grid-template-columns:repeat(8,1fr)}}
 .ep-btn{border-radius:12px;background:var(--surface);padding:10px 8px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)}
 .ep-btn:active{transform:scale(.95)}
+/* 红果：前 N 集免费（accessible_episode_cnt 对应的集），绿底标出。 */
+.ep-btn.free{background:#173325;color:#86efac;box-shadow:inset 0 0 0 1px #2f7d4f}
 /* ---------- player ---------- */
 .player-head{margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .player-head .crumb{font-size:14px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -186,6 +189,7 @@ img{display:block}
       <button type="button" class="src-tab on" id="tabXy">星芽短剧</button>
       <button type="button" class="src-tab" id="tabCms">CMS采集</button>
       <button type="button" class="src-tab" id="tabKw">酷短剧</button>
+      <button type="button" class="src-tab" id="tabHg">红果短剧</button>
     </div>
     <div id="xyBrowse">
     <div id="rules"><div class="rule-row">
@@ -248,6 +252,42 @@ img{display:block}
         <button type="button" id="btnKwPrev">‹ 上一页</button>
         <span id="kwPageLabel">第 1 页</span>
         <button type="button" id="btnKwNext">下一页 ›</button>
+      </div>
+    </section>
+    </div>
+
+    <!-- 红果短剧（hongguoduanju.com，WorkBuddy）：分类 + 二级分类 + 搜索 + 详情；浏览版，播放未接 -->
+    <div id="hgBrowse" class="hidden">
+    <div id="hgRules"><div class="rule-row">
+      <button type="button" class="rule-card" id="hgRuleCard">
+        <span class="rule-badge">红</span>
+        <span class="rule-meta">
+          <span class="rule-title">红果短剧</span>
+          <span class="rule-author">WorkBuddy · hongguoduanju.com</span>
+          <span class="rule-file">hongguo.json · 浏览版（播放未接）</span>
+        </span>
+      </button>
+    </div></div>
+    <div class="chips" id="hgChips" role="group" aria-label="分类"></div>
+    <div class="chips sub hidden" id="hgSubChips" role="group" aria-label="二级分类"></div>
+    <form class="search-row" id="hgSearchForm">
+      <input class="search-in" id="hgSearchInput" placeholder="输入剧名，如：母凭子贵" aria-label="搜索红果短剧">
+      <button class="search-btn" type="submit">搜索</button>
+    </form>
+    <p id="hgSearchNote" class="search-note hidden" role="status"></p>
+    <section class="sec" aria-label="视频列表">
+      <p id="hgLoading" class="list-msg hidden">正在取剧…</p>
+      <div id="hgErr" class="err-box hidden">
+        <p class="err-text"></p>
+        <button type="button" class="retry-btn" id="btnHgRetry">重试</button>
+      </div>
+      <p id="hgEmpty" class="list-msg hidden">没有找到剧。</p>
+      <p id="hgCountLine" class="count"></p>
+      <div class="v-list" id="hgCardList"></div>
+      <div class="pager hidden" id="hgPager">
+        <button type="button" id="btnHgPrev">‹ 上一页</button>
+        <span id="hgPageLabel">第 1 页</span>
+        <button type="button" id="btnHgNext">下一页 ›</button>
       </div>
     </section>
     </div>
@@ -362,7 +402,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 10;
+var PLUGIN_VERSION = 11;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14459,7 +14499,9 @@ function renderDetail() {
      否则切源后详情页还挂着上一条 CMS 线路。 */
   $("lineTabs").classList.add("hidden");
   $("detailTitle").textContent = d.title || "";
-  $("detailMeta").textContent = d.episodes.length > 0 ? "共 " + d.episodes.length + " 集" : "正在取分集…";
+  $("detailMeta").textContent = d.episodes.length > 0
+    ? "共 " + d.episodes.length + " 集" + (d.hongguo && d.freeCount ? " · 前 " + d.freeCount + " 集免费" : "")
+    : "正在取分集…";
   $("detailIntro").textContent = d.intro || "";
   $("detailIntro").classList.toggle("hidden", !d.intro);
   var coverBox = $("detailCover");
@@ -14468,10 +14510,15 @@ function renderDetail() {
   var grid = $("epGrid");
   grid.innerHTML = "";
   d.episodes.forEach(function (ep, i) {
-    var b = el("button", "ep-btn", String(ep.num));
+    /* 红果浏览版：点集数不进播放器，只提示未接入（取址接口与解密管线未移植）。 */
+    var b = el("button", "ep-btn" + (ep.free ? " free" : ""), String(ep.num));
     b.type = "button";
     b.title = ep.tip || (ep.seconds ? "第 " + ep.num + " 集 · " + xyFormatSeconds(ep.seconds) : "第 " + ep.num + " 集");
-    b.addEventListener("click", function () { playEpisode(i); });
+    if (d.hongguo) {
+      b.addEventListener("click", function () { showToast("红果播放暂未接入（取址接口与解密管线未移植）"); });
+    } else {
+      b.addEventListener("click", function () { playEpisode(i); });
+    }
     grid.appendChild(b);
   });
   $("epSection").classList.toggle("hidden", d.episodes.length === 0);
@@ -14916,6 +14963,8 @@ function autoNextEpisode() {
 function playEpisode(index) {
   var detail = currentDetail;
   if (!detail || !detail.episodes[index]) return;
+  /* 红果浏览版：任何路径点集都不进播放器（集数按钮本身已绑提示，这里是纵深守卫）。 */
+  if (detail.hongguo) { showToast("红果播放暂未接入（取址接口与解密管线未移植）"); return; }
   var token = ++player.loadToken;
   /* v9：初始方向按内容定（同剧换集用上一个视频的真实宽高；新剧星芽竖屏、CMS 横屏），
      不再写死竖屏。全屏请求仍在点按手势里立即发出，不等元数据。 */
@@ -15245,7 +15294,13 @@ fetchText = function (url, opts) {
     : /shortplay\/moduleMore/.test(url) ? "酷短·列表"
     : /shortplay\/videoList/.test(url) ? "酷短·剧集"
     : /mobi\.s/.test(url) ? "酷短·播址"
-    : /kuwo\.json/.test(url) ? "规则·酷短" : "星芽·请求";
+    : /kuwo\.json/.test(url) ? "规则·酷短"
+    : /hongguoduanju\.com\/api\/search\/result/.test(url) ? "红果·搜索"
+    : /hongguoduanju\.com\/api\/search\/context/.test(url) ? "红果·搜索"
+    : /hongguoduanju\.com\/category\//.test(url) ? "红果·列表"
+    : /hongguoduanju\.com\/rank\//.test(url) ? "红果·榜单"
+    : /hongguoduanju\.com\/detail\?series_id/.test(url) ? "红果·详情"
+    : /hongguo\.json/.test(url) ? "规则·红果" : "星芽·请求";
   return _origFetchText(url, opts).then(function (text) {
     pushLog({ label: label, url: url, ok: true, detail: "HTTP 200 · " + text.length + " 字符", ms: Date.now() - t0 });
     return text;
@@ -15502,32 +15557,40 @@ var cms = {
 var cmsHls = null;
 var cmsHlsLoading = null;
 
-/* v8：浏览区切换的唯一入口。name 为 "xy" | "registry" | "source" | "kuwo"。
+/* v8：浏览区切换的唯一入口。name 为 "xy" | "registry" | "source" | "kuwo" | "hongguo"。
    标签高亮与内容显隐在这里原子地一起改——v7 的 bug 是 #xyBrowse 本就是
    空 div（星芽内容全在 #rules 里），cmsShowView 藏它等于什么都没藏，
    标签亮了 CMS、上面却还是星芽的分类。HTML 已把星芽内容真正装进
    #xyBrowse、标签挪到 viewBrowse 下常驻；这里再保证不许只改一半。
-   v10：酷短剧是第三个源，同样走这里（#kwBrowse 整块换）。 */
+   v10：酷短剧是第三个源，同样走这里（#kwBrowse 整块换）。
+   v11：红果短剧是第四个源，同样走这里（#hgBrowse 整块换）。 */
 function cmsShowView(name) {
   cms.view = name;
   var isXy = (name === "xy");
   $("tabXy").classList.toggle("on", isXy);
   $("tabCms").classList.toggle("on", name === "registry" || name === "source");
   $("tabKw").classList.toggle("on", name === "kuwo");
+  $("tabHg").classList.toggle("on", name === "hongguo");
   /* 用户 2026-11-28 定：CMS 界面里星芽的东西直接去掉。#rules（星芽卡片）
      与 #xyBrowse（星芽分类/搜索/列表）同时藏；#srcTabs 保留。
      #rules 现在虽已在 #xyBrowse 里面（藏 xyBrowse 即连卡片一起藏），
      这里仍显式藏它——以后结构再动也不会让卡片漏到 CMS 上面。
-     酷短剧界面同理：星芽与 CMS 的区都藏，只留 #kwBrowse。 */
+     酷短剧界面同理：星芽与 CMS 的区都藏，只留 #kwBrowse。
+     红果短剧界面同理：只留 #hgBrowse。 */
   $("xyBrowse").classList.toggle("hidden", !isXy);
   $("rules").classList.toggle("hidden", !isXy);
   $("kwBrowse").classList.toggle("hidden", name !== "kuwo");
+  $("hgBrowse").classList.toggle("hidden", name !== "hongguo");
   $("cmsRegistrySec").classList.toggle("hidden", name !== "registry");
   $("cmsSourceSec").classList.toggle("hidden", name !== "source");
 }
 function cmsShowXy() {
   cms.detailFrom = null;
   cmsShowView("xy");
+}
+function hgShowTab() {
+  cmsShowView("hongguo");
+  if (!hg.entered) { hg.entered = true; hgLoadCategory(hg.cats[0].k, 1); }
 }
 function kwShowTab() {
   cmsShowView("kuwo");
@@ -16215,6 +16278,311 @@ function kwLoadCurrentEpisode(token) {
   });
 }
 
+/* ---------------- 红果短剧（hongguoduanju.com，WorkBuddy，group 6短剧） ----------------
+   规则原文见 rules/hongguo.json。浏览版：分类 + 二级分类 + 榜单 + 搜索 + 详情；
+   播放未接（取址接口 fqnovel 回空体、视频 CENC 加密需整集下载解密，浏览器插件
+   发不出 app UA、也没有本地文件接口；每剧 SSR 里只有几集免费 vid）。
+   数据源是站内 SSR：页面 HTML 里嵌 _ROUTER_DATA JSON（大括号配对截取后
+   JSON.parse，与规则 find_rule 同款写法）。实测（真浏览器 fetch）：
+   - 分类页 loaderData.category_$.recommendList（24 条/页，pagination.totalPages
+     管翻页），普通浏览器 UA 即有数据；?page=2 在真浏览器里能出数据。
+   - 二级分类：同一份 _ROUTER_DATA 里 selectorList[0].items，子分类地址
+     /category/{contentType}/{selector_item_id}（规则 hgAreaRow 同款）。
+   - 榜单页 content.rankList（20 条/页，totalPages 5）：规则注释说只有爬虫 UA
+     才带 rankList，但真浏览器（普通 UA）实测有数据，照常渲染。
+   - 搜索：path 形式 /search/<关键词> 的 SSR 里没有 _ROUTER_DATA（浏览器 UA 与
+     Googlebot UA、curl 与真浏览器四路都证实），规则的 SSR 搜索解析不到数据；
+     改走站内搜索 API：先 /api/search/context?aid=8662，再
+     /api/search/result/?query=…&tab=real-drama&page=N&aid=8662，返回的 searchList
+     与规则 hgCards 用的字段（video_data 包 series_id/series_cover/series_title）
+     一致，10 条/页、totalPages 管翻页。
+   - 详情：/detail?series_id={id} 取 loaderData.detail_page.seriesDetail，
+     集数按 episode_cnt 画 1..N，前 accessible_episode_cnt 集标免费；
+     点集只提示播放未接入，不进播放器。
+   取数走 v4 的 fetchText（一次一个请求、失败报错显示，不静默吞）。
+   不移植：hgApiOnce、fqnovel 取址、spade_a、CENC 解密（spade_deob/cenc_clear）。 */
+
+var HG_SITE = "https://hongguoduanju.com";
+var HG_SEARCH_CONTEXT = HG_SITE + "/api/search/context?aid=8662";
+var HG_SEARCH_RESULT = HG_SITE + "/api/search/result/?aid=8662";
+
+/* 规则原样：分类 class_name / class_url 各 8 项，以 & 分隔、按位配对。 */
+var HG_CATS_EMBEDDED = [
+  { k: "https://hongguoduanju.com/category/real-drama", n: "真人剧" },
+  { k: "https://hongguoduanju.com/category/comic-drama", n: "漫剧" },
+  { k: "https://hongguoduanju.com/category/ai-drama", n: "AI剧" },
+  { k: "https://hongguoduanju.com/category/comic", n: "漫画" },
+  { k: "https://hongguoduanju.com/rank/hot-drama", n: "热榜" },
+  { k: "https://hongguoduanju.com/rank/hot-real-drama", n: "真人榜" },
+  { k: "https://hongguoduanju.com/rank/hot-ai-drama", n: "AI榜" },
+  { k: "https://hongguoduanju.com/rank/hot-comic-drama", n: "漫榜" }
+];
+
+var hg = { cats: HG_CATS_EMBEDDED.slice(), nav: "", baseNav: "", subCats: [], cat: "", isRank: false, page: 1, cards: [], hasMore: false, loading: false, error: "", entered: false, isSearch: false, query: "", searchNote: "" };
+
+/* _ROUTER_DATA 解析：与规则 find_rule 同款（大括号配对截取后 JSON.parse）。 */
+function hgParseRouterData(htmlText) {
+  var raw = String(htmlText || "");
+  var ri = raw.indexOf("_ROUTER_DATA");
+  if (ri < 0) return null;
+  var eq = raw.indexOf("=", ri);
+  var st = -1;
+  for (var s = eq; s < raw.length; s++) { if (raw.charAt(s) === "{") { st = s; break; } }
+  if (st < 0) return null;
+  var dp = 0, ed = -1;
+  for (var i = st; i < raw.length; i++) {
+    var c = raw.charAt(i);
+    if (c === "{") dp++;
+    else if (c === "}") { dp--; if (dp === 0) { ed = i; break; } }
+  }
+  if (ed <= st) return null;
+  try { return JSON.parse(raw.substring(st, ed + 1)); } catch (e) { return null; }
+}
+/* 从 loaderData 里挑出各页面形态的数据（规则 hgDig 同款，另加 pagination）。 */
+function hgDig(ld) {
+  var o = { search: null, rec: null, rank: null, detail: null, sel: null, cat: null, pagination: null };
+  for (var k in ld) {
+    var v = ld[k];
+    if (!v || typeof v !== "object") continue;
+    var w = (v.content && typeof v.content === "object") ? v.content : v;
+    if (w.searchList) o.search = w.searchList;
+    if (w.recommendList) o.rec = w.recommendList;
+    if (w.rankList) o.rank = w.rankList;
+    if (v.seriesDetail) o.detail = v.seriesDetail;
+    if (w.selectorList && w.selectorList.length) o.sel = w.selectorList[0].items || [];
+    if (v.categoryRoute) o.cat = v.categoryRoute.contentType;
+    else if (w.categoryRoute) o.cat = w.categoryRoute.contentType;
+    if (w.pagination) o.pagination = w.pagination;
+  }
+  return o;
+}
+/* 规则 v35：剧名里含季号时，标题 =「剧名前四个字 + 第N季」（「持械入宋：第八季」→「持械入宋第8季」）；不含季号原样显示。 */
+var HG_CN_NUM = { "零": 0, "一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
+function hgSnStr(t) {
+  t = String(t || "");
+  if (/^\d+$/.test(t)) return String(parseInt(t, 10));
+  if (t.indexOf("十") >= 0) {
+    var p = t.split("十");
+    var hi = p[0] ? (HG_CN_NUM[p[0]] || 0) : 1;
+    var lo = (p[1] && p[1].length) ? (HG_CN_NUM[p[1]] || 0) : 0;
+    return String(hi * 10 + lo);
+  }
+  return String(HG_CN_NUM[t] != null ? HG_CN_NUM[t] : 1);
+}
+function hgSeasonTitle(name) {
+  var raw = String(name == null ? "" : name);
+  var s = raw.split("\n").join("").trim();
+  var m = s.match(/第\s*([0-9]{1,3}|[一二三四五六七八九十]{1,3})\s*季/) || s.match(/([0-9]{1,3})\s*季\s*$/);
+  if (!m) return raw;
+  var base = s
+    .replace(/第\s*(?:[0-9]{1,3}|[一二三四五六七八九十]{1,3})\s*季/g, "")
+    .replace(/[0-9]{1,3}\s*季\s*$/, "")
+    .replace(/[：:·・、,，\-–—_]+$/, "")
+    .trim();
+  if (!base) return raw;
+  return base.substring(0, 4) + "第" + hgSnStr(m[1]) + "季";
+}
+/* 剧集卡片（规则 hgCards 同款）：只取图片 / 名字 / ID；搜索结果的剧集数据包在 video_data 里。
+   注意：规则给 img 加的 @Referer= 后缀是海阔壳子语法，浏览器里直接用原图地址（byteimg 直连能出图）。 */
+function hgCardFromItem(it, isRank) {
+  if (!it || typeof it !== "object") return null;
+  var vd = (it.video_data && typeof it.video_data === "object") ? it.video_data : {};
+  var sid = it.series_id || it.seriesId || it.id || vd.series_id || "";
+  if (!sid) return null;
+  var cover = it.series_cover || it.cover || it.pic || vd.series_cover || "";
+  var name = it.series_name || it.title || it.name || vd.series_title || "";
+  var desc;
+  if (isRank) {
+    desc = (it.rank ? ("No." + it.rank + "  ") : "") + (it.heatText || it.primaryMetricText || "");
+    if (it.scoreText) desc += "  " + it.scoreText;
+  } else {
+    var intro = it.series_intro || it.description || vd.series_intro || "";
+    desc = (it.episode_right_text || vd.episode_right_text || "") + "\n" + String(intro).substring(0, 40);
+  }
+  return { ref: String(sid), title: hgSeasonTitle(name), cover: cover, desc: String(desc || "").substring(0, 120), isRank: !!isRank };
+}
+function hgParseListPage(htmlText) {
+  var j = hgParseRouterData(htmlText);
+  if (!j) return null;
+  var o = hgDig(j.loaderData || {});
+  var list = o.rank || o.rec || o.search || [];
+  var isRank = !!o.rank;
+  var cards = [];
+  for (var i = 0; i < list.length; i++) { var c = hgCardFromItem(list[i], isRank); if (c) cards.push(c); }
+  var hasMore = false;
+  if (o.pagination && typeof o.pagination.pageNum === "number" && typeof o.pagination.totalPages === "number") hasMore = o.pagination.pageNum < o.pagination.totalPages;
+  return { cards: cards, hasMore: hasMore, subCats: o.sel || [], cat: o.cat || "", isRank: isRank };
+}
+function hgParseSearch(jsonText) {
+  try {
+    var parsed = JSON.parse(jsonText);
+    var list = parsed && parsed.searchList;
+    if (!Array.isArray(list)) return { cards: [], hasMore: false };
+    var out = [];
+    for (var i = 0; i < list.length; i++) { var c = hgCardFromItem(list[i], false); if (c) out.push(c); }
+    var hasMore = false;
+    if (typeof parsed.pageNum === "number" && typeof parsed.totalPages === "number") hasMore = parsed.pageNum < parsed.totalPages;
+    return { cards: out, hasMore: hasMore };
+  } catch (e) { return { cards: [], hasMore: false }; }
+}
+function hgRenderChips() {
+  var box = $("hgChips");
+  box.innerHTML = "";
+  hg.cats.forEach(function (c) {
+    var b = el("button", "chip" + (hg.baseNav === c.k && !hg.isSearch ? " on" : ""), c.n);
+    b.type = "button";
+    b.addEventListener("click", function () { hgLoadCategory(c.k, 1, c.k); });
+    box.appendChild(b);
+  });
+}
+function hgRenderSubChips() {
+  var box = $("hgSubChips");
+  box.innerHTML = "";
+  /* 二级分类只在分类页有（榜单页没有 selectorList）；搜索状态下不显示。 */
+  if (hg.isSearch || !hg.subCats.length || !hg.cat) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  var allUrl = HG_SITE + "/category/" + hg.cat;
+  var all = el("button", "chip" + (hg.nav === allUrl ? " on" : ""), "全部");
+  all.type = "button";
+  all.addEventListener("click", function () { hgLoadCategory(allUrl, 1, hg.baseNav); });
+  box.appendChild(all);
+  hg.subCats.forEach(function (it) {
+    var u = allUrl + "/" + it.selector_item_id;
+    var b = el("button", "chip" + (hg.nav === u ? " on" : ""), it.show_name || "");
+    b.type = "button";
+    b.addEventListener("click", function () { hgLoadCategory(u, 1, hg.baseNav); });
+    box.appendChild(b);
+  });
+}
+function hgRenderBrowse() {
+  hgRenderChips();
+  hgRenderSubChips();
+  var list = $("hgCardList");
+  list.innerHTML = "";
+  var err = $("hgErr");
+  var empty = $("hgEmpty");
+  var loading = $("hgLoading");
+  err.classList.add("hidden");
+  empty.classList.add("hidden");
+  loading.classList.toggle("hidden", !hg.loading);
+  if (hg.loading) { $("hgPager").classList.add("hidden"); return; }
+  if (hg.error) {
+    err.classList.remove("hidden");
+    err.querySelector(".err-text").textContent = "取剧失败：" + hg.error;
+    $("hgPager").classList.add("hidden");
+    return;
+  }
+  if (hg.cards.length === 0) {
+    empty.classList.remove("hidden");
+    $("hgPager").classList.add("hidden");
+    return;
+  }
+  $("hgCountLine").textContent = hg.isSearch
+    ? "搜索「" + hg.query + "」· " + hg.cards.length + " 部"
+    : hg.cards.length + " 部";
+  hg.cards.forEach(function (card) {
+    var b = el("button", "v-card");
+    b.type = "button";
+    b.appendChild(coverEl(card.cover, card.title, "v-cover"));
+    var meta = el("span", "v-meta");
+    meta.appendChild(el("span", "v-title", card.title));
+    if (card.desc) meta.appendChild(el("span", "v-desc", card.desc));
+    b.appendChild(meta);
+    b.addEventListener("click", function () { hgOpenDetail(card); });
+    list.appendChild(b);
+  });
+  var pager = $("hgPager");
+  pager.classList.remove("hidden");
+  $("hgPageLabel").textContent = "第 " + hg.page + " 页";
+  $("btnHgPrev").disabled = hg.page <= 1 || hg.loading;
+  $("btnHgNext").disabled = !hg.hasMore || hg.loading;
+  var note = $("hgSearchNote");
+  note.textContent = hg.searchNote || "";
+  note.classList.toggle("hidden", !hg.searchNote);
+}
+function hgLoadCategory(url, page, baseUrl) {
+  hg.isSearch = false; hg.query = ""; hg.searchNote = "";
+  hg.nav = url; hg.baseNav = baseUrl || url; hg.page = page; hg.loading = true; hg.error = "";
+  hgRenderBrowse();
+  fetchText(url + (url.indexOf("?") >= 0 ? "&" : "?") + "page=" + page).then(function (text) {
+    var r = hgParseListPage(text);
+    if (!r) throw new Error("页面数据解析失败");
+    hg.cards = r.cards;
+    hg.hasMore = r.hasMore;
+    hg.subCats = r.subCats || [];
+    hg.cat = r.cat || "";
+    hg.isRank = !!r.isRank;
+    hg.loading = false; hg.error = "";
+    hgRenderBrowse();
+  }).catch(function (e) {
+    hg.loading = false;
+    hg.error = e instanceof Error ? e.message : String(e);
+    hgRenderBrowse();
+  });
+}
+function hgLoadSearch(query, page) {
+  hg.isSearch = true; hg.query = query; hg.page = page; hg.loading = true; hg.error = "";
+  hgRenderBrowse();
+  /* 搜索走站内 API（先 context 再 result，与站内搜索页实际发请求的顺序一致）。 */
+  fetchText(HG_SEARCH_CONTEXT).then(function () {
+    return fetchText(HG_SEARCH_RESULT + "&query=" + encodeURIComponent(query) + "&tab=real-drama&page=" + page);
+  }).then(function (text) {
+    var r = hgParseSearch(text);
+    hg.cards = r.cards; hg.hasMore = r.hasMore; hg.loading = false; hg.error = "";
+    hg.searchNote = hg.cards.length === 0 ? "搜「" + query + "」没有结果（站方就是这么匹配的，换个剧名试试）" : "";
+    hgRenderBrowse();
+  }).catch(function (e) {
+    hg.loading = false;
+    hg.error = e instanceof Error ? e.message : String(e);
+    hgRenderBrowse();
+  });
+}
+/* 规则分类：优先用 rules/hongguo.json（http(s) 下可取到时），file:// 下用内嵌快照。 */
+function hgLoadRuleCats() {
+  if (!window.location.protocol || window.location.protocol.indexOf("http") !== 0) return;
+  fetch("rules/hongguo.json").then(function (res) {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }).then(function (rule) {
+    var c = xyCatsFromRule(rule);
+    if (c.length > 0) { hg.cats = c; hgRenderChips(); }
+  }).catch(function () { /* 用内嵌分类，不报错 */ });
+}
+function hgParseDetail(htmlText) {
+  var j = hgParseRouterData(htmlText);
+  if (!j || !j.loaderData) return null;
+  var ld = j.loaderData;
+  for (var k in ld) {
+    var v = ld[k];
+    if (v && typeof v === "object" && v.seriesDetail) return v.seriesDetail;
+  }
+  return null;
+}
+function hgOpenDetail(card) {
+  currentDetail = { title: card.title, cover: card.cover, intro: card.desc, episodes: [], hongguo: true, seriesId: card.ref, freeCount: 0 };
+  renderDetail();
+  showView("detail");
+  fetchText(HG_SITE + "/detail?series_id=" + encodeURIComponent(card.ref)).then(function (text) {
+    var d = hgParseDetail(text);
+    if (!d) throw new Error("详情解析失败");
+    var total = typeof d.episode_cnt === "number" ? d.episode_cnt : 0;
+    var free = typeof d.accessible_episode_cnt === "number" ? d.accessible_episode_cnt : 0;
+    var eps = [];
+    for (var i = 1; i <= total; i++) {
+      eps.push({ num: i, name: "第" + i + "集", url: "", free: i <= free, tip: "第" + i + "集" + (i <= free ? " · 免费" : "") });
+    }
+    currentDetail.title = d.series_name || currentDetail.title;
+    currentDetail.cover = d.series_cover || currentDetail.cover;
+    currentDetail.intro = d.series_intro || currentDetail.intro;
+    currentDetail.episodes = eps;
+    currentDetail.freeCount = free;
+    renderDetail();
+  }).catch(function (e) {
+    showToast("打开失败（红果）：" + (e instanceof Error ? e.message : String(e)));
+    cmsShowView("hongguo");
+  });
+}
+
 /* ---------------- 启动绑定（boot 末尾调 cmsBoot） ---------------- */
 
 function cmsBoot() {
@@ -16224,6 +16592,18 @@ function cmsBoot() {
   if (tabCms) tabCms.addEventListener("click", cmsShowTabCms);
   var tabKw = $("tabKw");
   if (tabKw) tabKw.addEventListener("click", kwShowTab);
+  var tabHg = $("tabHg");
+  if (tabHg) tabHg.addEventListener("click", hgShowTab);
+  var hr = $("btnHgRetry");
+  if (hr) hr.addEventListener("click", function () { if (hg.isSearch) hgLoadSearch(hg.query, hg.page); else if (hg.nav) hgLoadCategory(hg.nav, hg.page, hg.baseNav); });
+  var hp = $("btnHgPrev");
+  if (hp) hp.addEventListener("click", function () { if (hg.loading || hg.page <= 1) return; if (hg.isSearch) hgLoadSearch(hg.query, hg.page - 1); else hgLoadCategory(hg.nav, hg.page - 1, hg.baseNav); });
+  var hn = $("btnHgNext");
+  if (hn) hn.addEventListener("click", function () { if (hg.loading || !hg.hasMore) return; if (hg.isSearch) hgLoadSearch(hg.query, hg.page + 1); else hgLoadCategory(hg.nav, hg.page + 1, hg.baseNav); });
+  var hs = $("hgSearchForm");
+  if (hs) hs.addEventListener("submit", function (e) { e.preventDefault(); var q = $("hgSearchInput").value.trim(); if (q) hgLoadSearch(q, 1); });
+  hgLoadRuleCats();
+  hgRenderChips();
   var kr = $("btnKwRetry");
   if (kr) kr.addEventListener("click", function () { if (kw.nav) kwLoadCategory(kw.nav, kw.page); });
   var kp = $("btnKwPrev");
