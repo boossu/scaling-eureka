@@ -403,7 +403,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 12;
+var PLUGIN_VERSION = 13;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -13742,8 +13742,10 @@ HevcCanvasRenderer.prototype.destroy = function () {
     if (this.texY) gl.deleteTexture(this.texY);
     if (this.texCb) gl.deleteTexture(this.texCb);
     if (this.texCr) gl.deleteTexture(this.texCr);
-    var lose = gl.getExtension("WEBGL_lose_context");
-    if (lose) lose.loseContext();
+    /* v13：不要 loseContext——fbCanvas 是常驻节点，退出播放器丢上下文后，
+       下次进回落路会在同一 canvas 上建新 renderer，getContext 拿回的是
+       已丢失的旧上下文，着色器编译静默失败（空 log），再也播不了。
+       程序与纹理已删，上下文本身留着给下次复用。 */
   }
   this.gl = null; this.program = null;
 };
@@ -14503,8 +14505,9 @@ function renderDetail() {
   if (!d) return;
   if (d.cms) { cmsRenderDetail(); return; }
   /* 非 CMS 详情（星芽/酷短剧）没有线路：把 CMS 详情留下的线路 tabs 藏掉，
-     否则切源后详情页还挂着上一条 CMS 线路。 */
-  $("lineTabs").classList.add("hidden");
+     否则切源后详情页还挂着上一条 CMS 线路。红果有画质线路（720p/1080p）。 */
+  if (d.hongguo) renderHgLines();
+  else { $("lineTabs").classList.add("hidden"); $("lineTabs").innerHTML = ""; }
   $("detailTitle").textContent = d.title || "";
   $("detailMeta").textContent = d.episodes.length > 0
     ? "共 " + d.episodes.length + " 集" + (d.hongguo && d.freeCount ? " · 前 " + d.freeCount + " 集免费" : "")
@@ -18353,12 +18356,24 @@ function hgGetVids(seriesId) {
     return vids;
   });
 }
+/* v13：红果详情页画质线路（720p/1080p），播之前先选；点选即设 hgV5.quality，
+   点集数沿用当前线路（hgLoadCurrentEpisode 已读 hgV5.quality 做 selectQuality）。 */
+function renderHgLines() {
+  var tabs = $("lineTabs");
+  tabs.innerHTML = "";
+  ["720", "1080"].forEach(function (q) {
+    var b = el("button", "line-tab" + (hgV5.quality === q ? " on" : ""), q + "p");
+    b.type = "button";
+    b.addEventListener("click", function () { hgV5.quality = q; renderHgLines(); });
+    tabs.appendChild(b);
+  });
+  tabs.classList.remove("hidden");
+}
 function renderQualityBtn() {
   var b = $("btnQuality");
   if (!b) return;
-  var isHg = !!(player.detail && player.detail.hongguo);
-  b.classList.toggle("hidden", !isHg);
-  if (isHg) b.textContent = hgV5.quality + "p";
+  /* v13：播放器里不再切分辨率（线路在详情页选），画质按钮一律隐藏。 */
+  b.classList.add("hidden");
 }
 function hgLoadCurrentEpisode(token) {
   var seriesId = player.detail.seriesId;
@@ -18406,6 +18421,10 @@ function hgLoadCurrentEpisode(token) {
       hgV5.blobUrl = URL.createObjectURL(new Blob([r.bytes], { type: "video/mp4" }));
       player.sources = [hgV5.blobUrl];
       player.srcIdx = 0;
+      /* v13：解密完成即清 loadState——原生路没有任何事件会清它（ready/firstFrame
+         只由回落播放器发），否则最后一发解密进度（10.0/10.0 MB）会把加载条
+         钉死在画面中央。 */
+      player.loadState = ""; renderCenter();
       if (!canPlayHevcNative()) {
         setMode("fallback");
         return startFallback(player.sources, token);
