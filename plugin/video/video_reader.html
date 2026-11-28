@@ -320,7 +320,7 @@ img{display:block}
     </section>
     </div>
 
-    <!-- v15 P0 导入的通用源：占位区，P1 接入通用引擎后才有列表/详情/播放 -->
+    <!-- v15 P1 导入的通用源：通用引擎（Hiker JS 沙箱）跑规则取数 -->
     <div id="genBrowse" class="hidden">
       <div class="rule-row"><button type="button" class="rule-card" id="genRuleCard">
         <span class="rule-badge">视</span>
@@ -330,6 +330,27 @@ img{display:block}
           <span class="rule-file"></span>
         </span>
       </button></div>
+      <div class="chips hidden" id="genChips" role="group" aria-label="分类"></div>
+      <form class="search-row hidden" id="genSearchForm">
+        <input class="search-in" id="genSearchInput" placeholder="输入剧名" aria-label="搜索">
+        <button class="search-btn" type="submit">搜索</button>
+      </form>
+      <p id="genSearchNote" class="search-note hidden" role="status"></p>
+      <section class="sec" aria-label="视频列表">
+        <p id="genLoading" class="list-msg hidden">正在取剧…</p>
+        <div id="genErr" class="err-box hidden">
+          <p class="err-text"></p>
+          <button type="button" class="retry-btn" id="btnGenRetry">重试</button>
+        </div>
+        <p id="genEmpty" class="list-msg hidden">没有找到剧。</p>
+        <p id="genCountLine" class="count"></p>
+        <div class="v-list" id="genCardList"></div>
+        <div class="pager hidden" id="genPager">
+          <button type="button" id="btnGenPrev">‹ 上一页</button>
+          <span id="genPageLabel">第 1 页</span>
+          <button type="button" id="btnGenNext">下一页 ›</button>
+        </div>
+      </section>
       <p id="genNote" class="gen-note"></p>
     </div>
 
@@ -445,7 +466,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 15;
+var PLUGIN_VERSION = 16;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14641,9 +14662,80 @@ function loadRuleCats() {
 
 function fetchText(url, opts) {
   opts = opts || {};
-  return fetch(url, { method: opts.method || "GET", headers: opts.headers || {}, body: opts.body }).then(function (res) {
+  return fetch(url, { method: opts.method || "GET", headers: opts.headers || {}, body: opts.body, signal: opts.signal }).then(function (res) {
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.text();
+  });
+}
+
+/* ---------------- v15 P1：沙箱取数（主线程） ----------------
+   规则 JS 的 request/post/fetch 走这里：解析海阔 URL 请求后缀
+   （;get;UTF-8;{"headers":{...}}）、合并调用方 opts、序列化对象 body、
+   25s 超时（比沙箱 run 的 30s 短一截，超时先报清晰错、不断 Worker）。 */
+function parseGenReqSuffix(raw) {
+  var s = String(raw == null ? "" : raw);
+  var i1 = s.indexOf(";");
+  if (i1 < 0) return { url: s, opts: {} };
+  var after = s.slice(i1 + 1);
+  var meth = after.split(";")[0].trim().toLowerCase();
+  if (["get", "post", "put", "delete", "head", "patch"].indexOf(meth) < 0) return { url: s, opts: {} };
+  var rest = after.slice(meth.length + 1);
+  var i2 = rest.indexOf(";");
+  var jsonPart = i2 >= 0 ? rest.slice(i2 + 1) : "";
+  var opts = { method: meth.toUpperCase() };
+  if (jsonPart) {
+    var j;
+    try { j = JSON.parse(jsonPart); } catch (e) { throw new Error("请求后缀 JSON 解析失败：" + (e.message || String(e))); }
+    if (j && typeof j === "object") {
+      if (j.headers && typeof j.headers === "object") opts.headers = j.headers;
+      if (j.body !== undefined) opts.body = j.body;
+      if (typeof j.method === "string" && j.method) opts.method = j.method.toUpperCase();
+    }
+  }
+  return { url: s.slice(0, i1), opts: opts };
+}
+function serializeGenBody(body, headers) {
+  if (body === undefined || body === null) return undefined;
+  if (typeof body === "string") return body;
+  if (typeof body === "object") {
+    var ct = "";
+    for (var k in headers) if (String(k).toLowerCase() === "content-type") ct = String(headers[k]);
+    if (/application\/json/i.test(ct)) return JSON.stringify(body);
+    var parts = [];
+    for (var key in body) {
+      var v = body[key];
+      parts.push(encodeURIComponent(key) + "=" + encodeURIComponent(v == null ? "" : String(v)));
+    }
+    if (!ct) headers["Content-Type"] = "application/x-www-form-urlencoded";
+    return parts.join("&");
+  }
+  return String(body);
+}
+function sandboxFetchText(url, opts) {
+  opts = opts || {};
+  var parsed;
+  try { parsed = parseGenReqSuffix(url); } catch (e) { return Promise.reject(e); }
+  var method = (opts.method || parsed.opts.method || "GET").toUpperCase();
+  var headers = {};
+  var k;
+  if (parsed.opts.headers) for (k in parsed.opts.headers) headers[k] = parsed.opts.headers[k];
+  if (opts.headers) for (k in opts.headers) headers[k] = opts.headers[k];
+  var body = opts.body !== undefined ? opts.body : parsed.opts.body;
+  var bodyText;
+  try { bodyText = serializeGenBody(body, headers); } catch (e) { return Promise.reject(e); }
+  var ms = (typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) ? opts.timeoutMs : 25000;
+  var ctrl = null, timer = null;
+  if (typeof AbortController !== "undefined") {
+    ctrl = new AbortController();
+    timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, ms);
+  }
+  return fetchText(parsed.url, { method: method, headers: headers, body: bodyText, signal: ctrl ? ctrl.signal : undefined }).then(function (t) {
+    if (timer) clearTimeout(timer);
+    return t;
+  }).catch(function (e) {
+    if (timer) clearTimeout(timer);
+    if (e && e.name === "AbortError") throw new Error("取数超时（" + ms + "ms）：" + parsed.url);
+    throw e;
   });
 }
 
@@ -15264,6 +15356,7 @@ function loadCurrentEpisode() {
   if (player.detail && player.detail.cms) { return cmsLoadCurrentEpisode(token); }
   if (player.detail && player.detail.kuwo) { return kwLoadCurrentEpisode(token); }
   if (player.detail && player.detail.hongguo) { return hgLoadCurrentEpisode(token); }
+  if (player.detail && player.detail.generic) { return genLoadCurrentEpisode(token); }
   var ep = player.detail.episodes[player.index];
   player.sources = xyPlaySources(ep);
   player.srcIdx = 0;
@@ -15398,6 +15491,11 @@ function onVideoError() {
     if (!player.kwRetried) { player.kwRetried = true; kwLoadCurrentEpisode(player.loadToken); return; }
     player.playError = "原生播不了这一集（可能是地址过期）；点集数重播会重新取地址。";
     renderCenter(); return;
+  }
+  if (player.detail && player.detail.generic && cmsIsHlsUrl(player.sources[player.srcIdx] || "")) {
+    /* 通用源 m3u8：原生失败切 hls.js（与 CMS 同款）；已在 hls 路上时不再重建。 */
+    if (player.mode === "hls") return;
+    cmsSwitchToHls(); return;
   }
   if (player.srcIdx + 1 < player.sources.length) {
     player.srcIdx += 1;
@@ -16157,7 +16255,364 @@ function renderSrcTabs() {
     bar.appendChild(b);
   }
 }
+
+/* ---------------- v15 P1：通用引擎（Hiker JS 沙箱运行时 v1） ----------------
+   导入的规则在这里真正跑起来。引擎只做 js:（三份内置规则全是 js:，无 $ 选择器）。
+   - 取数：列表/搜索/详情各跑一次规则 js；引擎先取一次当前 URL（getResCode 用），
+     取数失败不致命——规则也可能自己 request()；规则若依赖 getResCode 又没取到
+     数据，报错时优先报取数失败（根因），而不是 JSON 解析失败。
+   - 变量：putVar/getVar 按源隔离、只存内存（st.vars），每次跑完写回本源。
+   - $()：只做 .rule()/.lazyRule() 捕获（函数源码存为延迟描述符，附在 setResult
+     值里的 [RULE:n]/[LAZY:n] 标记上），本期不执行（P2）。其他 $ 调用直接抛
+     清晰错，不静默空。
+   - preRule：本期不跑（P3）。规则带 preRule 时列表/搜索/详情一律明报“需 preRule”，
+     不进沙箱、不返回空列表。
+   - 播放：集 URL 是直链才播（mp4 走原生、原生失败由 onVideoError 回落 WASM；
+     m3u8 走现有 HLS 路）。不是直链、或带 [RULE]/[LAZY] 标记，明报未实现，不静默。
+   - 翻页：MY_PAGE 递增，下一页追加（append），上一页重取替换。
+   已知局限（P3 再处理）：Hiker 的 request() 是同步的，浏览器里是 Promise——
+   规则里写 `let html = request(MY_URL)` 这种同步写法，本期拿到的会是 Promise
+   而不是文本；本期靠 getResCode() 覆盖（酷短剧与合成规则都走它）。 */
+var GEN_RULE_MARKER_RE = /\[(RULE|LAZY):\d+\]/;
+var genStates = {};
+var genCur = null;
+
+function genStateFor(src) {
+  if (!genStates[src.id]) {
+    var raw0 = (src.def && src.def.raw) || {};
+    genStates[src.id] = {
+      src: src, cats: genCats(raw0), nav: "", page: 1, cards: [], hasMore: false,
+      loading: false, error: "", isSearch: false, query: "", searchNote: "",
+      vars: {}, captured: {}, entered: false
+    };
+  }
+  return genStates[src.id];
+}
+function genNeedsPreRule(raw) {
+  return typeof raw.preRule === "string" && raw.preRule.trim() !== "";
+}
+function genCats(raw) {
+  var c = xyCatsFromRule(raw || {});
+  return c.map(function (o) {
+    var parts = String(o.k).split("**");
+    return { k: o.k, k1: parts[0], k2: parts.length > 1 ? parts[1] : "", n: o.n };
+  });
+}
+/* URL 模板替换：fyclass/fyAll -> 分类第一段，fypage -> 页码，
+   ** -> 分类第二段（class_url 里 "a**b" 的 b；搜索时是关键词）。 */
+function genSubUrl(tpl, cls) {
+  var u = String(tpl || "");
+  u = u.split("fyclass").join(cls.k1 || "");
+  u = u.split("fyAll").join(cls.k1 || "");
+  u = u.split("fypage").join(String(cls.page == null ? 1 : cls.page));
+  u = u.split("**").join(cls.k2 || "");
+  return u;
+}
+function genListUrlFor(raw, cat, page) {
+  var cls = { k1: cat ? cat.k1 : "", k2: cat ? cat.k2 : "", page: page };
+  var tpl = "";
+  if (cat && /^https?:\/\//i.test(cat.k1)) tpl = cat.k1;
+  else tpl = raw.url || "";
+  return genSubUrl(tpl, cls);
+}
+function genJsOf(raw, field, missingMsg) {
+  var s = raw[field];
+  if (typeof s !== "string" || s.trim() === "") return { err: missingMsg };
+  if (s.slice(0, 3) !== "js:") return { err: "规则用了 $ 选择器，引擎未实现（P5）" };
+  return { code: s.slice(3) };
+}
+function genNormCard(o) {
+  if (!o || typeof o !== "object") return null;
+  var title = typeof o.title === "string" ? o.title : "";
+  var url = typeof o.url === "string" ? o.url : "";
+  if (!title && !url) return null;
+  var cover = "";
+  if (typeof o.img === "string" && o.img) cover = o.img;
+  else if (typeof o.pic_url === "string" && o.pic_url) cover = o.pic_url;
+  var desc = "";
+  if (typeof o.desc === "string" && o.desc) desc = o.desc;
+  else if (typeof o.content === "string" && o.content) desc = o.content;
+  return { title: title, cover: cover, desc: desc, ref: url };
+}
+function genNormEp(o, i) {
+  if (!o || typeof o !== "object") return null;
+  var url = typeof o.url === "string" ? o.url : "";
+  if (!url) return null;
+  var title = (typeof o.title === "string" && o.title) ? o.title : ("第" + (i + 1) + "集");
+  var m = title.match(/(\d+)/);
+  var num = m ? parseInt(m[1], 10) : (i + 1);
+  var tip = title;
+  if (typeof o.desc === "string" && o.desc) tip += "\n" + o.desc;
+  return { num: num, name: title, url: url,
+    seconds: typeof o.seconds === "number" ? o.seconds : 0,
+    pic: typeof o.pic_url === "string" ? o.pic_url : "",
+    tip: tip, col_type: o.col_type || "" };
+}
+function genIsDirectUrl(u) {
+  return /\.(mp4|m3u8|mov|mkv|webm)([?#]|$)/i.test(String(u || "").trim());
+}
+/* 在沙箱里跑一段规则 js。ctx: {url, page, key}。 */
+function genRunJs(st, code, ctx) {
+  var url = ctx.url || "";
+  var resCode = "";
+  var fetchErr = null;
+  var preP = url
+    ? sandboxFetchText(url, { timeoutMs: 25000 }).then(function (t) { resCode = t; }).catch(function (e) { fetchErr = e; })
+    : Promise.resolve();
+  return preP.then(function () {
+    return HikerSandbox.run(code, st.vars, 30000, {
+      MY_URL: url, MY_PAGE: ctx.page || 1, KEY: ctx.key || "", resCode: resCode
+    });
+  }).then(function (value) {
+    var lv = HikerSandbox.lastVars();
+    if (lv) st.vars = lv;
+    var lc = HikerSandbox.lastCaptured();
+    if (lc) {
+      for (var id in lc) st.captured[id] = lc[id];
+    }
+    if (value === null || value === undefined) {
+      throw new Error("规则没有返回数据（没调 setResult 也没返回值）");
+    }
+    if (!Array.isArray(value)) {
+      throw new Error("规则返回的不是列表（setResult 应推数组）");
+    }
+    return value;
+  }).catch(function (e) {
+    var msg = e instanceof Error ? e.message : String(e);
+    if (fetchErr && resCode === "" && /Unexpected end of JSON input|Unexpected token|JSON/i.test(msg)) {
+      throw fetchErr;
+    }
+    throw e;
+  });
+}
+function genLoadCategory(srcId, classKey, page, append) {
+  var src = findSource(srcId);
+  if (!src || src.kind !== "generic") return;
+  var st = genStateFor(src);
+  genCur = srcId;
+  var raw = (src.def && src.def.raw) || {};
+  if (genNeedsPreRule(raw)) {
+    st.loading = false; st.error = "该规则需要 preRule（登录）才能取数，P3 再接";
+    renderGenBrowse(src);
+    return;
+  }
+  var js = genJsOf(raw, "find_rule", "该规则没有 find_rule，取不到列表");
+  if (js.err) { st.loading = false; st.error = js.err; renderGenBrowse(src); return; }
+  var cat = null;
+  for (var i = 0; i < st.cats.length; i++) if (st.cats[i].k === classKey) cat = st.cats[i];
+  if (!cat && st.cats.length > 0) cat = st.cats[0];
+  var url = genListUrlFor(raw, cat, page);
+  if (!url) { st.loading = false; st.error = "该规则没有列表地址（url / class_url），取不到列表"; renderGenBrowse(src); return; }
+  st.nav = cat ? cat.k : "";
+  st.page = page; st.loading = true; st.error = ""; st.isSearch = false; st.searchNote = "";
+  if (!append) st.cards = [];
+  renderGenBrowse(src);
+  genRunJs(st, js.code, { url: url, page: page, key: "" }).then(function (value) {
+    var cards = [];
+    for (var j = 0; j < value.length; j++) { var c = genNormCard(value[j]); if (c) cards.push(c); }
+    st.cards = append ? st.cards.concat(cards) : cards;
+    st.hasMore = cards.length > 0;
+    st.loading = false; st.error = "";
+    renderGenBrowse(src);
+  }).catch(function (e) {
+    st.loading = false;
+    st.error = e instanceof Error ? e.message : String(e);
+    renderGenBrowse(src);
+  });
+}
+function genLoadSearch(srcId, query) {
+  var q = String(query || "").trim();
+  var src = findSource(srcId);
+  if (!src || src.kind !== "generic") return;
+  var st = genStateFor(src);
+  genCur = srcId;
+  var raw = (src.def && src.def.raw) || {};
+  if (!q) { showToast("先输入要搜的剧名"); return; }
+  if (genNeedsPreRule(raw)) {
+    st.loading = false; st.error = "该规则需要 preRule（登录）才能取数，P3 再接";
+    renderGenBrowse(src);
+    return;
+  }
+  if (typeof raw.search_url !== "string" || !raw.search_url.trim()) {
+    st.loading = false; st.error = "该规则没有 search_url，搜不了";
+    renderGenBrowse(src); return;
+  }
+  var js = genJsOf(raw, "searchFind", "该规则没有 searchFind，搜不了");
+  if (js.err) { st.loading = false; st.error = js.err; renderGenBrowse(src); return; }
+  var url = genSubUrl(raw.search_url, { k1: "", k2: encodeURIComponent(q), page: 1 });
+  st.page = 1; st.loading = true; st.error = ""; st.isSearch = true; st.query = q; st.searchNote = "";
+  st.cards = [];
+  renderGenBrowse(src);
+  genRunJs(st, js.code, { url: url, page: 1, key: q }).then(function (value) {
+    var cards = [];
+    for (var j = 0; j < value.length; j++) { var c = genNormCard(value[j]); if (c) cards.push(c); }
+    st.cards = cards; st.hasMore = false; st.loading = false; st.error = "";
+    st.searchNote = cards.length === 0 ? ("搜「" + q + "」没有结果（站方就是这么匹配的，换个剧名试试）") : "";
+    renderGenBrowse(src);
+  }).catch(function (e) {
+    st.loading = false;
+    st.error = e instanceof Error ? e.message : String(e);
+    renderGenBrowse(src);
+  });
+}
+function genOpenCard(srcId, card) {
+  var src = findSource(srcId);
+  if (!src || src.kind !== "generic") return;
+  var st = genStateFor(src);
+  var raw = (src.def && src.def.raw) || {};
+  if (GEN_RULE_MARKER_RE.test(card.ref || "")) {
+    showToast("该源的集数页用 rule() 子页，P2 再接");
+    return;
+  }
+  if (genNeedsPreRule(raw)) { showToast("该规则需要 preRule（登录），P3 再接"); return; }
+  var js = genJsOf(raw, "detail_find_rule", "该规则没有详情取数（detail_find_rule），看不了集数");
+  if (js.err) { showToast(js.err); return; }
+  currentDetail = { title: card.title, cover: card.cover, intro: card.desc, episodes: [], generic: true, genSrc: srcId, genRef: card.ref };
+  renderDetail();
+  showView("detail");
+  genRunJs(st, js.code, { url: card.ref, page: 1, key: "" }).then(function (value) {
+    var eps = [];
+    for (var j = 0; j < value.length; j++) { var ep = genNormEp(value[j], j); if (ep) eps.push(ep); }
+    if (eps.length === 0) {
+      showToast("详情没有取到集数（规则返回空）");
+      showView("browse");
+      return;
+    }
+    if (!currentDetail || !currentDetail.generic || currentDetail.genRef !== card.ref) return;
+    currentDetail.episodes = eps;
+    renderDetail();
+  }).catch(function (e) {
+    showToast("打开失败（" + src.title + "）：" + (e instanceof Error ? e.message : String(e)));
+    showView("browse");
+  });
+}
+/* 通用源点集：直链才播；带 [RULE]/[LAZY] 标记或非直链，明报未实现。 */
+function genLoadCurrentEpisode(token) {
+  var ep = player.detail.episodes[player.index];
+  var url = ep ? ep.url : "";
+  if (!url) {
+    player.playError = "这集没有播址";
+    renderCenter();
+    return Promise.resolve();
+  }
+  if (GEN_RULE_MARKER_RE.test(url)) {
+    player.playError = "该集地址用 rule()/lazyRule() 现场算址，引擎未实现（P2 再接）";
+    renderCenter();
+    return Promise.resolve();
+  }
+  if (!genIsDirectUrl(url)) {
+    player.playError = "该集地址不是直链（mp4/m3u8），引擎本期只播直链";
+    renderCenter();
+    return Promise.resolve();
+  }
+  player.sources = [url];
+  player.srcIdx = 0;
+  if (cmsIsHlsUrl(url)) {
+    if (cmsCanPlayHlsNative()) { setMode("native"); loadNative(); }
+    else { cmsLoadHls(url, token); }
+    return Promise.resolve();
+  }
+  /* 直链 mp4 先走原生（多数是 H.264）；原生播不了（HEVC 且设备不支持）
+     时 onVideoError 会回落 WASM。 */
+  setMode("native");
+  loadNative();
+  return Promise.resolve();
+}
+function renderGenCardsInto(list, st, src) {
+  list.innerHTML = "";
+  st.cards.forEach(function (card) {
+    var b = el("button", "v-card");
+    b.type = "button";
+    b.appendChild(coverEl(card.cover, card.title, "v-cover"));
+    var meta = el("span", "v-meta");
+    meta.appendChild(el("span", "v-title", card.title));
+    if (card.desc) meta.appendChild(el("span", "v-desc", card.desc));
+    b.appendChild(meta);
+    b.addEventListener("click", function () { genOpenCard(src.id, card); });
+    list.appendChild(b);
+  });
+}
+function renderGenList(st, src) {
+  var list = $("genCardList");
+  if (!list) return;
+  var err = $("genErr");
+  var empty = $("genEmpty");
+  var loading = $("genLoading");
+  err.classList.add("hidden");
+  empty.classList.add("hidden");
+  loading.classList.toggle("hidden", !st.loading);
+  if (st.loading && st.cards.length === 0) {
+    list.innerHTML = "";
+    $("genPager").classList.add("hidden");
+    $("genCountLine").textContent = "";
+    return;
+  }
+  if (st.error) {
+    err.classList.remove("hidden");
+    err.querySelector(".err-text").textContent = "取剧失败：" + st.error;
+    $("genPager").classList.add("hidden");
+    if (st.cards.length === 0) { list.innerHTML = ""; empty.classList.remove("hidden"); }
+    else { renderGenCardsInto(list, st, src); }
+    $("genCountLine").textContent = st.cards.length > 0 ? st.cards.length + " 部" : "";
+    return;
+  }
+  if (st.cards.length === 0) {
+    list.innerHTML = "";
+    empty.classList.remove("hidden");
+    $("genPager").classList.add("hidden");
+    $("genCountLine").textContent = "";
+    return;
+  }
+  $("genCountLine").textContent = st.isSearch
+    ? "搜索「" + st.query + "」· " + st.cards.length + " 部"
+    : st.cards.length + " 部";
+  renderGenCardsInto(list, st, src);
+  var pager = $("genPager");
+  if (st.isSearch) {
+    pager.classList.add("hidden");
+    $("btnGenPrev").disabled = true;
+    $("btnGenNext").disabled = true;
+  }
+  else {
+    pager.classList.remove("hidden");
+    $("genPageLabel").textContent = "第 " + st.page + " 页";
+    $("btnGenPrev").disabled = st.page <= 1 || st.loading;
+    $("btnGenNext").disabled = !st.hasMore || st.loading;
+  }
+  var sn = $("genSearchNote");
+  if (sn) { sn.textContent = st.searchNote || ""; sn.classList.toggle("hidden", !st.searchNote); }
+}
+function bindGenStatic() {
+  var sf = $("genSearchForm");
+  if (sf) sf.addEventListener("submit", function (e) { e.preventDefault(); if (genCur) genLoadSearch(genCur, $("genSearchInput").value); });
+  var gr = $("btnGenRetry");
+  if (gr) gr.addEventListener("click", function () {
+    if (!genCur) return;
+    var st = genStates[genCur];
+    if (!st) return;
+    if (st.isSearch) genLoadSearch(genCur, st.query);
+    else genLoadCategory(genCur, st.nav, st.page, false);
+  });
+  var gp = $("btnGenPrev");
+  if (gp) gp.addEventListener("click", function () {
+    if (!genCur) return;
+    var st = genStates[genCur];
+    if (!st || st.loading || st.page <= 1) return;
+    genLoadCategory(genCur, st.nav, st.page - 1, false);
+  });
+  var gn = $("btnGenNext");
+  if (gn) gn.addEventListener("click", function () {
+    if (!genCur) return;
+    var st = genStates[genCur];
+    if (!st || st.loading || !st.hasMore) return;
+    genLoadCategory(genCur, st.nav, st.page + 1, true);
+  });
+}
+
 function renderGenBrowse(src) {
+  var st = genStateFor(src);
+  genCur = src.id;
+  var raw = (src.def && src.def.raw) || {};
   var card = $("genRuleCard");
   if (card) {
     card.querySelector(".rule-title").textContent = src.title;
@@ -16166,7 +16621,25 @@ function renderGenBrowse(src) {
     card.querySelector(".rule-badge").textContent = src.badge || "视";
   }
   var note = $("genNote");
-  if (note) note.textContent = "已导入“" + src.title + "”，规则存在本机（刷新还在）。列表 / 详情 / 播放走通用引擎，P1 接入后可播；现在先不执行规则。";
+  if (note) note.textContent = "已导入“" + src.title + "”，规则存在本机（刷新还在）。列表 / 详情 / 搜索走通用引擎；直链集数可直接播。";
+  var chips = $("genChips");
+  if (chips) {
+    chips.classList.toggle("hidden", st.cats.length <= 1);
+    chips.innerHTML = "";
+    st.cats.forEach(function (c) {
+      var b = el("button", "chip" + (st.nav === c.k && !st.isSearch ? " on" : ""), c.n);
+      b.type = "button";
+      b.addEventListener("click", function () { genLoadCategory(src.id, c.k, 1, false); });
+      chips.appendChild(b);
+    });
+  }
+  var sf = $("genSearchForm");
+  if (sf) sf.classList.toggle("hidden", !(typeof raw.search_url === "string" && raw.search_url.trim() && typeof raw.searchFind === "string" && raw.searchFind.trim()));
+  renderGenList(st, src);
+  if (!st.entered) {
+    st.entered = true;
+    genLoadCategory(src.id, st.cats.length > 0 ? st.cats[0].k : "", 1, false);
+  }
 }
 
 /* ---------------- v15 P0：入口页（hub） ----------------
@@ -16185,7 +16658,7 @@ function renderHub() {
       + '<span class="rule-badge">' + esc(s.badge || (s.title || "?").charAt(0)) + '</span>'
       + '<span class="rule-meta"><span class="rule-title">' + esc(s.title) + '</span>'
       + '<span class="rule-author">' + esc((s.author || "未知作者") + (s.site ? " · " + s.site : "")) + '</span>'
-      + '<span class="rule-file">' + esc(s.file + (s.kind === "generic" ? " · 待接入（P1）" : "")) + '</span></span></button>';
+      + '<span class="rule-file">' + esc(s.file + (s.kind === "generic" ? " · 通用引擎" : "")) + '</span></span></button>';
   }
   html += '<button type="button" class="import-btn" id="hubImportBtn">+ 导入规则文件</button>';
   html += '<button type="button" class="import-btn" id="hubPasteBtn">粘贴 JSON</button>';
@@ -16231,7 +16704,7 @@ function onImportVideoFile(file) {
       var raw = JSON.parse(reader.result);
       importVideoRuleFromRaw(raw, file.name).then(function (def) {
         hubImportClear();
-        showToast("已导入“" + def.title + "”（P1 接入后可播）");
+        showToast("已导入“" + def.title + "”（通用引擎已接）");
       }).catch(function (e2) { hubImportError("导入失败：" + (e2 && e2.message || String(e2))); });
     } catch (e) {
       hubImportError("导入失败：JSON 解析失败——" + (e.message || String(e)));
@@ -16250,7 +16723,7 @@ function importHubPastedJson() {
     var raw = JSON.parse(text);
     importVideoRuleFromRaw(raw, "粘贴的规则.json").then(function (def) {
       hubImportClear();
-      showToast("已导入“" + def.title + "”（P1 接入后可播）");
+      showToast("已导入“" + def.title + "”（通用引擎已接）");
       if (ta) ta.value = "";
       var p = $("hubPastePanel"); if (p) p.classList.add("hidden");
     }).catch(function (e2) { hubImportError("导入失败：" + (e2 && e2.message || String(e2))); });
@@ -16286,6 +16759,9 @@ var HikerSandbox = (function () {
     "var __seq = 0;",
     "var __runId = 0;",
     "var __done = {};",
+    "var __resCode = \"\";",
+    "var __captured = {};",
+    "var __capSeq = 0;",
     "function __callMain(msg) {",
     "  return new Promise(function (res) {",
     "    var id = ++__seq;",
@@ -16301,12 +16777,41 @@ var HikerSandbox = (function () {
     "  });",
     "}",
     "function request(url, opts) { return fetchText(url, opts); }",
+    "function post(url, opts) {",
+    "  var o = {};",
+    "  var src = opts || {};",
+    "  for (var k in src) o[k] = src[k];",
+    "  o.method = \"POST\";",
+    "  return fetchText(url, o);",
+    "}",
+    "function fetch(url, opts) { return fetchText(url, opts); }",
     "function getVar(k, d) { return (k in __vars) ? __vars[k] : (d === undefined ? \"\" : d); }",
+    "function putVar(k, v) { __vars[k] = v; }",
     "function setVar(k, v) { __vars[k] = v; }",
+    "function getResCode() { return __resCode; }",
     "function setResult(v) {",
     "  if (__done[__runId]) return;",
     "  __done[__runId] = true;",
-    "  self.postMessage({ type: \"result\", id: __runId, ok: true, value: (v === undefined ? null : v) });",
+    "  self.postMessage({ type: \"result\", id: __runId, ok: true, value: (v === undefined ? null : v), captured: __captured, vars: __vars });",
+    "}",
+    "function $(sel) {",
+    "  function cap(kind, fn) {",
+    "    var id = ++__capSeq;",
+    "    var src = \"\";",
+    "    try { src = fn.toString(); } catch (e) { src = \"\"; }",
+    "    __captured[id] = { kind: kind, src: src, sel: String(sel) };",
+    "    return \"[\" + (kind === \"rule\" ? \"RULE\" : \"LAZY\") + \":\" + id + \"]\";",
+    "  }",
+    "  var o = {",
+    "    rule: function (fn) { return cap(\"rule\", fn); },",
+    "    lazyRule: function (fn) { return cap(\"lazy\", fn); }",
+    "  };",
+    "  return new Proxy(o, { get: function (t, p) {",
+    "    if (p === \"then\") return undefined;",
+    "    if (typeof p === \"symbol\") return undefined;",
+    "    if (p in t) return t[p];",
+    "    throw new Error(\"引擎未实现 $ 选择器（P5），只支持 .rule()/.lazyRule() 捕获\");",
+    "  } });",
     "}",
     "self.onmessage = function (e) {",
     "  var m = e.data || {};",
@@ -16320,14 +16825,18 @@ var HikerSandbox = (function () {
     "  __runId = m.id;",
     "  __done[m.id] = false;",
     "  __vars = m.vars || {};",
+    "  __resCode = (m.ctx && typeof m.ctx.resCode === \"string\") ? m.ctx.resCode : \"\";",
+    "  __captured = {};",
+    "  __capSeq = 0;",
+    "  var __ctx = m.ctx || {};",
     "  try {",
-    "    var fn = new Function(\"fetchText\", \"request\", \"getVar\", \"setVar\", \"setResult\", m.code);",
-    "    var r = fn(fetchText, request, getVar, setVar, setResult);",
+    "    var fn = new Function(\"fetchText\", \"request\", \"post\", \"fetch\", \"getVar\", \"putVar\", \"setVar\", \"setResult\", \"getResCode\", \"MY_URL\", \"MY_PAGE\", \"KEY\", \"$\", m.code);",
+    "    var r = fn(fetchText, request, post, fetch, getVar, putVar, setVar, setResult, getResCode, __ctx.MY_URL || \"\", __ctx.MY_PAGE || 1, __ctx.KEY || \"\", $);",
     "    if (r && typeof r.then === \"function\") {",
     "      r.then(function (v) {",
     "        if (__done[m.id]) return;",
     "        __done[m.id] = true;",
-    "        self.postMessage({ type: \"result\", id: m.id, ok: true, value: (v === undefined ? null : v) });",
+    "        self.postMessage({ type: \"result\", id: m.id, ok: true, value: (v === undefined ? null : v), captured: __captured, vars: __vars });",
     "      }, function (err) {",
     "        if (__done[m.id]) return;",
     "        __done[m.id] = true;",
@@ -16335,7 +16844,7 @@ var HikerSandbox = (function () {
     "      });",
     "    } else if (!__done[m.id]) {",
     "      __done[m.id] = true;",
-    "      self.postMessage({ type: \"result\", id: m.id, ok: true, value: (r === undefined ? null : r) });",
+    "      self.postMessage({ type: \"result\", id: m.id, ok: true, value: (r === undefined ? null : r), captured: __captured, vars: __vars });",
     "    }",
     "  } catch (err) {",
     "    if (__done[m.id]) return;",
@@ -16346,6 +16855,7 @@ var HikerSandbox = (function () {
     "self.postMessage({ type: \"ready\" });"
   ].join("\n");
   var worker = null, seq = 0, pending = {}, ready = false, readyWaiters = [];
+  var lastCaptured = {}, lastVars = null;
   function ensure() {
     if (worker) return worker;
     var blob = new Blob([WORKER_SRC], { type: "text/javascript" });
@@ -16357,7 +16867,7 @@ var HikerSandbox = (function () {
       if (m.type === "pong") { var pp = pending[m.id]; if (pp) { delete pending[m.id]; clearTimeout(pp.timer); pp.resolve(true); } return; }
       if (m.type === "fetch") {
         var fid = m.__id;
-        fetchText(m.url, m.opts || {}).then(function (text) {
+        sandboxFetchText(m.url, m.opts || {}).then(function (text) {
           if (worker) worker.postMessage({ type: "__fetchResult", __id: fid, ok: true, text: text });
         }).catch(function (err) {
           if (worker) worker.postMessage({ type: "__fetchResult", __id: fid, ok: false, error: String((err && err.message) || err) });
@@ -16369,6 +16879,7 @@ var HikerSandbox = (function () {
         if (!pr) return;
         delete pending[m.id];
         clearTimeout(pr.timer);
+        if (m.ok) { lastCaptured = m.captured || {}; lastVars = m.vars || null; }
         if (m.ok) pr.resolve(m.value); else pr.reject(new Error(m.error || "沙箱执行失败"));
         return;
       }
@@ -16396,10 +16907,14 @@ var HikerSandbox = (function () {
       });
     });
   }
-  function run(code, vars, timeoutMs) {
+  /* v15 P1：ctx（MY_URL / MY_PAGE / KEY / resCode）随 run 带进 Worker；
+     lastCaptured / lastVars 只在成功时更新（失败沿用旧值会被引擎误读，
+     所以 run 开始先清掉）。 */
+  function run(code, vars, timeoutMs, ctx) {
     ensure();
     var id = ++seq;
     var ms = timeoutMs || 30000;
+    lastCaptured = {}; lastVars = null;
     return whenReady().then(function () {
       return new Promise(function (resolve, reject) {
         var timer = setTimeout(function () {
@@ -16408,7 +16923,7 @@ var HikerSandbox = (function () {
           reject(new Error("沙箱执行超时（" + ms + "ms），已终止"));
         }, ms);
         pending[id] = { resolve: resolve, reject: reject, timer: timer };
-        worker.postMessage({ type: "run", id: id, code: code, vars: vars || {} });
+        worker.postMessage({ type: "run", id: id, code: code, vars: vars || {}, ctx: ctx || {} });
       });
     });
   }
@@ -16418,7 +16933,9 @@ var HikerSandbox = (function () {
     var all = pending; pending = {};
     Object.keys(all).forEach(function (id) { clearTimeout(all[id].timer); all[id].reject(new Error("沙箱已终止")); });
   }
-  return { run: run, ping: ping, terminate: terminate, ensure: ensure };
+  return { run: run, ping: ping, terminate: terminate, ensure: ensure,
+    lastCaptured: function () { return lastCaptured; },
+    lastVars: function () { return lastVars; } };
 })();
 
 /* ---------------- 清单 ---------------- */
@@ -19659,6 +20176,7 @@ function cmsBoot() {
       cmsShowView("source");
     }
   });
+  bindGenStatic();
 }
 
 /* ---------------- 启动 ---------------- */
