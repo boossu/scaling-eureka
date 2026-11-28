@@ -463,7 +463,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 22;
+var PLUGIN_VERSION = 23;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -13914,7 +13914,10 @@ HevcFallbackPlayer.prototype.setState = function (s, detail) {
   if (this.events.onState) this.events.onState(s, detail);
 };
 HevcFallbackPlayer.prototype.clock = function () {
-  if (this.audio && !this.audioFailed && this.audio.readyState >= 1) return this.audio.currentTime;
+  /* v23：音频被手势拦住（paused 在 0）时不许拿 audio.currentTime 当时钟——
+     否则画面永远定在首帧、时钟钉在 0:00（用户截图的 WASM 卡死态）。
+     只有音频真正在播时才跟它走；否则状态 playing 就走 performance 时钟，画面照动。 */
+  if (this.audio && !this.audioFailed && this.audio.readyState >= 1 && !this.audio.paused) return this.audio.currentTime;
   if (this.state === "playing") return this.clockBase + ((performance.now() - this.clockStart) / 1000) * this.rate;
   return this.clockBase;
 };
@@ -14054,7 +14057,11 @@ HevcFallbackPlayer.prototype.prepareAudioEarly = function () {
   this.mediaSource = ms;
   var audio = new Audio();
   audio.preload = "auto";
+  /* v23：回落音频默认静音起播——静音 play 不受手势策略拦截，WASM 可零点自动播；
+     用户第一次点按播放器（任意处）即恢复声音，此后各集都有声起播。 */
+  audio.muted = !player._fbAudioUnmuted;
   this.audio = audio;
+  player.muted = audio.muted;
   audio.src = URL.createObjectURL(ms);
   audio.addEventListener("ended", function () { self.handleEnded(); });
   audio.addEventListener("playing", function () {
@@ -14584,6 +14591,15 @@ HevcFallbackPlayer.prototype.seek = function (seconds) {
 };
 HevcFallbackPlayer.prototype.setVolume = function (v) { if (this.audio) this.audio.volume = Math.max(0, Math.min(1, v)); };
 HevcFallbackPlayer.prototype.setMuted = function (m) { if (this.audio) this.audio.muted = m; };
+HevcFallbackPlayer.prototype.resumeAudio = function () {
+  /* v23：用户点按后恢复声音（手势内 play 允许）。先把音频对到当前画面时钟，避免静音期音频落后导致跳变。 */
+  if (!this.audio || this.audioFailed) return;
+  if (!this.audio.muted && !this.audio.paused) return;
+  this.audio.muted = false;
+  var t = this.clock();
+  try { if (Number.isFinite(t) && t >= 0 && Math.abs(this.audio.currentTime - t) > 0.5) this.audio.currentTime = t; } catch (e) {}
+  this.kickAudio();
+};
 HevcFallbackPlayer.prototype.setRate = function (r) {
   this.rate = r;
   if (this.audio) this.audio.playbackRate = r;
@@ -15244,7 +15260,17 @@ function renderEpSheet() {
   $("epSheetTitle").textContent = "选集（" + player.detail.episodes.length + " 集）";
 }
 
+function maybeResumeFallbackAudio() {
+  /* v23：回落音频默认静音起播；用户第一次点按播放器即恢复声音（手势内 play 允许），此后各集都有声。 */
+  if (player.mode !== "fallback" || !player.fallback) return;
+  var fb = player.fallback;
+  if (fb && typeof fb.resumeAudio === "function") fb.resumeAudio();
+  player._fbAudioUnmuted = true;
+  player.muted = false;
+  renderBottom();
+}
 function togglePlay() {
+  maybeResumeFallbackAudio();
   var b = getBackend();
   if (!b) return;
   if (b.isPaused()) {
@@ -15277,6 +15303,7 @@ function seekTo(t) {
 }
 function applyVolume(v, m) {
   player.volume = v; player.muted = m;
+  if (!m) player._fbAudioUnmuted = true; /* v23：用户主动取消静音后，各集回落音频都有声起播 */
   var b = getBackend();
   if (b) { b.setVolume(v); b.setMuted(m); }
   renderBottom();
@@ -15447,8 +15474,7 @@ function playEpisode(index) {
     },
     onNeedGesture: function () {
       if (token !== player.loadToken) return;
-      player.needGesture = true;
-      renderCenter();
+      /* v23：回落路默认静音起播，音频被拦也不弹“点一下播放”——画面照播（静音），点按播放器任意处即恢复声音。 */
     },
     onAudio: function (s) {
       if (token !== player.loadToken) return;
@@ -15488,9 +15514,40 @@ function onVideoError() {
   if (_v18v && !_v18v.getAttribute("src") && _v18v.error && _v18v.error.code === 4) return;
   if (player.detail && player.detail.cms) { cmsOnVideoError(); return; }
   if (player.detail && player.detail.hongguo) {
-    /* 红果只有一个 Blob 源：原生失败不进 sources 重试/二次解包，直接报重取提示。 */
-    player.playError = "红果播不了这一集（可能是地址过期）；点集数重播会重新取地址。";
-    renderCenter(); return;
+    /* v23：原生失败不弹窗，静默切 WASM 回落（会话还活着就直接用它起回落；
+       会话已死则重走取流，token 已标 MSE 失败所以直接进回落）。
+       回落也失败时才由回落路写 playError 报错。 */
+    var _v23token = player.loadToken;
+    if (player._hgMseFailedToken !== _v23token) player._hgMseFailedToken = _v23token;
+    var _v23st = hgMse;
+    if (_v23st) _v23st._v18Recovered = true; /* 已由这里接管回落，fail() 不再重起 */
+    var _v23rb = player._hgReplayChunks || [];
+    player._hgReplayChunks = [];
+    if (_v23rb.length) player._hgPendingChunks = _v23rb.concat(player._hgPendingChunks || []);
+    player.playError = "";
+    player.loadState = "";
+    setMode("fallback");
+    var _v23v = $("nativeVideo");
+    try { hgMseTeardown(_v23st, _v23v); } catch (e) {}
+    var _v23s = player._hgSession;
+    var _v23fb = getFallbackPlayer();
+    if (_v23fb && _v23s && !_v23s.error) {
+      _v23fb.loadStream(_v23s, _v23token).then(function (info) {
+        if (_v23token !== player.loadToken || !info) return;
+        player.duration = info.duration;
+        return _v23fb.play().then(function () {
+          if (_v23token === player.loadToken) setPlaying(true);
+        });
+      }).catch(function (e) {
+        if (_v23token !== player.loadToken) return;
+        player.playError = "红果取流失败：" + (e instanceof Error ? e.message : String(e));
+        renderCenter();
+      });
+    } else {
+      hgLoadCurrentEpisode(_v23token);
+    }
+    renderCenter();
+    return;
   }
   if (player.detail && player.detail.kuwo) {
     /* 酷短剧播址是带签名的 302 地址：第一次失败只当地址过期，重新现取一次；
@@ -15525,6 +15582,7 @@ function bindPlayer() {
   E.topBar = $("playerTop");
   /* v3：控制条藏着时第一次点按只弹起、不切换播/停；显示时点按照旧播/停。 */
   var onStageTap = function () {
+    maybeResumeFallbackAudio();
     if (!player.showControls) { pokeControls(); return; }
     togglePlay();
   };
