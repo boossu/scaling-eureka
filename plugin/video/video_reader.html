@@ -466,7 +466,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 17;
+var PLUGIN_VERSION = 18;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -15167,7 +15167,8 @@ function renderCenter() {
     rb.type = "button";
     rb.addEventListener("click", function () {
       player.playError = "";
-      setMode(canPlayHevcNative() ? "native" : "fallback");
+      /* v18：本集 MSE 已失败过时重试直接走回落，不再试 MSE。 */
+      setMode(player._hgMseFailedToken === player.loadToken ? "fallback" : (canPlayHevcNative() ? "native" : "fallback"));
       loadCurrentEpisode();
     });
     box.appendChild(rb);
@@ -15410,7 +15411,7 @@ function playEpisode(index) {
       else if (s === "ready") player.loadState = "";
       else if (s === "error") player.loadState = "";
       else if (detailMsg) player.loadState = detailMsg;
-      if (s === "playing") setPlaying(true);
+      if (s === "playing") { player.playError = ""; setPlaying(true); }
       if (s === "paused" || s === "ended") setPlaying(false);
       renderCenter();
     },
@@ -15424,6 +15425,9 @@ function playEpisode(index) {
       if (token !== player.loadToken) return;
       player.duration = info.duration;
       player._hgStarted = true; /* v14 回落路：首帧即起播，onProgress 不再写加载条 */
+      /* v18：回落起播即清掉陈旧的 playError（MSE 尝试留下的误报错
+         不许盖住已在播的画面）。 */
+      player.playError = "";
       player.loadState = "";
       renderCenter();
     },
@@ -15479,6 +15483,12 @@ function exitPlayer() {
 }
 
 function onVideoError() {
+  /* v18：video 元素不在播时它的 error 与播放无关，一律忽略——回落模式
+     下播放走 canvas，MSE teardown 拆 src 时也会 fired code 4
+     "Empty src attribute"（src 为空）；这类误报错不许写成 playError。 */
+  if (player.mode === "fallback") return;
+  var _v18v = $("nativeVideo");
+  if (_v18v && !_v18v.getAttribute("src") && _v18v.error && _v18v.error.code === 4) return;
   if (player.detail && player.detail.cms) { cmsOnVideoError(); return; }
   if (player.detail && player.detail.hongguo) {
     /* 红果只有一个 Blob 源：原生失败不进 sources 重试/二次解包，直接报重取提示。 */
@@ -19845,6 +19855,7 @@ function hgStopStream() {
   }
   player._hgFeedChunk = null;
   player._hgPendingChunks = [];
+  player._hgReplayChunks = [];
   if (hgMse) hgMseTeardown(hgMse, $("nativeVideo"));
 }
 /* MSE SourceBuffer 追加队列：一次只 append 一个，updateend 后再 append 下一个。 */
@@ -19878,7 +19889,10 @@ function hgMseTeardown(st, video) {
     player._hgMseActive = false;
   }
   if (video && st.msUrl && video.src && video.src.indexOf(st.msUrl) >= 0) {
-    try { video.removeAttribute("src"); video.load(); } catch (e) {}
+    /* v18：只 removeAttribute("src")，不调 video.load()——调 load() 会让
+       元素跑资源选择、src 为空即 fired code 4 "Empty src attribute"，
+       经 onVideoError 写成 playError 粘住（手机 MSE 失败的报错框就是它）。 */
+    try { video.removeAttribute("src"); } catch (e) {}
   }
   if (st.msUrl) {
     try { URL.revokeObjectURL(st.msUrl); } catch (e) {}
@@ -19917,9 +19931,43 @@ function hgStartMse(video, session, token) {
     function fail(reason) {
       /* MSE 不走 → 回落路。已接管的块路由交还给待发队列（免得后到的块
          被已拆的 MSE 吃掉），MediaSource 一并拆掉。 */
-      if (player._hgFeedChunk === mseFeed) player._hgFeedChunk = null;
+      console.warn("[hg] MSE 回落：" + reason);
+      if (token === player.loadToken) {
+        if (player._hgFeedChunk === mseFeed) player._hgFeedChunk = null;
+        /* v18：MSE 真跑起来后失败（st 已建），本集（本次会话）不再试 MSE。 */
+        if (st) player._hgMseFailedToken = token;
+        /* v18：把喂给 MSE 的块还给待发队列（重放缓冲），回落路排空时
+           从头拿到，不缺开头媒体块。 */
+        var rb = player._hgReplayChunks || [];
+        player._hgReplayChunks = [];
+        if (rb.length) player._hgPendingChunks = rb.concat(player._hgPendingChunks || []);
+      }
       if (st) hgMseTeardown(st, video);
       ok({ ok: false, reason: reason });
+      /* v18 补（E6）：MSE 已起播后才失败——onAppend 第 2 次 updateend 已调
+         ok({ok:true})、调用方已切原生并返回，上面 ok(false) 的 resolve
+         已被忽略，调用方不会再起回落。必须在这里主动切回落并起
+         loadStream，否则播器卡在原生、无 src、无回落（手机 0:00/0:00
+         黑屏就是这条竞态；B2 诊断实测：mode=native、fbFrames=-1、
+         pend=7 滞留、会话已下完）。只恢复一次，且只恢复当前集。 */
+      if (st && st.started && !st._v18Recovered && token === player.loadToken) {
+        st._v18Recovered = true;
+        setMode("fallback");
+        var fb = getFallbackPlayer();
+        if (fb) {
+          fb.loadStream(session, token).then(function (info) {
+            if (token !== player.loadToken || !info) return;
+            player.duration = info.duration;
+            return fb.play().then(function () {
+              if (token === player.loadToken) setPlaying(true);
+            });
+          }).catch(function (e) {
+            if (token !== player.loadToken) return;
+            player.playError = "红果取流失败：" + (e instanceof Error ? e.message : String(e));
+            renderCenter();
+          });
+        }
+      }
     }
     /* 会话出错（如下载中断）直接 reject，走外层“失败重取一次 / 报错”。 */
     session._streamReject = function (e) { if (!settled) { settled = true; reject(e); } };
@@ -19978,7 +20026,12 @@ function hgStartMse(video, session, token) {
         st.vq.push(init);
         if (st.aq) st.aq.push(init);
         /* 4. 接管后续块并排空待发队列（init 已先入队，顺序不错）。 */
-        mseFeed = function (start, end, bytes) { hgMseFeed(st, bytes); };
+        mseFeed = function (start, end, bytes) {
+          /* v18：喂给 MSE 的块另存一份重放缓冲——MSE 失败回落时，块要
+             原样还给回落路（会话每块只回调一次，不重发）。 */
+          (player._hgReplayChunks = player._hgReplayChunks || []).push({ start: start, end: end, bytes: bytes });
+          hgMseFeed(st, bytes);
+        };
         player._hgFeedChunk = mseFeed;
         hgDrainPending();
         /* 5. 首个媒体段 append 完（视频 SB 第 2 次 updateend）即播。
@@ -19990,6 +20043,8 @@ function hgStartMse(video, session, token) {
           if (appends >= 2 && !st.started) {
             st.started = true;
             player._hgStarted = true;
+            /* v18：MSE 起播也清掉陈旧的 playError。 */
+            player.playError = "";
             player.loadState = ""; renderCenter();
             var p = video.play();
             if (p) p.catch(function () { player.needGesture = true; renderCenter(); });
@@ -20078,10 +20133,20 @@ function hgLoadCurrentEpisode(token) {
       if (session.error) throw session.error;
       player._hgSession = session;
       player._hgPendingChunks = [];
+      player._hgReplayChunks = [];
       /* v14：先试 MSE（只在 MediaSource 认 HEVC 时走），桌面 Chromium
-         不支持 HEVC MSE（预期）→ 优雅回落到 WASM，不报错。 */
+         不支持 HEVC MSE（预期）→ 优雅回落到 WASM，不报错。
+         v18：本集 MSE 已失败过（_hgMseFailedToken === token）时不再试，
+         直接走回落——“再试一次”别再进同一个坑。 */
       var video = $("nativeVideo");
-      return hgStartMse(video, session, token).then(function (r) {
+      var mseP;
+      if (player._hgMseFailedToken === token) {
+        console.warn("[hg] MSE 已失败过，本集直接走回落");
+        mseP = Promise.resolve({ ok: false, reason: "MSE 已失败过" });
+      } else {
+        mseP = hgStartMse(video, session, token);
+      }
+      return mseP.then(function (r) {
         if (token !== player.loadToken) return;
         if (r && r.ok) {
           player.duration = r.duration || player.duration;
