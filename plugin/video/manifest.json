@@ -1,6 +1,6 @@
 {
   "reader": {
-    "sha256": "b18c28ed5a45921350074dcadb26e29b79dac4244d1115867bb1177b79bc46b4",
+    "sha256": "60f658722f2620dbaff6d65277cd11078857a0a225db684f1a68104135a340b5",
     "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/video_reader.html"
   },
   "rules": [
@@ -9,8 +9,14 @@
       "name": "星芽短剧",
       "sha256": "a3b8b33fff34b1402562101d54a80c9b9709d8d453ec903de7f75406f4e50205",
       "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/xingya.json"
+    },
+    {
+      "file": "kuwo.json",
+      "name": "酷短剧",
+      "sha256": "42475b99e03b542914f4beb49b046670110782dc2228bceaea993b362d7efe69",
+      "url": "https://raw.githubusercontent.com/boossu/scaling-eureka/main/plugin/video/rules/kuwo.json"
     }
   ],
   "updated": "2026-11-28",
-  "version": 9
+  "version": 10
 }

@@ -185,6 +185,7 @@ img{display:block}
     <div class="src-tabs" id="srcTabs" role="group" aria-label="来源">
       <button type="button" class="src-tab on" id="tabXy">星芽短剧</button>
       <button type="button" class="src-tab" id="tabCms">CMS采集</button>
+      <button type="button" class="src-tab" id="tabKw">酷短剧</button>
     </div>
     <div id="xyBrowse">
     <div id="rules"><div class="rule-row">
@@ -217,6 +218,36 @@ img{display:block}
         <button type="button" id="btnPrev">‹ 上一页</button>
         <span id="pageLabel">第 1 页</span>
         <button type="button" id="btnNext">下一页 ›</button>
+      </div>
+    </section>
+    </div>
+
+    <!-- 酷短剧（酷我，Thomas喲）：分类 + 列表，无搜索（规则 search_url 为空） -->
+    <div id="kwBrowse" class="hidden">
+    <div id="kwRules"><div class="rule-row">
+      <button type="button" class="rule-card" id="kwRuleCard">
+        <span class="rule-badge">酷</span>
+        <span class="rule-meta">
+          <span class="rule-title">酷短剧</span>
+          <span class="rule-author">Thomas喲 · wapi.kuwo.cn</span>
+          <span class="rule-file">kuwo.json</span>
+        </span>
+      </button>
+    </div></div>
+    <div class="chips" id="kwChips" role="group" aria-label="分类"></div>
+    <section class="sec" aria-label="视频列表">
+      <p id="kwLoading" class="list-msg hidden">正在取剧…</p>
+      <div id="kwErr" class="err-box hidden">
+        <p class="err-text"></p>
+        <button type="button" class="retry-btn" id="btnKwRetry">重试</button>
+      </div>
+      <p id="kwEmpty" class="list-msg hidden">没有找到剧。</p>
+      <p id="kwCountLine" class="count"></p>
+      <div class="v-list" id="kwCardList"></div>
+      <div class="pager hidden" id="kwPager">
+        <button type="button" id="btnKwPrev">‹ 上一页</button>
+        <span id="kwPageLabel">第 1 页</span>
+        <button type="button" id="btnKwNext">下一页 ›</button>
       </div>
     </section>
     </div>
@@ -331,7 +362,7 @@ img{display:block}
 </div>
 <div id="toast" class="hidden" role="status"></div>
 <script>
-var PLUGIN_VERSION = 9;
+var PLUGIN_VERSION = 10;
 </script>
 <script>
 /* ---- mp4box 2.6.0 (MIT) vendored: styp chunk + all, CJS wrapped ---- */
@@ -14424,6 +14455,9 @@ function renderDetail() {
   var d = currentDetail;
   if (!d) return;
   if (d.cms) { cmsRenderDetail(); return; }
+  /* 非 CMS 详情（星芽/酷短剧）没有线路：把 CMS 详情留下的线路 tabs 藏掉，
+     否则切源后详情页还挂着上一条 CMS 线路。 */
+  $("lineTabs").classList.add("hidden");
   $("detailTitle").textContent = d.title || "";
   $("detailMeta").textContent = d.episodes.length > 0 ? "共 " + d.episodes.length + " 集" : "正在取分集…";
   $("detailIntro").textContent = d.intro || "";
@@ -14436,7 +14470,7 @@ function renderDetail() {
   d.episodes.forEach(function (ep, i) {
     var b = el("button", "ep-btn", String(ep.num));
     b.type = "button";
-    b.title = ep.seconds ? "第 " + ep.num + " 集 · " + xyFormatSeconds(ep.seconds) : "第 " + ep.num + " 集";
+    b.title = ep.tip || (ep.seconds ? "第 " + ep.num + " 集 · " + xyFormatSeconds(ep.seconds) : "第 " + ep.num + " 集");
     b.addEventListener("click", function () { playEpisode(i); });
     grid.appendChild(b);
   });
@@ -14453,7 +14487,7 @@ var player = {
   rate: 1, seekPreview: null, loadToken: 0, h264Redirect: false,
   fallback: null, fbEvents: {}, hideTimer: 0, flashTimer: 0, dragging: false,
   progressTimer: 0, fakeFullscreen: false, viewportPortrait: true,
-  lastInteractAt: 0, isPortraitVideo: true, userRotated: false, fill: false, _fsIcon: false
+  lastInteractAt: 0, isPortraitVideo: true, userRotated: false, fill: false, kwRetried: false, _fsIcon: false
 };
 
 function playerEls() {
@@ -14857,6 +14891,7 @@ function loadCurrentEpisode() {
   var token = player.loadToken;
   player.nativeToken = token;
   if (player.detail && player.detail.cms) { return cmsLoadCurrentEpisode(token); }
+  if (player.detail && player.detail.kuwo) { return kwLoadCurrentEpisode(token); }
   var ep = player.detail.episodes[player.index];
   player.sources = xyPlaySources(ep);
   player.srcIdx = 0;
@@ -14894,6 +14929,7 @@ function playEpisode(index) {
   player.loadState = ""; player.playError = ""; player.needGesture = false;
   player.seekPreview = null;
   player.userRotated = false;
+  player.kwRetried = false;
   setAudioStatus("unknown");
   setOrientation(o);
   $("epSheet").classList.add("hidden");
@@ -14974,6 +15010,13 @@ function exitPlayer() {
 
 function onVideoError() {
   if (player.detail && player.detail.cms) { cmsOnVideoError(); return; }
+  if (player.detail && player.detail.kuwo) {
+    /* 酷短剧播址是带签名的 302 地址：第一次失败只当地址过期，重新现取一次；
+       再失败才报错（WASM 回落只解 HEVC，mp4 走它没用，不进）。 */
+    if (!player.kwRetried) { player.kwRetried = true; kwLoadCurrentEpisode(player.loadToken); return; }
+    player.playError = "原生播不了这一集（可能是地址过期）；点集数重播会重新取地址。";
+    renderCenter(); return;
+  }
   if (player.srcIdx + 1 < player.sources.length) {
     player.srcIdx += 1;
     loadNative();
@@ -15198,7 +15241,11 @@ fetchText = function (url, opts) {
     : /theater\/home_page/.test(url) ? "星芽·列表"
     : /v3\/search/.test(url) ? "星芽·搜索"
     : /theater\/detail/.test(url) ? "星芽·详情"
-    : /xingya\.json/.test(url) ? "规则·星芽" : "星芽·请求";
+    : /xingya\.json/.test(url) ? "规则·星芽"
+    : /shortplay\/moduleMore/.test(url) ? "酷短·列表"
+    : /shortplay\/videoList/.test(url) ? "酷短·剧集"
+    : /mobi\.s/.test(url) ? "酷短·播址"
+    : /kuwo\.json/.test(url) ? "规则·酷短" : "星芽·请求";
   return _origFetchText(url, opts).then(function (text) {
     pushLog({ label: label, url: url, ok: true, detail: "HTTP 200 · " + text.length + " 字符", ms: Date.now() - t0 });
     return text;
@@ -15455,28 +15502,36 @@ var cms = {
 var cmsHls = null;
 var cmsHlsLoading = null;
 
-/* v8：浏览区切换的唯一入口。name 为 "xy" | "registry" | "source"。
+/* v8：浏览区切换的唯一入口。name 为 "xy" | "registry" | "source" | "kuwo"。
    标签高亮与内容显隐在这里原子地一起改——v7 的 bug 是 #xyBrowse 本就是
    空 div（星芽内容全在 #rules 里），cmsShowView 藏它等于什么都没藏，
    标签亮了 CMS、上面却还是星芽的分类。HTML 已把星芽内容真正装进
-   #xyBrowse、标签挪到 viewBrowse 下常驻；这里再保证不许只改一半。 */
+   #xyBrowse、标签挪到 viewBrowse 下常驻；这里再保证不许只改一半。
+   v10：酷短剧是第三个源，同样走这里（#kwBrowse 整块换）。 */
 function cmsShowView(name) {
   cms.view = name;
-  var isCms = (name !== "xy");
-  $("tabXy").classList.toggle("on", !isCms);
-  $("tabCms").classList.toggle("on", isCms);
+  var isXy = (name === "xy");
+  $("tabXy").classList.toggle("on", isXy);
+  $("tabCms").classList.toggle("on", name === "registry" || name === "source");
+  $("tabKw").classList.toggle("on", name === "kuwo");
   /* 用户 2026-11-28 定：CMS 界面里星芽的东西直接去掉。#rules（星芽卡片）
      与 #xyBrowse（星芽分类/搜索/列表）同时藏；#srcTabs 保留。
      #rules 现在虽已在 #xyBrowse 里面（藏 xyBrowse 即连卡片一起藏），
-     这里仍显式藏它——以后结构再动也不会让卡片漏到 CMS 上面。 */
-  $("xyBrowse").classList.toggle("hidden", isCms);
-  $("rules").classList.toggle("hidden", isCms);
+     这里仍显式藏它——以后结构再动也不会让卡片漏到 CMS 上面。
+     酷短剧界面同理：星芽与 CMS 的区都藏，只留 #kwBrowse。 */
+  $("xyBrowse").classList.toggle("hidden", !isXy);
+  $("rules").classList.toggle("hidden", !isXy);
+  $("kwBrowse").classList.toggle("hidden", name !== "kuwo");
   $("cmsRegistrySec").classList.toggle("hidden", name !== "registry");
   $("cmsSourceSec").classList.toggle("hidden", name !== "source");
 }
 function cmsShowXy() {
   cms.detailFrom = null;
   cmsShowView("xy");
+}
+function kwShowTab() {
+  cmsShowView("kuwo");
+  if (!kw.entered) { kw.entered = true; kwLoadCategory(kw.cats[0].k, 1); }
 }
 function cmsShowTabCms() {
   if (cms.registry) { cmsShowView(cms.view === "source" ? "source" : "registry"); }
@@ -15953,6 +16008,213 @@ function cmsLoadCurrentEpisode(token) {
   return Promise.resolve();
 }
 
+/* ---------------- 酷短剧（酷我，Thomas喲，group 6短剧） ----------------
+   规则原文见 rules/kuwo.json。接口链（实测）：
+   列表 moduleMore?currentPage=fypage&moduleId=fyAll&rn=12 → data.list
+   （title / currrentDesc / img / url=专辑 id；data.hasNextPage 管翻页）
+   剧集 videoList?albumId=专辑 id → data.list 一次全量
+   （name / duration 秒 / listencnt / img / mvpayinfo.vid）
+   播址 mobi.s?f=web&type=get_url_by_vid&vid=… → 纯文本 url=…mp4，
+   302 跳带签名的腾讯 CDN；点播那一刻现取现用，不许缓存；不许 HEAD 校验，
+   直接交给 video 元素。竖屏短剧，与星芽同形（点播默认竖屏，无搜索）。
+   取数走 v4 的 fetchText（一次一个请求、失败报错显示，不静默吞）。 */
+
+var KW_LIST_TEMPLATE = "http://wapi.kuwo.cn/openapi/v1/shortplay/moduleMore?currentPage=fypage&moduleId=fyAll&rn=12";
+var KW_EP_TEMPLATE = "http://wapi.kuwo.cn/openapi/v1/shortplay/videoList?albumId=";
+var KW_PLAY_TEMPLATE = "http://nmobi.kuwo.cn/mobi.s?f=web&type=get_url_by_vid&vid=";
+
+/* 规则原样：分类 class_name / class_url 各 7 项，以 & 分隔、按位配对。 */
+var KW_CATS_EMBEDDED = [
+  { k: "10", n: "猜你想看" }, { k: "11", n: "土味爱情" }, { k: "12", n: "更多精彩" },
+  { k: "13", n: "霸道总裁的人生" }, { k: "14", n: "赘婿当道" },
+  { k: "15", n: "漫漫追妻路" }, { k: "16", n: "家庭情感" }
+];
+
+var kw = { cats: KW_CATS_EMBEDDED.slice(), nav: "", page: 1, cards: [], hasMore: false, loading: false, error: "", entered: false };
+
+function kwListUrl(classId, page) {
+  return KW_LIST_TEMPLATE.replace("fyAll", classId).replace("fypage", String(page));
+}
+function kwParseList(jsonText) {
+  try {
+    var parsed = JSON.parse(jsonText);
+    var list = parsed && parsed.data && parsed.data.list;
+    if (!Array.isArray(list)) return { cards: [], hasMore: false };
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      if (!it || typeof it !== "object") continue;
+      var albumId = it.url;
+      if (albumId === undefined || albumId === null || albumId === "") continue;
+      out.push({
+        ref: String(albumId),
+        title: typeof it.title === "string" ? it.title : "",
+        cover: typeof it.img === "string" ? it.img : "",
+        /* currrentDesc（三个 r）就是接口原字段名，照规则原样用。 */
+        desc: typeof it.currrentDesc === "string" ? it.currrentDesc : ""
+      });
+    }
+    var hasMore = false;
+    var d = parsed.data;
+    if (d) {
+      if (typeof d.hasNextPage === "boolean") hasMore = d.hasNextPage;
+      else if (typeof d.pages === "number" && typeof d.pageNum === "number") hasMore = d.pageNum < d.pages;
+    }
+    return { cards: out, hasMore: hasMore && out.length > 0 };
+  } catch (e) { return { cards: [], hasMore: false }; }
+}
+function kwRenderChips() {
+  var box = $("kwChips");
+  box.innerHTML = "";
+  kw.cats.forEach(function (c) {
+    var b = el("button", "chip" + (kw.nav === c.k ? " on" : ""), c.n);
+    b.type = "button";
+    b.addEventListener("click", function () { kwLoadCategory(c.k, 1); });
+    box.appendChild(b);
+  });
+}
+function kwRenderBrowse() {
+  kwRenderChips();
+  var list = $("kwCardList");
+  list.innerHTML = "";
+  var err = $("kwErr");
+  var empty = $("kwEmpty");
+  var loading = $("kwLoading");
+  err.classList.add("hidden");
+  empty.classList.add("hidden");
+  loading.classList.toggle("hidden", !kw.loading);
+  if (kw.loading) { $("kwPager").classList.add("hidden"); return; }
+  if (kw.error) {
+    err.classList.remove("hidden");
+    err.querySelector(".err-text").textContent = "取剧失败：" + kw.error;
+    $("kwPager").classList.add("hidden");
+    return;
+  }
+  if (kw.cards.length === 0) {
+    empty.classList.remove("hidden");
+    $("kwPager").classList.add("hidden");
+    return;
+  }
+  $("kwCountLine").textContent = kw.cards.length + " 部";
+  kw.cards.forEach(function (card) {
+    var b = el("button", "v-card");
+    b.type = "button";
+    b.appendChild(coverEl(card.cover, card.title, "v-cover"));
+    var meta = el("span", "v-meta");
+    meta.appendChild(el("span", "v-title", card.title));
+    if (card.desc) meta.appendChild(el("span", "v-desc", card.desc));
+    b.appendChild(meta);
+    b.addEventListener("click", function () { kwOpenVideo(card); });
+    list.appendChild(b);
+  });
+  var pager = $("kwPager");
+  pager.classList.remove("hidden");
+  $("kwPageLabel").textContent = "第 " + kw.page + " 页";
+  $("btnKwPrev").disabled = kw.page <= 1 || kw.loading;
+  $("btnKwNext").disabled = !kw.hasMore || kw.loading;
+}
+function kwLoadCategory(classId, page) {
+  kw.nav = classId; kw.page = page; kw.loading = true; kw.error = "";
+  kwRenderBrowse();
+  fetchText(kwListUrl(classId, page)).then(function (text) {
+    var r = kwParseList(text);
+    kw.cards = r.cards;
+    kw.hasMore = r.hasMore;
+    kw.loading = false; kw.error = "";
+    kwRenderBrowse();
+  }).catch(function (e) {
+    kw.loading = false;
+    kw.error = e instanceof Error ? e.message : String(e);
+    kwRenderBrowse();
+  });
+}
+/* 规则分类：优先用 rules/kuwo.json（http(s) 下可取到时），file:// 下用内嵌快照。 */
+function kwLoadRuleCats() {
+  if (!window.location.protocol || window.location.protocol.indexOf("http") !== 0) return;
+  fetch("rules/kuwo.json").then(function (res) {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }).then(function (rule) {
+    var c = xyCatsFromRule(rule);
+    if (c.length > 0) { kw.cats = c; kwRenderChips(); }
+  }).catch(function () { /* 用内嵌分类，不报错 */ });
+}
+/* 规则原样拼剧集描述：🔥 listencnt + 📼 0m:ss；秒数不足两位补 0。 */
+function kwFormatTime(t) {
+  t = Number(t) || 0;
+  var m = Math.floor(t / 60);
+  var s = t % 60;
+  return (m < 10 ? "0" + m : String(m)) + ":" + (s < 10 ? "0" + s : String(s));
+}
+function kwEpDesc(listencnt, duration) {
+  return "🔥 " + (listencnt || 0) + "\n📼 " + kwFormatTime(duration);
+}
+function kwParseEpisodes(jsonText) {
+  try {
+    var parsed = JSON.parse(jsonText);
+    var list = parsed && parsed.data && parsed.data.list;
+    if (!Array.isArray(list)) return [];
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      if (!it || typeof it !== "object") continue;
+      var vid = it.mvpayinfo && it.mvpayinfo.vid;
+      if (vid === undefined || vid === null || vid === "") continue;
+      var dur = typeof it.duration === "number" ? it.duration : 0;
+      var name = typeof it.name === "string" ? it.name : ("第" + (i + 1) + "集");
+      out.push({
+        num: i + 1, name: name, url: "", vid: String(vid), seconds: dur,
+        tip: name + "\n" + kwEpDesc(it.listencnt, dur)
+      });
+    }
+    return out;
+  } catch (e) { return []; }
+}
+function kwOpenVideo(card) {
+  currentDetail = { title: card.title, cover: card.cover, intro: card.desc, episodes: [], kuwo: true };
+  renderDetail();
+  showView("detail");
+  fetchText(KW_EP_TEMPLATE + encodeURIComponent(card.ref)).then(function (text) {
+    currentDetail.episodes = kwParseEpisodes(text);
+    renderDetail();
+  }).catch(function (e) {
+    showToast("打开失败（酷短剧）：" + (e instanceof Error ? e.message : String(e)));
+    cmsShowView("kuwo");
+  });
+}
+function kwLoadCurrentEpisode(token) {
+  var ep = player.detail.episodes[player.index];
+  var vid = ep ? ep.vid : "";
+  if (!vid) {
+    player.playError = "这集没有播址";
+    renderCenter();
+    return Promise.resolve();
+  }
+  /* 播址点播那一刻现取现用（带签名的 302 地址会过期），不缓存；不 HEAD 校验，
+     直接交给 video 元素（原生会自动跟 302）。 */
+  return fetchText(KW_PLAY_TEMPLATE + encodeURIComponent(vid)).then(function (text) {
+    if (token !== player.loadToken) return;
+    /* mobi.s 的字段顺序随机：format=mp4 跟在 url= 行后面时服务端漏了换行，
+       原样截到换行会把 format=mp4 粘进地址（实测 vid 17690356 即如此）。
+       所以先截到第一个 .mp4 为止；截不到再回落到规则原样的换行截取。 */
+    var m = String(text || "").match(/url=(https?:\/\/[^\s\r\n]*?\.mp4)/i);
+    var url = m ? m[1].trim() : "";
+    if (!url) {
+      var m2 = String(text || "").match(/url=([^\s\r\n]+)/);
+      url = m2 ? m2[1].trim() : "";
+    }
+    if (!url) throw new Error("播址解析失败");
+    player.sources = [url];
+    player.srcIdx = 0;
+    setMode("native");
+    loadNative();
+  }).catch(function (e) {
+    if (token !== player.loadToken) return;
+    player.playError = "取播址失败：" + (e instanceof Error ? e.message : String(e));
+    renderCenter();
+  });
+}
+
 /* ---------------- 启动绑定（boot 末尾调 cmsBoot） ---------------- */
 
 function cmsBoot() {
@@ -15960,6 +16222,16 @@ function cmsBoot() {
   var tabXy = $("tabXy"), tabCms = $("tabCms");
   if (tabXy) tabXy.addEventListener("click", cmsShowTabXy);
   if (tabCms) tabCms.addEventListener("click", cmsShowTabCms);
+  var tabKw = $("tabKw");
+  if (tabKw) tabKw.addEventListener("click", kwShowTab);
+  var kr = $("btnKwRetry");
+  if (kr) kr.addEventListener("click", function () { if (kw.nav) kwLoadCategory(kw.nav, kw.page); });
+  var kp = $("btnKwPrev");
+  if (kp) kp.addEventListener("click", function () { if (!kw.loading && kw.page > 1) kwLoadCategory(kw.nav, kw.page - 1); });
+  var kn = $("btnKwNext");
+  if (kn) kn.addEventListener("click", function () { if (!kw.loading && kw.hasMore) kwLoadCategory(kw.nav, kw.page + 1); });
+  kwLoadRuleCats();
+  kwRenderChips();
   var rb = $("btnCmsRegistryRetry");
   if (rb) rb.addEventListener("click", function () { loadCmsRegistry(); });
   var br = $("btnBackCmsRegistry");
